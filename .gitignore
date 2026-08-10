@@ -19,13 +19,36 @@ venv/
 .vscode/
 .idea/
 
-# Data
-data/*
+# ---------------------------------------------------------------
+# 대회 데이터 — 커밋 금지 (train.csv 1.5M행, trackman_history 1.8M행)
+# ---------------------------------------------------------------
+data/
+*.csv
+# 단, 실험 산출물 CSV(drift_audit 등)는 기록으로 남긴다.
+# ※ .gitignore는 줄 끝 주석을 지원하지 않는다 — 주석은 반드시 별도 줄에.
+!experiments/*.csv
 
-# Model checkpoints
+# 학습 아티팩트 / 직렬화
+*.pkl
+*.joblib
 *.pt
 *.pth
 *.ckpt
+catboost_info/
+
+# 제출 zip — 개당 17MB, src/ 코드에서 재생성 가능.
+# baseline_submit.zip(3.9MB)도 대회에서 받는 것이라 제외한다.
+*.zip
+
+# submit/ 은 build_submit.py 의 산출물이다. 원본은 src/ 에만 존재한다.
+# (submit/script.py 는 엔트리포인트라 유일 원본이므로 추적한다)
+submit/model/
+submit/output/
+submit/data/
+submit/features.py
+submit/predict.py
+submit/mlp_infer.py
+submit/requirements.txt
 
 # Outputs
 outputs/

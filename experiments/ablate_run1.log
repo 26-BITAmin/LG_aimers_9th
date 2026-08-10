@@ -1,0 +1,34 @@
+﻿variant                     iter   nf   BSS raw    BSS R4  BSS oracle
+------------------------------------------------------------------------
+A base (hl=1.5)              134   79     362.1     489.7       492.0   (38s)
+B uniform                    140   79     154.6     311.9       314.3   (70s)
+C hl=1.0                     103   79     444.7     555.8       558.1   (101s)
+D hl=2.5                     141   79     301.6     440.9       443.2   (134s)
+E 2022-23 only               118   79     497.0     507.7       599.1   (151s)
+.\.venv\Scripts\python.exe : D:\projects\LG aimers 야구\src\ablate.py:38: RuntimeWarning: Mean of empty slice.
+At line:1 char:302
++ ... atch {} } }; .\.venv\Scripts\python.exe -u src\ablate.py 2>&1 | Tee-O ...
++                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\projects\LG ...of empty slice.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  return float(r[-1] + np.diff(r).mean())
+D:\projects\LG aimers 야구\.venv\Lib\site-packages\numpy\_core\_methods.py:145: RuntimeWarning: invalid value encountered
+ in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+F 2023 only                   86   79     665.1  -94574.4       698.0   (163s)
+G no game_type               133   78     579.7     661.4       663.5   (195s)
+H +pitcher/batter_id         119   81     452.0     565.9       568.1   (226s)
+I slow+regularized           292   79     405.0     521.8       524.0   (270s)
+J slow, no game_type         461   78     589.8     671.2       673.3   (325s)
+K l2 objective               134   79     360.2     490.3       492.6   (356s)
+L smooth k=50                143   79     374.7     508.3       510.6   (392s)
+M smooth k=800               134   79     360.0     487.7       490.0   (424s)
+
+--- fold1 강건성 확인 (train≤2022 → valid 2023) ---
+A base (hl=1.5)               15   79    -285.4     -66.4        48.3
+G no game_type                45   78      59.7      90.5       203.4
+J slow, no game_type         104   78      53.6      79.0       191.6
+I slow+regularized            22   79    -324.1     -64.1        51.4
+
+total 515s

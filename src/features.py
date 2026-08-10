@@ -1,0 +1,243 @@
+"""피처 빌더 — 학습과 추론의 **단일 진실 소스**.
+
+리키지 규칙 (CLAUDE.md §3.2):
+    이 모듈의 모든 함수는 **행 단위로 독립적**이다.
+    `df` 전체에 대한 groupby / value_counts / rolling / 분위수 계산이 없다.
+    행 사이를 잇는 값은 전부 `artifacts` 딕셔너리에서 온다 —
+    이 딕셔너리는 **train에서만 fit** 되고 `model/`에 직렬화되어 추론 시 조회만 된다.
+
+    → 그래서 `fit_artifacts(train_df)`와 `build_features(df, artifacts)`가 분리돼 있다.
+      `build_features`는 절대 fit 하지 않는다.
+"""
+import numpy as np
+import pandas as pd
+
+# 이 모듈은 config를 import하지 않는다 — 제출 zip에 그대로 복사되어
+# 추론 시에도 동일한 코드가 돌아야 하기 때문. 튜닝 상수는 artifacts에 동결된다.
+
+# ── 스무딩 대상: (rate 컬럼, 표본수 컬럼) ──────────────────────────
+SMOOTH_SPEC = [
+    ("asof_pitcher_success_rate", "asof_pitcher_n"),
+    ("asof_pitcher_middle_rate", "asof_pitcher_n"),
+    ("asof_pitcher_reverse_rate", "asof_pitcher_n"),
+    ("asof_pitcher_ball_rate", "asof_pitcher_n"),
+    ("asof_pitcher_strike_rate", "asof_pitcher_n"),
+    ("asof_batter_success_rate", "asof_batter_n"),
+    ("asof_batter_middle_rate", "asof_batter_n"),
+    ("asof_pitcher_fastball_rate", "asof_pitcher_pitchmix_n"),
+    ("asof_pitcher_breaking_rate", "asof_pitcher_pitchmix_n"),
+    ("asof_pitcher_offspeed_rate", "asof_pitcher_pitchmix_n"),
+]
+
+_PITCHER_N_COLS = {"asof_pitcher_n", "asof_pitcher_pitchmix_n"}
+
+# 범주형 → 정수 코드 (미지값 -1).
+# str/int을 분리해 두는 이유: train은 dtype을 명시해 읽지만 평가 서버의 test는
+# pandas 기본 추론으로 읽힐 수 있다. int16 vs int64가 섞이면 dict 조회가 조용히
+# 전부 실패해 -1로 떨어진다 — 에러 없이 성능만 죽는 종류의 버그다.
+CATEGORICAL_STR = ["base_state", "top_bottom", "game_type"]
+CATEGORICAL_INT = ["pitcher_team_id", "batter_team_id"]
+CATEGORICAL_COLS = CATEGORICAL_STR + CATEGORICAL_INT
+
+# prev{1,3,5}_game_* 는 항상 같이 결측된다 (등판 이력 없음) → 플래그 하나로 충분
+PREV_COLS = [
+    "asof_pitcher_prev1_game_success_rate", "asof_pitcher_prev3_game_success_rate",
+    "asof_pitcher_prev5_game_success_rate", "asof_pitcher_prev1_game_middle_rate",
+    "asof_pitcher_prev3_game_middle_rate", "asof_pitcher_prev5_game_middle_rate",
+]
+
+
+def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None):
+    """train에서만 호출. 추론 시 필요한 상수들을 계산해 딕셔너리로 반환.
+
+    tm_table: (pitcher_id, season) → Trackman 요약 피처 DataFrame.
+        `src/trackman_features.py`가 시즌 경계를 지켜 미리 만든다.
+        여기서는 **순수 numpy 배열로 눌러서** 저장한다 — 추론 시 pandas 버전에
+        의존하지 않고, 조회가 행 단위 searchsorted로 끝나게 하기 위함.
+    """
+    art = {"priors": {}, "cat_maps": {},
+           "smooth_k": {col: (k_pitcher if ncol in _PITCHER_N_COLS else k_batter)
+                        for col, ncol in SMOOTH_SPEC}}
+
+    if tm_table is not None:
+        cols = [c for c in tm_table.columns if c not in ("pitcher_id", "season")]
+        key = (tm_table["pitcher_id"].to_numpy(dtype=np.int64) * 10000
+               + tm_table["season"].to_numpy(dtype=np.int64))
+        order = np.argsort(key)
+        art["tm"] = {"keys": key[order],
+                     "values": tm_table[cols].to_numpy(dtype=np.float32)[order],
+                     "cols": list(cols)}
+
+    w = np.ones(len(train_df)) if weights is None else np.asarray(weights, dtype=np.float64)
+
+    # 스무딩용 리그 평균 — 가중 평균으로 최근 시즌 쪽에 맞춘다
+    for col, _ in SMOOTH_SPEC:
+        v = train_df[col].to_numpy(dtype=np.float64)
+        m = np.isfinite(v)
+        art["priors"][col] = float(np.average(v[m], weights=w[m])) if m.any() else 0.5
+    for col in PREV_COLS:
+        v = train_df[col].to_numpy(dtype=np.float64)
+        m = np.isfinite(v)
+        art["priors"][col] = float(np.average(v[m], weights=w[m])) if m.any() else 0.5
+
+    # 범주형 → 정수 코드. test에만 나오는 값은 -1(=결측)로 떨어진다.
+    for col in CATEGORICAL_STR:
+        vals = sorted(str(v) for v in train_df[col].astype("object").dropna().unique())
+        art["cat_maps"][col] = {v: i for i, v in enumerate(vals)}
+    for col in CATEGORICAL_INT:
+        vals = sorted(int(v) for v in train_df[col].dropna().unique())
+        art["cat_maps"][col] = {v: i for i, v in enumerate(vals)}
+
+    return art
+
+
+def _col64(g, col, fill):
+    """float32로 한 번 내린 뒤 float64로 올린다.
+
+    ⚠️ 이 두 단계를 건너뛰면 train/serve skew가 난다.
+    학습은 train.csv를 float32 dtype으로 읽지만, 평가 서버의 test.csv는
+    pandas 기본 추론으로 **float64**가 된다. 곧바로 float64로 쓰면 서빙 쪽이
+    원본 정밀도를 더 많이 갖게 되어 두 경로의 차분 피처가 1 ULP씩 어긋나고,
+    LightGBM의 max_bin 경계에 걸린 행에서 예측이 갈린다.
+    """
+    v = g[col].to_numpy(dtype=np.float32).astype(np.float64)
+    return np.nan_to_num(v, nan=fill)
+
+
+def _smooth(rate, n, prior, k):
+    """경험적 베이즈: (n*rate + k*prior) / (n + k).
+    n=0(결측)이면 prior로, n>>k면 원본 rate로 수렴한다."""
+    rate = np.nan_to_num(rate.astype(np.float64), nan=prior)
+    n = n.astype(np.float64)
+    return (n * rate + k * prior) / (n + k)
+
+
+def build_features(df, art):
+    """행 단위 피처 생성. df 전체 통계를 절대 쓰지 않는다."""
+    out = {}
+    g = df
+
+    # ── 경기 상황 (원본 통과) ──────────────────────────────
+    for c in ("game_month", "game_dayofweek", "inning", "balls_before",
+              "strikes_before", "outs_before", "run_top_before", "run_bot_before",
+              "run_total_before", "score_diff_home", "score_diff_pitcher_team",
+              "runner_on_1b", "runner_on_2b", "runner_on_3b", "num_runners_on",
+              "home_win_expectancy", "li", "pitcher_hand", "batter_hand"):
+        out[c] = g[c].to_numpy(dtype=np.float32)
+
+    balls = g["balls_before"].to_numpy(dtype=np.int16)
+    strikes = g["strikes_before"].to_numpy(dtype=np.int16)
+
+    # ── 카운트 상태: 0-2와 3-0은 제구 압박이 정반대다 ─────────
+    out["count_state"] = (balls * 3 + strikes).astype(np.float32)   # 0..11
+    out["count_diff"] = (strikes - balls).astype(np.float32)
+    out["is_two_strikes"] = (strikes == 2).astype(np.float32)
+    out["is_three_balls"] = (balls == 3).astype(np.float32)
+    out["is_full_count"] = ((balls == 3) & (strikes == 2)).astype(np.float32)
+    out["is_first_pitch"] = ((balls == 0) & (strikes == 0)).astype(np.float32)
+
+    # ── 좌우 매치업 ────────────────────────────────────────
+    ph = g["pitcher_hand"].to_numpy(dtype=np.int16)
+    bh = g["batter_hand"].to_numpy(dtype=np.int16)
+    out["hand_same"] = (ph == bh).astype(np.float32)
+    out["hand_matchup"] = (ph * 4 + bh).astype(np.float32)
+
+    # ── 압박 지표 ──────────────────────────────────────────
+    we = g["home_win_expectancy"].to_numpy(dtype=np.float32)
+    out["we_margin"] = np.abs(we - 50.0)                 # 접전일수록 0
+    out["is_pitcher_home"] = (g["top_bottom"].astype("object").to_numpy() == "T").astype(np.float32)
+    out["abs_score_diff"] = np.abs(g["score_diff_pitcher_team"].to_numpy(dtype=np.float32))
+    out["is_late_close"] = ((g["inning"].to_numpy() >= 7) &
+                            (out["abs_score_diff"] <= 2)).astype(np.float32)
+
+    # ── asof 표본 수 ───────────────────────────────────────
+    n_p = g["asof_pitcher_n"].to_numpy()
+    n_b = g["asof_batter_n"].to_numpy()
+    n_m = g["asof_pitcher_pitchmix_n"].to_numpy()
+    out["asof_pitcher_n"] = n_p.astype(np.float32)
+    out["asof_batter_n"] = n_b.astype(np.float32)
+    out["asof_pitcher_pitchmix_n"] = n_m.astype(np.float32)
+
+    # ── 결측 자체가 신호다 ─────────────────────────────────
+    out["miss_pitcher_asof"] = g["asof_pitcher_success_rate"].isna().to_numpy().astype(np.float32)
+    out["miss_batter_asof"] = g["asof_batter_success_rate"].isna().to_numpy().astype(np.float32)
+    out["miss_prev_game"] = g["asof_pitcher_prev1_game_success_rate"].isna().to_numpy().astype(np.float32)
+
+    # ── 경험적 베이즈 스무딩 ───────────────────────────────
+    # 원본 rate(결측 유지)와 스무딩 rate를 **둘 다** 넣고 모델이 고르게 한다.
+    n_map = {"asof_pitcher_n": n_p, "asof_batter_n": n_b, "asof_pitcher_pitchmix_n": n_m}
+    sm = {}
+    for col, ncol in SMOOTH_SPEC:
+        raw = g[col].to_numpy(dtype=np.float32)
+        out[col] = raw                                    # 원본 (NaN 그대로 → LGBM이 처리)
+        s = _smooth(raw, n_map[ncol], art["priors"][col], art["smooth_k"][col])
+        sm[col] = s
+        out[col + "_sm"] = s.astype(np.float32)
+
+    for col in PREV_COLS:
+        out[col] = g[col].to_numpy(dtype=np.float32)
+
+    # ── 최근 폼 변화 (차분은 트리가 스스로 못 만든다) ────────
+    pr = art["priors"]
+    p1 = _col64(g, "asof_pitcher_prev1_game_success_rate", pr["asof_pitcher_prev1_game_success_rate"])
+    p3 = _col64(g, "asof_pitcher_prev3_game_success_rate", pr["asof_pitcher_prev3_game_success_rate"])
+    p5 = _col64(g, "asof_pitcher_prev5_game_success_rate", pr["asof_pitcher_prev5_game_success_rate"])
+    career = sm["asof_pitcher_success_rate"]
+    out["form_p1_minus_career"] = (p1 - career).astype(np.float32)
+    out["form_p3_minus_career"] = (p3 - career).astype(np.float32)
+    out["form_p1_minus_p5"] = (p1 - p5).astype(np.float32)
+    out["form_p3_minus_p5"] = (p3 - p5).astype(np.float32)
+
+    m1 = _col64(g, "asof_pitcher_prev1_game_middle_rate", pr["asof_pitcher_prev1_game_middle_rate"])
+    out["form_mid_p1_minus_career"] = (m1 - sm["asof_pitcher_middle_rate"]).astype(np.float32)
+
+    # ── 매치업 엣지: 투수 제구력 vs 타자가 겪어온 제구력 ─────
+    out["matchup_success_edge"] = (career - sm["asof_batter_success_rate"]).astype(np.float32)
+    out["matchup_middle_edge"] = (sm["asof_pitcher_middle_rate"]
+                                  - sm["asof_batter_middle_rate"]).astype(np.float32)
+
+    # ── 실패 3유형의 구성비 (몰림 vs 반대방향) ──────────────
+    fail = sm["asof_pitcher_middle_rate"] + sm["asof_pitcher_reverse_rate"]
+    out["fail_middle_share"] = (sm["asof_pitcher_middle_rate"] /
+                                np.maximum(fail, 1e-6)).astype(np.float32)
+    out["pitcher_ball_minus_strike"] = (sm["asof_pitcher_ball_rate"]
+                                        - sm["asof_pitcher_strike_rate"]).astype(np.float32)
+
+    # ── 구종 레퍼토리 다양성 (엔트로피) ─────────────────────
+    mix = np.stack([sm["asof_pitcher_fastball_rate"],
+                    sm["asof_pitcher_breaking_rate"],
+                    sm["asof_pitcher_offspeed_rate"]], axis=1)
+    mix = np.clip(mix, 1e-6, 1.0)
+    mix = mix / mix.sum(axis=1, keepdims=True)
+    out["pitchmix_entropy"] = (-(mix * np.log(mix)).sum(axis=1)).astype(np.float32)
+    out["pitchmix_nonfastball"] = (1.0 - mix[:, 0]).astype(np.float32)
+
+    # ── Trackman 투수 요약 (시즌 경계 지킨 사전계산 테이블 조회) ──
+    # 각 행이 자기 (pitcher_id, season) 키로 조회할 뿐이다 —
+    # df 전체에 대한 집계가 아니므로 행 독립성이 유지된다.
+    # `season`은 조회 키로만 쓰고 모델 피처로는 내보내지 않는다.
+    if "tm" in art:
+        tm = art["tm"]
+        k = (g["pitcher_id"].to_numpy(dtype=np.int64) * 10000
+             + g["season"].to_numpy(dtype=np.int64))
+        pos = np.searchsorted(tm["keys"], k)
+        pos_c = np.clip(pos, 0, len(tm["keys"]) - 1)
+        hit = tm["keys"][pos_c] == k
+        vals = tm["values"][pos_c]
+        for j, c in enumerate(tm["cols"]):
+            out[c] = np.where(hit, vals[:, j], np.nan).astype(np.float32)
+        out["tm_matched"] = hit.astype(np.float32)
+
+    # ── 범주형 → 정수 코드 (미지값 -1) ──────────────────────
+    for col in CATEGORICAL_STR:
+        codes = g[col].astype("object").astype(str).map(art["cat_maps"][col])
+        out[col] = codes.fillna(-1).to_numpy(dtype=np.float64).astype(np.float32)
+    for col in CATEGORICAL_INT:
+        codes = g[col].astype("int64").map(art["cat_maps"][col])
+        out[col] = codes.fillna(-1).to_numpy(dtype=np.float64).astype(np.float32)
+
+    X = pd.DataFrame(out)
+    return X
+
+
+__all__ = ["fit_artifacts", "build_features", "CATEGORICAL_COLS"]

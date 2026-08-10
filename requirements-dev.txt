@@ -1,0 +1,11 @@
+# 로컬 학습 환경. 제출 requirements.txt와 버전을 일치시킨다.
+# (pickle/직렬화는 마이너 버전만 달라도 깨진다 — CLAUDE.md §4)
+#   python -m venv .venv
+#   .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+lightgbm==4.6.0
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.2
+joblib==1.4.2
+scikit-learn==1.6.1
+pyarrow==19.0.1
