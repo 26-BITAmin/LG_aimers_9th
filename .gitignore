@@ -56,3 +56,6 @@ logs/
 
 # Cache
 .cache/
+
+# fold 예측 캐시 (재생성 가능, 수 MB)
+experiments/cache/

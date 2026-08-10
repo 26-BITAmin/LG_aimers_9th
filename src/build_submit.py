@@ -178,8 +178,13 @@ def describe(meta):
     """제출물을 구분하는 짧은 태그. 30자 제한이 있으므로 최대한 압축한다.
     전체 설정은 SUBMISSIONS.md에 있고, 파일명은 서로 구분만 되면 된다.
 
-    예: `s06_p475_h5_f51_e20m3.zip`
-        prior 0.475 / half_life 0.5 / 피처 51개 / LGBM 20 + MLP 3
+    예: `s09_p475_h5_f80_e20m8a40.zip`
+        prior 0.475 / half_life 0.5 / 피처 80개 / LGBM 20 + MLP 8 / alpha 0.40
+
+    ⚠️ **블렌드 가중 alpha를 반드시 넣는다.** 이게 빠져 있어서 s08(a=0.30)과
+       s09(a=0.40)의 태그가 번호만 빼고 글자 단위로 같아진 적이 있다.
+       이름으로 설정을 구분하는 게 이 함수의 존재 이유다 —
+       **새 하이퍼파라미터를 배포에 넣으면 여기에도 넣어야 한다.**
     """
     parts = ["p" + f"{meta['target_prior_2025']:.3f}".split(".")[1]]     # 0.475 -> p475
     parts.append("h" + str(meta["recency_half_life"]).replace("0.", "").replace(".", ""))
@@ -187,6 +192,7 @@ def describe(meta):
     e = "e" + str(meta.get("n_members", len(meta.get("seeds", []))))
     if meta.get("use_mlp"):
         e += "m" + str(len(meta.get("mlp_members", [])))
+        e += "a" + f"{float(meta.get('mlp_alpha', 0)):.2f}".split(".")[1]  # 0.40 -> a40
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
@@ -220,9 +226,14 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
             "| # | 파일 | Trackman | prior | 피처 | 홀드아웃 BSS(oracle) | LB |\n"
             "| --- | --- | --- | --- | --- | --- | --- |\n",
             encoding="utf-8")
+    # 구성 칸은 파일명 태그와 같은 정보를 담아야 한다. 예전엔 '+MLP'만 붙여서
+    # 멤버 수와 alpha가 사라졌고, 표만 봐서는 s08과 s09를 구분할 수 없었다.
+    cfg = str(meta["n_features"])
+    if meta.get("use_mlp"):
+        cfg += f"+MLP{len(meta.get('mlp_members', []))}(a{meta.get('mlp_alpha')})"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
-           f"{meta['n_features']}{'+MLP' if meta.get('use_mlp') else ''} | | |")
+           f"{cfg} | | |")
 
     # ⚠️ append하면 표 아래 본문에 줄이 붙는다. **표의 마지막 행 뒤에 끼워 넣는다.**
     lines = path.read_text(encoding="utf-8").split("\n")

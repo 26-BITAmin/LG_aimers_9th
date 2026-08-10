@@ -15,6 +15,7 @@ MLP는 fold마다 한 번만 학습해 재사용한다 (트리 설정과 무관�
 
 실행:  .venv/Scripts/python.exe -u src/ablate19.py
 """
+import gc
 import sys
 import time
 from pathlib import Path
@@ -82,15 +83,30 @@ def fold_data(df, valid_season):
             X(va), va[TARGET_COL].to_numpy(dtype=np.float64), art)
 
 
-def lgb_ens(Xtr, ytr, w, Xva, over_all):
-    """ENSEMBLE_VARIANTS 구조는 유지하고 그 위에 over_all을 덮는다."""
+def lgb_ens(Xtr, ytr, w, Xva, over_all, announce=False):
+    """ENSEMBLE_VARIANTS 구조는 유지하고 그 위에 over_all을 덮는다.
+
+    ⚠️ **변형이 명시한 값이 이긴다.** over_all은 변형이 건드리지 않은 키만 채운다.
+    ENSEMBLE_VARIANTS의 값(wide의 num_leaves=127, extra의 lambda_l2=10 등)은 다양성
+    포트폴리오로 의도해서 고른 것이다. 전역 오버라이드가 그걸 덮으면 'leaves 63의 효과'와
+    '앙상블 다양성 감소'가 한 숫자에 섞여 어느 쪽인지 분리할 수 없게 된다.
+    즉 여기서 재튜닝하는 대상은 변형이 침묵하는 **기본값**이다.
+
+    (dict(base, **a, **b)는 a·b에 같은 키가 있으면 TypeError다. 덮어쓰기가 아니다.)
+    """
     lr = over_all.pop("_lr", None)
     rounds = over_all.pop("_rounds", N_ROUNDS)
     z, n = np.zeros(len(Xva)), 0
-    for over in ENSEMBLE_VARIANTS.values():
+    for vname, over in ENSEMBLE_VARIANTS.items():
+        eff = {k: v for k, v in over_all.items() if k not in over}
+        if announce and eff != over_all:
+            skipped = sorted(set(over_all) - set(eff))
+            print(f"      · {vname}: {skipped} 는 변형이 이미 지정 → 그대로 둠")
         for s in LGB_SEEDS:
-            p = dict(FINAL_LGB_PARAMS, **over, **over_all, seed=s, bagging_seed=s,
-                     feature_fraction_seed=s, data_random_seed=s)
+            p = dict(FINAL_LGB_PARAMS)
+            p.update(over)
+            p.update(eff)
+            p.update(seed=s, bagging_seed=s, feature_fraction_seed=s, data_random_seed=s)
             if lr is not None:
                 p["learning_rate"] = lr
             bst = lgb.train(p, lgb.Dataset(Xtr, ytr, weight=w), num_boost_round=rounds)
@@ -99,14 +115,26 @@ def lgb_ens(Xtr, ytr, w, Xva, over_all):
     return z / n
 
 
-def main():
+def main(folds=None, cfg_names=None):
+    """folds / cfg_names 로 부분 재실행할 수 있다.
+
+    이 기계는 15GB이고 다른 작업과 공유된다. 전체 실행(9설정 x 2fold)은 메모리가
+    모자라면 **트레이스백 없이 OS에 죽는다** — 실제로 한 번 그렇게 잘렸다.
+    시드가 전부 고정돼 있어 같은 (fold, 설정)은 몇 번을 돌려도 같은 값이 나오므로,
+    빠진 칸만 골라 다시 재는 것이 안전하고 싸다.
+    """
     t0 = time.time()
+    folds = FOLDS if folds is None else folds
+    cfgs = TREE_CFGS if cfg_names is None else {k: TREE_CFGS[k] for k in cfg_names}
     df = load_csv(TRAIN_CSV)
     solo, blend, Y = {}, {}, {}
 
-    for f in FOLDS:
+    for f in folds:
         print(f"\n=== valid={f} ===")
         Xtr, ytr, w, Xva, yva, art = fold_data(df, f)
+        if len(folds) == 1:      # 원본 데이터프레임(약 1GB)을 더 안 쓴다면 놓아준다
+            del df
+            gc.collect()
         A, C, B, Cv, num_cols, sizes = mlp.encode(Xtr, Xva, art)
         Y[f] = yva
 
@@ -121,13 +149,19 @@ def main():
         print(f"  mlp {len(zs)}멤버  단독 {mlp.score(z_mlp, yva):.1f}"
               f"   ({time.time()-t0:.0f}s)")
 
-        for name, over in TREE_CFGS.items():
-            z_lgb = lgb_ens(Xtr, ytr, w, Xva, dict(over))
+        for name, over in cfgs.items():
+            z_lgb = lgb_ens(Xtr, ytr, w, Xva, dict(over), announce=(f == folds[0]))
             solo.setdefault(name, {})[f] = mlp.score(z_lgb, yva)
             blend.setdefault(name, {})[f] = mlp.score(
                 (1 - MLP_ALPHA) * z_lgb + MLP_ALPHA * z_mlp, yva)
             print(f"  {name:<15s} 트리단독 {solo[name][f]:>7.1f}   "
                   f"블렌드 {blend[name][f]:>7.1f}   ({time.time()-t0:.0f}s)")
+            del z_lgb
+            gc.collect()
+
+    if len(folds) < len(FOLDS) or len(cfgs) < len(TREE_CFGS):
+        print("\n부분 실행이라 요약표는 생략한다. 위 숫자를 전체 로그와 합쳐서 판정할 것.")
+        return
 
     base_s = np.array([solo["현행 (기준)"][f] for f in FOLDS])
     base_b = np.array([blend["현행 (기준)"][f] for f in FOLDS])
@@ -157,4 +191,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # 부분 재실행:  ablate19.py --folds 2024 --cfgs "현행 (기준)|l2 100"
+    a = sys.argv[1:]
+    fo = [int(x) for x in a[a.index("--folds") + 1].split(",")] if "--folds" in a else None
+    cn = a[a.index("--cfgs") + 1].split("|") if "--cfgs" in a else None
+    if cn:
+        bad = [c for c in cn if c not in TREE_CFGS]
+        if bad:
+            raise SystemExit(f"모르는 설정 이름: {bad}\n가능: {list(TREE_CFGS)}")
+    main(folds=fo, cfg_names=cn)
