@@ -32,4 +32,8 @@ outputs/
 logs/
 
 # Cache
-.cache/
+.cache/data/
+*.csv
+*.parquet
+*.pt
+*.ckpt
