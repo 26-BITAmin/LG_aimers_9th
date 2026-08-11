@@ -26,3 +26,6 @@ exp08_trend_features,C,634.117,670.245,634.117,0.0095,223497,291,0,5cefa61,"+ tr
 exp09_failmode_features,A,546.642,555.961,546.642,0.00483,217024,281,0,c09b8d2,"+ asof_reverse_R_static / asof_middle_R_static (season-frozen, R-only), on top of exp04"
 exp09_failmode_features,B,467.0,467.0,467.0,-4e-05,219839,286,0,c09b8d2,"+ asof_reverse_R_static / asof_middle_R_static (season-frozen, R-only), on top of exp04"
 exp09_failmode_features,C,627.935,665.062,627.935,0.00963,223497,291,0,c09b8d2,"+ asof_reverse_R_static / asof_middle_R_static (season-frozen, R-only), on top of exp04"
+exp10_trend_plus_failmode,A,545.342,551.944,545.342,0.00406,217024,281,0,40ceb45,"exp08 trend + exp09 failmode combined, on top of exp04"
+exp10_trend_plus_failmode,B,464.365,464.911,464.365,0.00117,219839,286,0,40ceb45,"exp08 trend + exp09 failmode combined, on top of exp04"
+exp10_trend_plus_failmode,C,640.814,678.073,640.814,0.00965,223497,291,0,40ceb45,"exp08 trend + exp09 failmode combined, on top of exp04"
