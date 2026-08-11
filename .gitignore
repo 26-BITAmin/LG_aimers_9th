@@ -37,3 +37,8 @@ logs/
 *.parquet
 *.pt
 *.ckpt
+data/
+*.csv
+*.parquet
+*.pt
+*.ckpt
