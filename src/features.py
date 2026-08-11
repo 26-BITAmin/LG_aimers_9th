@@ -11,8 +11,9 @@ test.csv 내부 다른 행(자기 자신이 속한 시즌 안의 앞선 투구 �
 투수별 정적 lookup이어야 한다 — `pitcher_train_totals.parquet`을 만든 이유가 이거다.
 
 이 파일은 그래서 두 갈래로 나뉜다:
-- `build_training_features(fit_df)`: 학습 데이터 자체를 만들 때는 fit_df 내부에서
-  strictly-prior 행 단위 누적을 써도 안전하다 (fit_df 자신의 과거 행만 사용, 미래 유출 없음).
+- `build_training_features(fit_df)`: 학습 구간 안에서도 **시즌 단위 frozen snapshot**만
+  쓴다 (행 단위 strictly-prior cumsum이 아님 — 이유는 함수 docstring 참조, exp03에서
+  실측으로 걸러낸 train/serve skew 버그다).
 - `fit_pitcher_lookup` + `apply_static_features`: valid/test 행에 적용할 때는 fit_df
   전체를 학습 구간으로 압축한 "얼어붙은" 투수별 정적값만 join한다.
 
@@ -56,48 +57,36 @@ CUSTOM_STATIC_FEATURES = [
 K_BLEND = 30.0
 
 
-def _add_prior_rate(df, src, name, mask=None):
-    """strictly-prior 누적: cumsum() - 자기값. df는 pitcher_id, asof_pitcher_n 순 정렬돼 있어야 함."""
-    v = df[src].to_numpy(float)
-    ok = np.isfinite(v)
-    m = np.ones(len(df)) if mask is None else mask.astype(float)
-    use = ok.astype(float) * m
-    val = np.where(ok, v, 0.0) * m
-    tmp = pd.DataFrame({"g": df["pitcher_id"].values, "u": use, "v": val})
-    cu = tmp.groupby("g")["u"].cumsum() - tmp["u"]
-    cv = tmp.groupby("g")["v"].cumsum() - tmp["v"]
-    df[name] = np.where(cu > 0, cv / cu, np.nan)
-    df[name + "_n"] = cu
-    return df
-
-
 def build_training_features(fit_df: pd.DataFrame) -> pd.DataFrame:
-    """학습(fit) 구간 안에서 strictly-prior 행 단위 커스텀 피처를 만든다.
+    """학습(fit) 구간 안에서 커스텀 피처를 만든다.
 
-    fit_df 자신의 과거 행만 사용하므로 안전 (미래/타 구간 유출 없음).
-    반환된 프레임은 pitcher_id, asof_pitcher_n 순으로 재정렬돼 있다 (원본 순서 보존 불필요 —
-    학습에는 순서가 영향을 주지 않음).
+    ★ 시즌 단위 frozen snapshot — 행 단위 strictly-prior cumsum이 **아니다**.
+    처음엔 행 단위(각 투구 직전까지 누적)로 만들었는데, exp03에서 실측 결과 오히려
+    성능이 떨어졌다 (fold A/B/C 전부 악화). 원인을 진단해보니: 행 단위 누적은 학습 중
+    같은 투수의 인접한 행들끼리 시계열 자기상관을 만들어 학습 분포가 매우 넓고 세밀한
+    반면(고유값 27만 개, std 0.058, 0~1 범위), 실제 배포에서 검증/테스트 행에 적용하는
+    값은 시즌 하나당 투수 1명에 상수 1개(고유값 225개, std 0.047, 0.36~0.76 범위)라
+    분포가 전혀 다르다 — 전형적인 train/serve skew. 트리가 학습 때 본 넓은 분포에
+    맞춰 분기를 잡으면 검증의 좁은 분포에서는 그 분기가 어긋난다.
+
+    고쳐서: 학습 구간 안에서도 "그 시즌 시작 시점에 얼어붙은, 이전 시즌들만으로 만든
+    투수별 정적값"을 쓴다 — 배포 시 결과물과 정확히 같은 결(texture)이 되도록.
+    같은 이유로 fit_df의 **첫 시즌**은 그 이전 이력이 fit_df 안에 없으므로 전부 NaN
+    (콜드스타트, 결측 유지 정책과 일치).
     """
-    P = fit_df.sort_values(["pitcher_id", "asof_pitcher_n"], kind="mergesort").reset_index(drop=True)
-    maskR = (P["game_type"] == "R").to_numpy()
-    same_hand = (P["pitcher_hand"] == P["batter_hand"]).to_numpy()
-
-    P = _add_prior_rate(P, TARGET, "asof_success_R2", mask=maskR)
-    P = _add_prior_rate(P, TARGET, "asof_success_R_same", mask=maskR & same_hand)
-    P = _add_prior_rate(P, TARGET, "asof_success_R_diff", mask=maskR & (~same_hand))
-
-    platoon = np.where(same_hand, P["asof_success_R_same"], P["asof_success_R_diff"])
-    platoon_n = np.where(same_hand, P["asof_success_R_same_n"], P["asof_success_R_diff_n"])
-    base = P["asof_success_R2"].to_numpy(float)
-    platoon_filled = np.where(np.isfinite(platoon), platoon, base)
-    w = np.where(np.isfinite(platoon_n), platoon_n / (platoon_n + K_BLEND), 0.0)
-    blend = np.where(np.isfinite(base), w * platoon_filled + (1 - w) * base, platoon_filled)
-
-    P["asof_success_R2_static"] = base
-    P["asof_success_R_platoon_static"] = platoon
-    P["asof_success_R_platoon_n_static"] = platoon_n
-    P["asof_success_R_platoon_blend_static"] = blend
-    return P
+    seasons = sorted(fit_df["season"].unique())
+    frames = []
+    for s in seasons:
+        season_rows = fit_df.loc[fit_df["season"] == s]
+        prior = fit_df.loc[fit_df["season"] < s]
+        if len(prior) == 0:
+            static_feats = pd.DataFrame(
+                {c: np.nan for c in CUSTOM_STATIC_FEATURES}, index=season_rows.index)
+        else:
+            lookup = fit_pitcher_lookup(prior)
+            static_feats = apply_static_features(season_rows, lookup)
+        frames.append(pd.concat([season_rows, static_feats], axis=1))
+    return pd.concat(frames, axis=0)
 
 
 def fit_pitcher_lookup(fit_df: pd.DataFrame, target: str = TARGET) -> pd.DataFrame:

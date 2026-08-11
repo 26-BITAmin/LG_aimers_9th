@@ -5,3 +5,9 @@ exp01_baseline_official,C,340.726,376.613,340.726,0.00947,223497,291,0,680b208,"
 exp02_numeric_ids_regularized,A,545.028,552.895,545.028,0.00443,217024,281,0,46a12dc,"pitcher_id/batter_id numeric (not categorical), min_data_in_leaf=500, lr=0.03"
 exp02_numeric_ids_regularized,B,448.052,448.114,448.052,-0.00039,219839,286,0,46a12dc,"pitcher_id/batter_id numeric (not categorical), min_data_in_leaf=500, lr=0.03"
 exp02_numeric_ids_regularized,C,616.465,671.314,616.465,0.01171,223497,291,0,46a12dc,"pitcher_id/batter_id numeric (not categorical), min_data_in_leaf=500, lr=0.03"
+exp03_custom_platoon_frozen,A,496.669,498.903,496.669,0.00236,217024,281,0,db55fb1,"+ asof_success_R2_static / R_platoon_static / R_platoon_blend_static (frozen at train cutoff, deployable)"
+exp03_custom_platoon_frozen,B,384.33,384.439,384.33,-0.00052,219839,286,0,db55fb1,"+ asof_success_R2_static / R_platoon_static / R_platoon_blend_static (frozen at train cutoff, deployable)"
+exp03_custom_platoon_frozen,C,504.888,512.263,504.888,0.00429,223497,291,0,db55fb1,"+ asof_success_R2_static / R_platoon_static / R_platoon_blend_static (frozen at train cutoff, deployable)"
+exp04_custom_platoon_season_frozen,A,559.634,570.504,559.634,0.00521,217024,281,0,db55fb1,fixed: season-start frozen snapshot for training rows too (matches deploy texture)
+exp04_custom_platoon_season_frozen,B,461.307,461.308,461.307,6e-05,219839,286,0,db55fb1,fixed: season-start frozen snapshot for training rows too (matches deploy texture)
+exp04_custom_platoon_season_frozen,C,631.497,672.483,631.497,0.01012,223497,291,0,db55fb1,fixed: season-start frozen snapshot for training rows too (matches deploy texture)
