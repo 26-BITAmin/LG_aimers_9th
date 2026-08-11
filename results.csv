@@ -23,3 +23,6 @@ exp07_isolate_min_data_in_leaf,C,623.521,664.776,623.521,0.01015,223497,291,0,c4
 exp08_trend_features,A,542.779,558.187,542.779,0.00621,217024,281,0,5cefa61,"+ trend_prev1/3/5 = prevN_game_success_rate - career asof_pitcher_success_rate, on top of exp04"
 exp08_trend_features,B,475.632,475.747,475.632,-0.00054,219839,286,0,5cefa61,"+ trend_prev1/3/5 = prevN_game_success_rate - career asof_pitcher_success_rate, on top of exp04"
 exp08_trend_features,C,634.117,670.245,634.117,0.0095,223497,291,0,5cefa61,"+ trend_prev1/3/5 = prevN_game_success_rate - career asof_pitcher_success_rate, on top of exp04"
+exp09_failmode_features,A,546.642,555.961,546.642,0.00483,217024,281,0,c09b8d2,"+ asof_reverse_R_static / asof_middle_R_static (season-frozen, R-only), on top of exp04"
+exp09_failmode_features,B,467.0,467.0,467.0,-4e-05,219839,286,0,c09b8d2,"+ asof_reverse_R_static / asof_middle_R_static (season-frozen, R-only), on top of exp04"
+exp09_failmode_features,C,627.935,665.062,627.935,0.00963,223497,291,0,c09b8d2,"+ asof_reverse_R_static / asof_middle_R_static (season-frozen, R-only), on top of exp04"
