@@ -17,3 +17,6 @@ exp05_more_capacity,C,609.843,655.347,609.843,0.01066,223497,291,0,e2a626d,"num_
 exp06_intercept_calibration,A,553.867,573.939,553.867,0.00708,217024,281,0,231100f,"nested-holdout intercept correction on top of exp04 config, no valid-label peeking"
 exp06_intercept_calibration,B,451.24,458.992,451.24,-0.0044,219839,286,0,231100f,"nested-holdout intercept correction on top of exp04 config, no valid-label peeking"
 exp06_intercept_calibration,C,593.458,648.264,593.458,0.0117,223497,291,0,231100f,"nested-holdout intercept correction on top of exp04 config, no valid-label peeking"
+exp07_isolate_min_data_in_leaf,A,561.522,574.897,561.522,0.00578,217024,281,0,c41150b,"isolate: num_leaves back to 31 (exp04), only min_data_in_leaf 500->300"
+exp07_isolate_min_data_in_leaf,B,471.292,471.297,471.292,0.00011,219839,286,0,c41150b,"isolate: num_leaves back to 31 (exp04), only min_data_in_leaf 500->300"
+exp07_isolate_min_data_in_leaf,C,623.521,664.776,623.521,0.01015,223497,291,0,c41150b,"isolate: num_leaves back to 31 (exp04), only min_data_in_leaf 500->300"
