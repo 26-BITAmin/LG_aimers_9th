@@ -20,11 +20,10 @@ venv/
 .idea/
 
 # Data
-data/*
-
-# Model checkpoints
+data/
+*.csv
+*.parquet
 *.pt
-*.pth
 *.ckpt
 
 # Outputs
@@ -32,13 +31,7 @@ outputs/
 logs/
 
 # Cache
-.cache/data/
-*.csv
-*.parquet
-*.pt
-*.ckpt
-data/
-*.csv
-*.parquet
-*.pt
-*.ckpt
+.cache/
+
+# 실험 로그는 버전관리 대상 (CLAUDE.md: "실험 하나 = results.csv 한 줄")
+!/results.csv

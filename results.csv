@@ -1,0 +1,4 @@
+label,fold,score,pts_res,pts_raw,bias,n_va,n_pitchers,seed,git_sha,notes
+exp01_baseline_official,A,283.408,338.22,283.408,0.01171,217024,281,0,680b208,"47 official features only, no custom"
+exp01_baseline_official,B,272.739,285.388,272.739,0.00562,219839,286,0,680b208,"47 official features only, no custom"
+exp01_baseline_official,C,340.726,376.613,340.726,0.00947,223497,291,0,680b208,"47 official features only, no custom"
