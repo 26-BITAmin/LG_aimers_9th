@@ -2,3 +2,6 @@ label,fold,score,pts_res,pts_raw,bias,n_va,n_pitchers,seed,git_sha,notes
 exp01_baseline_official,A,283.408,338.22,283.408,0.01171,217024,281,0,680b208,"47 official features only, no custom"
 exp01_baseline_official,B,272.739,285.388,272.739,0.00562,219839,286,0,680b208,"47 official features only, no custom"
 exp01_baseline_official,C,340.726,376.613,340.726,0.00947,223497,291,0,680b208,"47 official features only, no custom"
+exp02_numeric_ids_regularized,A,545.028,552.895,545.028,0.00443,217024,281,0,46a12dc,"pitcher_id/batter_id numeric (not categorical), min_data_in_leaf=500, lr=0.03"
+exp02_numeric_ids_regularized,B,448.052,448.114,448.052,-0.00039,219839,286,0,46a12dc,"pitcher_id/batter_id numeric (not categorical), min_data_in_leaf=500, lr=0.03"
+exp02_numeric_ids_regularized,C,616.465,671.314,616.465,0.01171,223497,291,0,46a12dc,"pitcher_id/batter_id numeric (not categorical), min_data_in_leaf=500, lr=0.03"
