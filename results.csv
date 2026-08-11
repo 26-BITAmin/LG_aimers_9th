@@ -20,3 +20,6 @@ exp06_intercept_calibration,C,593.458,648.264,593.458,0.0117,223497,291,0,231100
 exp07_isolate_min_data_in_leaf,A,561.522,574.897,561.522,0.00578,217024,281,0,c41150b,"isolate: num_leaves back to 31 (exp04), only min_data_in_leaf 500->300"
 exp07_isolate_min_data_in_leaf,B,471.292,471.297,471.292,0.00011,219839,286,0,c41150b,"isolate: num_leaves back to 31 (exp04), only min_data_in_leaf 500->300"
 exp07_isolate_min_data_in_leaf,C,623.521,664.776,623.521,0.01015,223497,291,0,c41150b,"isolate: num_leaves back to 31 (exp04), only min_data_in_leaf 500->300"
+exp08_trend_features,A,542.779,558.187,542.779,0.00621,217024,281,0,5cefa61,"+ trend_prev1/3/5 = prevN_game_success_rate - career asof_pitcher_success_rate, on top of exp04"
+exp08_trend_features,B,475.632,475.747,475.632,-0.00054,219839,286,0,5cefa61,"+ trend_prev1/3/5 = prevN_game_success_rate - career asof_pitcher_success_rate, on top of exp04"
+exp08_trend_features,C,634.117,670.245,634.117,0.0095,223497,291,0,5cefa61,"+ trend_prev1/3/5 = prevN_game_success_rate - career asof_pitcher_success_rate, on top of exp04"
