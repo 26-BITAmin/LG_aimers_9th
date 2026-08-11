@@ -14,3 +14,6 @@ exp04_custom_platoon_season_frozen,C,631.497,672.483,631.497,0.01012,223497,291,
 exp05_more_capacity,A,554.966,564.283,554.966,0.00483,217024,281,0,e2a626d,"num_leaves 31->63, min_data_in_leaf 500->300 vs exp04"
 exp05_more_capacity,B,472.715,472.985,472.715,-0.00082,219839,286,0,e2a626d,"num_leaves 31->63, min_data_in_leaf 500->300 vs exp04"
 exp05_more_capacity,C,609.843,655.347,609.843,0.01066,223497,291,0,e2a626d,"num_leaves 31->63, min_data_in_leaf 500->300 vs exp04"
+exp06_intercept_calibration,A,553.867,573.939,553.867,0.00708,217024,281,0,231100f,"nested-holdout intercept correction on top of exp04 config, no valid-label peeking"
+exp06_intercept_calibration,B,451.24,458.992,451.24,-0.0044,219839,286,0,231100f,"nested-holdout intercept correction on top of exp04 config, no valid-label peeking"
+exp06_intercept_calibration,C,593.458,648.264,593.458,0.0117,223497,291,0,231100f,"nested-holdout intercept correction on top of exp04 config, no valid-label peeking"
