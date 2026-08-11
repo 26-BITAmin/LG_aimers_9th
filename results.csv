@@ -11,3 +11,6 @@ exp03_custom_platoon_frozen,C,504.888,512.263,504.888,0.00429,223497,291,0,db55f
 exp04_custom_platoon_season_frozen,A,559.634,570.504,559.634,0.00521,217024,281,0,db55fb1,fixed: season-start frozen snapshot for training rows too (matches deploy texture)
 exp04_custom_platoon_season_frozen,B,461.307,461.308,461.307,6e-05,219839,286,0,db55fb1,fixed: season-start frozen snapshot for training rows too (matches deploy texture)
 exp04_custom_platoon_season_frozen,C,631.497,672.483,631.497,0.01012,223497,291,0,db55fb1,fixed: season-start frozen snapshot for training rows too (matches deploy texture)
+exp05_more_capacity,A,554.966,564.283,554.966,0.00483,217024,281,0,e2a626d,"num_leaves 31->63, min_data_in_leaf 500->300 vs exp04"
+exp05_more_capacity,B,472.715,472.985,472.715,-0.00082,219839,286,0,e2a626d,"num_leaves 31->63, min_data_in_leaf 500->300 vs exp04"
+exp05_more_capacity,C,609.843,655.347,609.843,0.01066,223497,291,0,e2a626d,"num_leaves 31->63, min_data_in_leaf 500->300 vs exp04"
