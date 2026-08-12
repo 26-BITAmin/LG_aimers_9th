@@ -33,5 +33,8 @@ logs/
 # Cache
 .cache/
 
+# CatBoost training logs (local run artifacts, not results)
+catboost_info/
+
 # 실험 로그는 버전관리 대상 (CLAUDE.md: "실험 하나 = results.csv 한 줄")
 !/results.csv
