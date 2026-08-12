@@ -32,3 +32,6 @@ exp10_trend_plus_failmode,C,640.814,678.073,640.814,0.00965,223497,291,0,40ceb45
 exp12_ballstrike_features,A,557.839,569.649,557.839,0.00543,217024,281,0,e6b6680,"+ asof_ball_R_static / asof_strike_R_static (season-frozen, R-only), on top of exp04"
 exp12_ballstrike_features,B,468.723,469.164,468.723,0.00105,219839,286,0,e6b6680,"+ asof_ball_R_static / asof_strike_R_static (season-frozen, R-only), on top of exp04"
 exp12_ballstrike_features,C,625.057,662.338,625.057,0.00965,223497,291,0,e6b6680,"+ asof_ball_R_static / asof_strike_R_static (season-frozen, R-only), on top of exp04"
+exp14_failmode_platoon,A,550.856,557.424,550.856,0.00405,217024,281,0,1e2ab31,"+ asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (same/diff-hand + credibility blend, k=30), on top of exp04"
+exp14_failmode_platoon,B,475.046,475.286,475.046,-0.00077,219839,286,0,1e2ab31,"+ asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (same/diff-hand + credibility blend, k=30), on top of exp04"
+exp14_failmode_platoon,C,630.748,677.292,630.748,0.01078,223497,291,0,1e2ab31,"+ asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (same/diff-hand + credibility blend, k=30), on top of exp04"

@@ -77,6 +77,8 @@ FAILMODE_FEATURES = ["asof_reverse_R_static", "asof_middle_R_static"]
 
 BALLSTRIKE_FEATURES = ["asof_ball_R_static", "asof_strike_R_static"]
 
+FAILMODE_PLATOON_FEATURES = ["asof_reverse_R_platoon_blend_static", "asof_middle_R_platoon_blend_static"]
+
 K_BLEND = 30.0
 
 
@@ -87,6 +89,10 @@ def _components(with_failmode, with_ballstrike):
     if with_ballstrike:
         c += ["ball", "strike"]
     return c
+
+
+def _platoon_components(with_failmode_platoon):
+    return ["reverse", "middle"] if with_failmode_platoon else []
 
 
 def add_trend_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -103,7 +109,8 @@ def add_trend_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
-                             with_ballstrike: bool = False) -> pd.DataFrame:
+                             with_ballstrike: bool = False,
+                             with_failmode_platoon: bool = False) -> pd.DataFrame:
     """학습(fit) 구간 안에서 커스텀 피처를 만든다.
 
     ★ 시즌 단위 frozen snapshot — 행 단위 strictly-prior cumsum이 **아니다**.
@@ -121,8 +128,10 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
     (콜드스타트, 결측 유지 정책과 일치).
     """
     comps = _components(with_failmode, with_ballstrike)
+    platoon_comps = _platoon_components(with_failmode_platoon)
     cols = CUSTOM_STATIC_FEATURES + (FAILMODE_FEATURES if with_failmode else []) \
-        + (BALLSTRIKE_FEATURES if with_ballstrike else [])
+        + (BALLSTRIKE_FEATURES if with_ballstrike else []) \
+        + (FAILMODE_PLATOON_FEATURES if with_failmode_platoon else [])
     seasons = sorted(fit_df["season"].unique())
     frames = []
     for s in seasons:
@@ -131,8 +140,9 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
         if len(prior) == 0:
             static_feats = pd.DataFrame({c: np.nan for c in cols}, index=season_rows.index)
         else:
-            lookup = fit_pitcher_lookup(prior, components=comps)
-            static_feats = apply_static_features(season_rows, lookup, components=comps)
+            lookup = fit_pitcher_lookup(prior, components=comps, platoon_components=platoon_comps)
+            static_feats = apply_static_features(season_rows, lookup, components=comps,
+                                                   platoon_components=platoon_comps)
         frames.append(pd.concat([season_rows, static_feats], axis=1))
     return pd.concat(frames, axis=0)
 
@@ -144,16 +154,20 @@ _COMPONENT_OUT_COL = {"reverse": "asof_reverse_R_static", "middle": "asof_middle
 
 
 def fit_pitcher_lookup(fit_df: pd.DataFrame, target: str = TARGET,
-                        components=()) -> pd.DataFrame:
+                        components=(), platoon_components=()) -> pd.DataFrame:
     """fit_df(학습 구간) 전체를 압축한 투수별 정적(frozen) lookup. 배포 시 이 형태로만 써야 한다.
 
-    components에 "reverse"/"middle"/"ball"/"strike"를 넣으면 그 성분의 R 전용 누적률도
-    같이 만든다 (train.csv에서만 파생된 디코딩 결과, EDA/artifacts/decoded_pitch_outcomes.parquet).
-    공식 asof_pitcher_*_rate는 전부 2022 이전 F 오염이 섞여 있는데(EDA_정리.md §5),
+    components에 "reverse"/"middle"/"ball"/"strike"를 넣으면 그 성분의 R 전용 누적률(좌우
+    구분 없음)도 같이 만든다. platoon_components에 넣으면 success와 동일한 same/diff-hand
+    분할 + 카운트도 함께 만들어 apply_static_features에서 credibility-blend 할 수 있게 한다
+    (success의 `asof_success_R_platoon_blend_static`이 +85~97점 낸 것과 같은 메커니즘을
+    실패 성분에 재사용 — reverse는 정의상 좌우 매치업에 따라 갈릴 개연성이 있다).
+    둘 다 train.csv에서만 파생된 디코딩 결과(EDA/artifacts/decoded_pitch_outcomes.parquet)를
+    쓴다. 공식 asof_pitcher_*_rate는 전부 2022 이전 F 오염이 섞여 있는데(EDA_정리.md §5),
     success와 같은 방식으로 R만 걸러서 다시 만든다.
     """
     R = fit_df.loc[fit_df["game_type"] == "R"].copy()
-    if components:
+    if components or platoon_components:
         dec = _load_decoded()
         R = R.join(dec, on="row_id")
     same = (R["pitcher_hand"] == R["batter_hand"])
@@ -173,11 +187,31 @@ def fit_pitcher_lookup(fit_df: pd.DataFrame, target: str = TARGET,
         col = _COMPONENT_RATE_COL[comp]
         g = agg(R, comp).rename(columns={"rate": col})[[col]]
         lookup = lookup.join(g, how="outer")
+
+    for comp in platoon_components:
+        base_col = _COMPONENT_RATE_COL[comp]
+        n_same_col, rate_same_col = f"n_{comp}_same", f"rate_{comp}_same"
+        n_diff_col, rate_diff_col = f"n_{comp}_diff", f"rate_{comp}_diff"
+        base_g = agg(R, comp).rename(columns={"rate": base_col})[[base_col]]
+        same_gc = agg(R[same], comp).rename(columns={"n": n_same_col, "rate": rate_same_col})
+        diff_gc = agg(R[~same], comp).rename(columns={"n": n_diff_col, "rate": rate_diff_col})
+        lookup = lookup.join(base_g, how="outer").join(same_gc, how="outer").join(diff_gc, how="outer")
     return lookup
 
 
+def _platoon_blend(base_rate, rate_same, n_same, rate_diff, n_diff, same_hand, k_blend):
+    """success 피처(exp04)에서 검증된 same/diff-hand 선택 + credibility-blend 로직.
+    platoon_n이 작을수록(=콜드스타트) base_rate 쪽으로 당겨진다 (w = n/(n+k_blend))."""
+    platoon_rate = np.where(same_hand, rate_same, rate_diff)
+    platoon_n = np.where(same_hand, n_same, n_diff)
+    filled = np.where(np.isfinite(platoon_rate), platoon_rate, base_rate)
+    w = np.where(np.isfinite(platoon_n), platoon_n / (platoon_n + k_blend), 0.0)
+    blend = np.where(np.isfinite(base_rate), w * filled + (1 - w) * base_rate, filled)
+    return platoon_rate, platoon_n, blend
+
+
 def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float = K_BLEND,
-                           components=()) -> pd.DataFrame:
+                           components=(), platoon_components=()) -> pd.DataFrame:
     """valid/test 행에 얼어붙은 lookup을 join. 현재 행 자신의 pitcher_hand/batter_hand로
     same/diff 버킷을 선택한다 (이건 test 행 '자기 자신'의 피처이므로 허용됨).
     """
@@ -185,13 +219,9 @@ def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float
     same_hand = (key["pitcher_hand"] == key["batter_hand"]).to_numpy()
     j = key.join(lookup, on="pitcher_id")
 
-    platoon_rate = np.where(same_hand, j["rate_same"], j["rate_diff"])
-    platoon_n = np.where(same_hand, j["n_same"], j["n_diff"])
     base_rate = j["rate_R2"].to_numpy(float)
-
-    platoon_filled = np.where(np.isfinite(platoon_rate), platoon_rate, base_rate)
-    w = np.where(np.isfinite(platoon_n), platoon_n / (platoon_n + k_blend), 0.0)
-    blend = np.where(np.isfinite(base_rate), w * platoon_filled + (1 - w) * base_rate, platoon_filled)
+    platoon_rate, platoon_n, blend = _platoon_blend(
+        base_rate, j["rate_same"], j["n_same"], j["rate_diff"], j["n_diff"], same_hand, k_blend)
 
     out = {
         "asof_success_R2_static": base_rate,
@@ -201,27 +231,37 @@ def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float
     }
     for comp in components:
         out[_COMPONENT_OUT_COL[comp]] = j[_COMPONENT_RATE_COL[comp]].to_numpy(float)
+    for comp in platoon_components:
+        base_col = _COMPONENT_RATE_COL[comp]
+        base_rate_c = j[base_col].to_numpy(float)
+        _, _, blend_c = _platoon_blend(
+            base_rate_c, j[f"rate_{comp}_same"], j[f"n_{comp}_same"],
+            j[f"rate_{comp}_diff"], j[f"n_{comp}_diff"], same_hand, k_blend)
+        out[f"asof_{comp}_R_platoon_blend_static"] = blend_c
     return pd.DataFrame(out, index=df.index)
 
 
 def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Series,
                        use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
-                       use_ballstrike: bool = False):
+                       use_ballstrike: bool = False, use_failmode_platoon: bool = False):
     """train_mask/valid_mask(src.folds.split 결과)로부터 (fit_df, valid_df)를 만든다.
 
-    use_custom=True면 CUSTOM_STATIC_FEATURES(+ use_failmode/use_ballstrike로 성분 추가)를
-    두 프레임에 동일한 이름으로 덧붙인다 (시즌 단위 frozen snapshot, 배포와 동일 조건).
+    use_custom=True면 CUSTOM_STATIC_FEATURES(+ use_failmode/use_ballstrike/use_failmode_platoon로
+    성분 추가)를 두 프레임에 동일한 이름으로 덧붙인다 (시즌 단위 frozen snapshot, 배포와 동일 조건).
     use_trend=True면 TREND_FEATURES(행 단위 뺄셈, 항상 안전)를 덧붙인다.
     """
     fit_raw = df.loc[train_mask].copy()
     valid_df = df.loc[valid_mask].copy()
     comps = _components(use_failmode, use_ballstrike)
+    platoon_comps = _platoon_components(use_failmode_platoon)
 
     if use_custom:
         fit_df = build_training_features(fit_raw, with_failmode=use_failmode,
-                                          with_ballstrike=use_ballstrike)
-        lookup = fit_pitcher_lookup(fit_raw, components=comps)
-        static_feats = apply_static_features(valid_df, lookup, components=comps)
+                                          with_ballstrike=use_ballstrike,
+                                          with_failmode_platoon=use_failmode_platoon)
+        lookup = fit_pitcher_lookup(fit_raw, components=comps, platoon_components=platoon_comps)
+        static_feats = apply_static_features(valid_df, lookup, components=comps,
+                                              platoon_components=platoon_comps)
         valid_df = pd.concat([valid_df.reset_index(drop=True), static_feats.reset_index(drop=True)], axis=1)
     else:
         fit_df = fit_raw
@@ -234,7 +274,7 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
 
 
 def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
-                  use_ballstrike: bool = False):
+                  use_ballstrike: bool = False, use_failmode_platoon: bool = False):
     cols = list(OFFICIAL_FEATURES)
     if use_custom:
         cols += CUSTOM_STATIC_FEATURES
@@ -242,6 +282,8 @@ def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool =
             cols += FAILMODE_FEATURES
         if use_ballstrike:
             cols += BALLSTRIKE_FEATURES
+        if use_failmode_platoon:
+            cols += FAILMODE_PLATOON_FEATURES
     if use_trend:
         cols += TREND_FEATURES
     return cols
