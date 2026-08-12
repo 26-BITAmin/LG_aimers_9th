@@ -44,3 +44,6 @@ exp18_season_trend,C,617.096,654.035,617.096,0.00961,223497,291,0,8c5abdd,"+ aso
 exp20_catboost_baseline,A,523.783,526.608,523.783,0.00266,217024,281,0,11cc968,"CatBoost, exp04-identical feature set (official 47 + CUSTOM_STATIC_FEATURES), pitcher_id/batter_id numeric, depth=6/l2=5/lr=0.03 (LightGBM-matched capacity)"
 exp20_catboost_baseline,B,617.741,618.324,617.741,-0.00121,219839,286,0,11cc968,"CatBoost, exp04-identical feature set (official 47 + CUSTOM_STATIC_FEATURES), pitcher_id/batter_id numeric, depth=6/l2=5/lr=0.03 (LightGBM-matched capacity)"
 exp20_catboost_baseline,C,696.884,724.832,696.884,0.00836,223497,291,0,11cc968,"CatBoost, exp04-identical feature set (official 47 + CUSTOM_STATIC_FEATURES), pitcher_id/batter_id numeric, depth=6/l2=5/lr=0.03 (LightGBM-matched capacity)"
+exp23_ensemble_lgb_catboost,A,559.586,565.78,559.586,0.00394,217024,281,0,b1d5c87,"0.5*LightGBM(exp04) + 0.5*CatBoost(exp20), identical feature set both models, fixed unweighted blend"
+exp23_ensemble_lgb_catboost,B,560.544,560.675,560.544,-0.00057,219839,286,0,b1d5c87,"0.5*LightGBM(exp04) + 0.5*CatBoost(exp20), identical feature set both models, fixed unweighted blend"
+exp23_ensemble_lgb_catboost,C,682.166,716.322,682.166,0.00924,223497,291,0,b1d5c87,"0.5*LightGBM(exp04) + 0.5*CatBoost(exp20), identical feature set both models, fixed unweighted blend"
