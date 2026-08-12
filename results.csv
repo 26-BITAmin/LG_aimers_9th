@@ -53,3 +53,6 @@ exp25_catboost_n_exposed,C,701.845,725.394,701.845,0.00767,223497,291,0,17095f6,
 exp27_catboost_failmode_platoon,A,526.362,527.241,526.362,0.00148,217024,281,0,1d062f1,"CatBoost + asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (was noise on LightGBM/exp14-15), on top of exp20"
 exp27_catboost_failmode_platoon,B,586.829,589.607,586.829,-0.00264,219839,286,0,1d062f1,"CatBoost + asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (was noise on LightGBM/exp14-15), on top of exp20"
 exp27_catboost_failmode_platoon,C,700.012,730.547,700.012,0.00874,223497,291,0,1d062f1,"CatBoost + asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (was noise on LightGBM/exp14-15), on top of exp20"
+exp28_catboost_ballstrike,A,531.47,533.472,531.47,0.00224,217024,281,0,dcea707,"CatBoost + asof_ball_R_static / asof_strike_R_static (was noise on LightGBM/exp12-13), on top of exp20"
+exp28_catboost_ballstrike,B,611.668,612.117,611.668,-0.00106,219839,286,0,dcea707,"CatBoost + asof_ball_R_static / asof_strike_R_static (was noise on LightGBM/exp12-13), on top of exp20"
+exp28_catboost_ballstrike,C,701.385,727.4,701.385,0.00806,223497,291,0,dcea707,"CatBoost + asof_ball_R_static / asof_strike_R_static (was noise on LightGBM/exp12-13), on top of exp20"
