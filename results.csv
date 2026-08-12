@@ -35,3 +35,6 @@ exp12_ballstrike_features,C,625.057,662.338,625.057,0.00965,223497,291,0,e6b6680
 exp14_failmode_platoon,A,550.856,557.424,550.856,0.00405,217024,281,0,1e2ab31,"+ asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (same/diff-hand + credibility blend, k=30), on top of exp04"
 exp14_failmode_platoon,B,475.046,475.286,475.046,-0.00077,219839,286,0,1e2ab31,"+ asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (same/diff-hand + credibility blend, k=30), on top of exp04"
 exp14_failmode_platoon,C,630.748,677.292,630.748,0.01078,223497,291,0,1e2ab31,"+ asof_reverse_R_platoon_blend_static / asof_middle_R_platoon_blend_static (same/diff-hand + credibility blend, k=30), on top of exp04"
+exp16_n_exposed,A,562.621,569.389,562.621,0.00411,217024,281,0,652aac9,"+ asof_success_R2_n_static (frozen R-only pitch count, lets tree learn its own credibility instead of fixed k_blend=30), on top of exp04"
+exp16_n_exposed,B,472.457,472.458,472.457,-6e-05,219839,286,0,652aac9,"+ asof_success_R2_n_static (frozen R-only pitch count, lets tree learn its own credibility instead of fixed k_blend=30), on top of exp04"
+exp16_n_exposed,C,630.22,665.143,630.22,0.00934,223497,291,0,652aac9,"+ asof_success_R2_n_static (frozen R-only pitch count, lets tree learn its own credibility instead of fixed k_blend=30), on top of exp04"
