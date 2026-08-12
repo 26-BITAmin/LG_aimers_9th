@@ -33,10 +33,11 @@ def git_sha():
 
 def run_fold(df, fold_name, feature_cols, cat_cols, lgb_params, use_custom,
              num_boost_round=2000, early_stopping_rounds=50, seed=0,
-             use_trend=False, use_failmode=False):
+             use_trend=False, use_failmode=False, use_ballstrike=False):
     train_mask, valid_mask = F.split(df, fold_name)
     fit_df, valid_df = feat.build_fold_frames(df, train_mask, valid_mask, use_custom=use_custom,
-                                               use_trend=use_trend, use_failmode=use_failmode)
+                                               use_trend=use_trend, use_failmode=use_failmode,
+                                               use_ballstrike=use_ballstrike)
 
     Xt = fit_df[feature_cols].copy()
     Xv = valid_df[feature_cols].copy()
@@ -87,7 +88,7 @@ def log_result(label, fold, res, seed=0, notes=""):
 def run_experiment(label, feature_cols, cat_cols, lgb_params, use_custom,
                     fold_names=("A", "B", "C"), num_boost_round=2000,
                     early_stopping_rounds=50, seed=0, notes="",
-                    use_trend=False, use_failmode=False):
+                    use_trend=False, use_failmode=False, use_ballstrike=False):
     t0 = time.time()
     df = load_train()
     print(f"=== {label} ===  features={len(feature_cols)}  custom={use_custom}")
@@ -96,7 +97,8 @@ def run_experiment(label, feature_cols, cat_cols, lgb_params, use_custom,
         res, booster, p, yv, valid_df = run_fold(df, fn, feature_cols, cat_cols, lgb_params,
                                                    use_custom, num_boost_round,
                                                    early_stopping_rounds, seed,
-                                                   use_trend=use_trend, use_failmode=use_failmode)
+                                                   use_trend=use_trend, use_failmode=use_failmode,
+                                                   use_ballstrike=use_ballstrike)
         results[fn] = res
         log_result(label, fn, res, seed=seed, notes=notes)
         print(f"  fold {fn}: score={res['score']:.1f}  pts_res={res['pts_res']:.1f}  "

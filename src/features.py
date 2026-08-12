@@ -32,12 +32,12 @@ _decoded_cache = None
 
 
 def _load_decoded():
-    """EDA 노트북 02가 만든 행 단위 실현 결과(reverse/middle). train.csv에서만 파생됐고
-    test 행은 절대 건드리지 않는다 — 배포 규칙과 무관하게 항상 안전.
+    """EDA 노트북 02가 만든 행 단위 실현 결과(reverse/middle/ball/strike). train.csv에서만
+    파생됐고 test 행은 절대 건드리지 않는다 — 배포 규칙과 무관하게 항상 안전.
     투수당 마지막 1구는 디코딩 손실로 NaN (792행, 무시 가능)."""
     global _decoded_cache
     if _decoded_cache is None:
-        d = pd.read_parquet(_DECODED_PATH, columns=["row_id", "reverse", "middle"])
+        d = pd.read_parquet(_DECODED_PATH, columns=["row_id", "reverse", "middle", "ball", "strike"])
         _decoded_cache = d.set_index("row_id")
     return _decoded_cache
 
@@ -75,7 +75,18 @@ TREND_FEATURES = ["trend_prev1", "trend_prev3", "trend_prev5"]
 
 FAILMODE_FEATURES = ["asof_reverse_R_static", "asof_middle_R_static"]
 
+BALLSTRIKE_FEATURES = ["asof_ball_R_static", "asof_strike_R_static"]
+
 K_BLEND = 30.0
+
+
+def _components(with_failmode, with_ballstrike):
+    c = []
+    if with_failmode:
+        c += ["reverse", "middle"]
+    if with_ballstrike:
+        c += ["ball", "strike"]
+    return c
 
 
 def add_trend_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -91,7 +102,8 @@ def add_trend_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False) -> pd.DataFrame:
+def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
+                             with_ballstrike: bool = False) -> pd.DataFrame:
     """학습(fit) 구간 안에서 커스텀 피처를 만든다.
 
     ★ 시즌 단위 frozen snapshot — 행 단위 strictly-prior cumsum이 **아니다**.
@@ -108,7 +120,9 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False) -
     같은 이유로 fit_df의 **첫 시즌**은 그 이전 이력이 fit_df 안에 없으므로 전부 NaN
     (콜드스타트, 결측 유지 정책과 일치).
     """
-    cols = CUSTOM_STATIC_FEATURES + (FAILMODE_FEATURES if with_failmode else [])
+    comps = _components(with_failmode, with_ballstrike)
+    cols = CUSTOM_STATIC_FEATURES + (FAILMODE_FEATURES if with_failmode else []) \
+        + (BALLSTRIKE_FEATURES if with_ballstrike else [])
     seasons = sorted(fit_df["season"].unique())
     frames = []
     for s in seasons:
@@ -117,22 +131,29 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False) -
         if len(prior) == 0:
             static_feats = pd.DataFrame({c: np.nan for c in cols}, index=season_rows.index)
         else:
-            lookup = fit_pitcher_lookup(prior, with_failmode=with_failmode)
-            static_feats = apply_static_features(season_rows, lookup, with_failmode=with_failmode)
+            lookup = fit_pitcher_lookup(prior, components=comps)
+            static_feats = apply_static_features(season_rows, lookup, components=comps)
         frames.append(pd.concat([season_rows, static_feats], axis=1))
     return pd.concat(frames, axis=0)
 
 
+_COMPONENT_RATE_COL = {"reverse": "rate_reverse_R", "middle": "rate_middle_R",
+                        "ball": "rate_ball_R", "strike": "rate_strike_R"}
+_COMPONENT_OUT_COL = {"reverse": "asof_reverse_R_static", "middle": "asof_middle_R_static",
+                       "ball": "asof_ball_R_static", "strike": "asof_strike_R_static"}
+
+
 def fit_pitcher_lookup(fit_df: pd.DataFrame, target: str = TARGET,
-                        with_failmode: bool = False) -> pd.DataFrame:
+                        components=()) -> pd.DataFrame:
     """fit_df(학습 구간) 전체를 압축한 투수별 정적(frozen) lookup. 배포 시 이 형태로만 써야 한다.
 
-    with_failmode=True면 실패 성분(reverse/middle, train.csv에서만 파생된 디코딩 결과)의
-    R 전용 누적률도 같이 만든다 — 공식 asof_pitcher_reverse_rate/middle_rate는 2022 이전
-    F 오염이 섞여 있는데(EDA_정리.md §5), success와 마찬가지로 R만 걸러서 다시 만든다.
+    components에 "reverse"/"middle"/"ball"/"strike"를 넣으면 그 성분의 R 전용 누적률도
+    같이 만든다 (train.csv에서만 파생된 디코딩 결과, EDA/artifacts/decoded_pitch_outcomes.parquet).
+    공식 asof_pitcher_*_rate는 전부 2022 이전 F 오염이 섞여 있는데(EDA_정리.md §5),
+    success와 같은 방식으로 R만 걸러서 다시 만든다.
     """
     R = fit_df.loc[fit_df["game_type"] == "R"].copy()
-    if with_failmode:
+    if components:
         dec = _load_decoded()
         R = R.join(dec, on="row_id")
     same = (R["pitcher_hand"] == R["batter_hand"])
@@ -148,15 +169,15 @@ def fit_pitcher_lookup(fit_df: pd.DataFrame, target: str = TARGET,
     diff_g = agg(R[~same], target).rename(columns={"n": "n_diff", "rate": "rate_diff"})
     lookup = overall.join(same_g, how="outer").join(diff_g, how="outer")
 
-    if with_failmode:
-        rev = agg(R, "reverse").rename(columns={"rate": "rate_reverse_R"})[["rate_reverse_R"]]
-        mid = agg(R, "middle").rename(columns={"rate": "rate_middle_R"})[["rate_middle_R"]]
-        lookup = lookup.join(rev, how="outer").join(mid, how="outer")
+    for comp in components:
+        col = _COMPONENT_RATE_COL[comp]
+        g = agg(R, comp).rename(columns={"rate": col})[[col]]
+        lookup = lookup.join(g, how="outer")
     return lookup
 
 
 def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float = K_BLEND,
-                           with_failmode: bool = False) -> pd.DataFrame:
+                           components=()) -> pd.DataFrame:
     """valid/test 행에 얼어붙은 lookup을 join. 현재 행 자신의 pitcher_hand/batter_hand로
     same/diff 버킷을 선택한다 (이건 test 행 '자기 자신'의 피처이므로 허용됨).
     """
@@ -178,27 +199,29 @@ def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float
         "asof_success_R_platoon_n_static": platoon_n,
         "asof_success_R_platoon_blend_static": blend,
     }
-    if with_failmode:
-        out["asof_reverse_R_static"] = j["rate_reverse_R"].to_numpy(float)
-        out["asof_middle_R_static"] = j["rate_middle_R"].to_numpy(float)
+    for comp in components:
+        out[_COMPONENT_OUT_COL[comp]] = j[_COMPONENT_RATE_COL[comp]].to_numpy(float)
     return pd.DataFrame(out, index=df.index)
 
 
 def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Series,
-                       use_custom: bool, use_trend: bool = False, use_failmode: bool = False):
+                       use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
+                       use_ballstrike: bool = False):
     """train_mask/valid_mask(src.folds.split 결과)로부터 (fit_df, valid_df)를 만든다.
 
-    use_custom=True면 CUSTOM_STATIC_FEATURES(+ use_failmode면 FAILMODE_FEATURES도)를
+    use_custom=True면 CUSTOM_STATIC_FEATURES(+ use_failmode/use_ballstrike로 성분 추가)를
     두 프레임에 동일한 이름으로 덧붙인다 (시즌 단위 frozen snapshot, 배포와 동일 조건).
     use_trend=True면 TREND_FEATURES(행 단위 뺄셈, 항상 안전)를 덧붙인다.
     """
     fit_raw = df.loc[train_mask].copy()
     valid_df = df.loc[valid_mask].copy()
+    comps = _components(use_failmode, use_ballstrike)
 
     if use_custom:
-        fit_df = build_training_features(fit_raw, with_failmode=use_failmode)
-        lookup = fit_pitcher_lookup(fit_raw, with_failmode=use_failmode)
-        static_feats = apply_static_features(valid_df, lookup, with_failmode=use_failmode)
+        fit_df = build_training_features(fit_raw, with_failmode=use_failmode,
+                                          with_ballstrike=use_ballstrike)
+        lookup = fit_pitcher_lookup(fit_raw, components=comps)
+        static_feats = apply_static_features(valid_df, lookup, components=comps)
         valid_df = pd.concat([valid_df.reset_index(drop=True), static_feats.reset_index(drop=True)], axis=1)
     else:
         fit_df = fit_raw
@@ -210,12 +233,15 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
     return fit_df, valid_df
 
 
-def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool = False):
+def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
+                  use_ballstrike: bool = False):
     cols = list(OFFICIAL_FEATURES)
     if use_custom:
         cols += CUSTOM_STATIC_FEATURES
         if use_failmode:
             cols += FAILMODE_FEATURES
+        if use_ballstrike:
+            cols += BALLSTRIKE_FEATURES
     if use_trend:
         cols += TREND_FEATURES
     return cols
