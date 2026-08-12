@@ -65,3 +65,6 @@ exp30_catboost_depth4,C,671.588,706.659,671.588,0.00936,223497,291,0,4e618b5,"Ca
 exp31_catboost_depth8,A,525.719,530.848,525.719,0.00358,217024,281,0,35efad1,"CatBoost depth 6->8 (capacity increase) vs exp20 -- opposite direction from exp30, since depth=4 hurt all folds"
 exp31_catboost_depth8,B,597.012,598.423,597.012,-0.00188,219839,286,0,35efad1,"CatBoost depth 6->8 (capacity increase) vs exp20 -- opposite direction from exp30, since depth=4 hurt all folds"
 exp31_catboost_depth8,C,722.522,748.25,722.522,0.00802,223497,291,0,35efad1,"CatBoost depth 6->8 (capacity increase) vs exp20 -- opposite direction from exp30, since depth=4 hurt all folds"
+exp32_ensemble_catboost_depth8,A,561.19,568.924,561.19,0.0044,217024,281,0,d755670,"0.5*LightGBM(exp04) + 0.5*CatBoost(depth=8, exp31), vs exp23's depth=6 CatBoost"
+exp32_ensemble_catboost_depth8,B,549.727,550.057,549.727,-0.00091,219839,286,0,d755670,"0.5*LightGBM(exp04) + 0.5*CatBoost(depth=8, exp31), vs exp23's depth=6 CatBoost"
+exp32_ensemble_catboost_depth8,C,705.639,738.554,705.639,0.00907,223497,291,0,d755670,"0.5*LightGBM(exp04) + 0.5*CatBoost(depth=8, exp31), vs exp23's depth=6 CatBoost"
