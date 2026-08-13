@@ -68,3 +68,7 @@ exp31_catboost_depth8,C,722.522,748.25,722.522,0.00802,223497,291,0,35efad1,"Cat
 exp32_ensemble_catboost_depth8,A,561.19,568.924,561.19,0.0044,217024,281,0,d755670,"0.5*LightGBM(exp04) + 0.5*CatBoost(depth=8, exp31), vs exp23's depth=6 CatBoost"
 exp32_ensemble_catboost_depth8,B,549.727,550.057,549.727,-0.00091,219839,286,0,d755670,"0.5*LightGBM(exp04) + 0.5*CatBoost(depth=8, exp31), vs exp23's depth=6 CatBoost"
 exp32_ensemble_catboost_depth8,C,705.639,738.554,705.639,0.00907,223497,291,0,d755670,"0.5*LightGBM(exp04) + 0.5*CatBoost(depth=8, exp31), vs exp23's depth=6 CatBoost"
+exp34_blend_weight_nested_holdout,A,557.058,564.228,557.058,0.00423,217024,281,0,24fb91c,"blend weight w chosen per-fold via nested holdout inside train (last train season held out), never touches actual valid labels; compare vs exp32's fixed 0.5 | w_lgb=0.40"
+exp34_blend_weight_nested_holdout,B,542.736,542.999,542.736,-0.00081,219839,286,0,24fb91c,"blend weight w chosen per-fold via nested holdout inside train (last train season held out), never touches actual valid labels; compare vs exp32's fixed 0.5 | w_lgb=0.55"
+exp34_blend_weight_nested_holdout,C,722.522,748.25,722.522,0.00802,223497,291,0,24fb91c,"blend weight w chosen per-fold via nested holdout inside train (last train season held out), never touches actual valid labels; compare vs exp32's fixed 0.5 | w_lgb=0.00"
+exp36_fold_d_final_check,D,680.833,707.237,680.833,0.00812,223497,291,0,24fb91c,"exp32 config (LightGBM exp04 + CatBoost depth=8, 50/50 fixed blend) on fold D -- FINAL CHECK ONLY, never retuned from this"
