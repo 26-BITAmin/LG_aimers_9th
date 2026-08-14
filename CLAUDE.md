@@ -136,6 +136,11 @@ RF 튜닝 · isotonic/Platt/기울기 보정(held-out −13.4/−2.5) ·
 최근 시즌 지수 가중치(recency weight, exp38~39) — 3시즌 fold 창에서 효과 잡음과
 구분 안 됨 (wonwoo 브랜치는 6시즌 창이라 다름) ·
 CatBoost `depth` 10 이상(exp37) — 8이 정점, 10은 fold C −42.8로 반전 ·
+CatBoost에서 `pitcher_team_id`/`batter_team_id` 제거(exp43~44) — fold A만 +15.7로
+보였으나 fold C −87.4로 반전(team_id는 fold C 성능의 핵심 구성요소였음), fold A
+원인은 미해결로 남음 · 선형 회귀를 세 번째 앙상블 멤버로 고정 가중치 블렌드(exp45)
+— fold A/C는 소폭 이득(+2~+7)이나 fold B가 전 가중치에서 그보다 훨씬 크게(−4.5~
+−37.6) 악화, linear 단독 성능이 fold B에서만 붕괴(원인 미상) ·
 `far_off`·`overlap` 누적 피처(−19~+27) · 타자 정체성·`li`·WE·`inning`·구종 배합 ·
 카운트 조건부 투수 이력(−30.9) · Trackman ID 매핑 · test 기반 importance weighting ·
 fold A/B 단독 판단
