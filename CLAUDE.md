@@ -142,6 +142,11 @@ CatBoost에서 `pitcher_team_id`/`batter_team_id` 제거(exp43~44) — fold A만
 원인은 미해결로 남음 · 선형 회귀를 세 번째 앙상블 멤버로 고정 가중치 블렌드(exp45)
 — fold A/C는 소폭 이득(+2~+7)이나 fold B가 전 가중치에서 그보다 훨씬 크게(−4.5~
 −37.6) 악화, linear 단독 성능이 fold B에서만 붕괴(원인 미상) ·
+투수→팀→리그 3단 축소 피처(exp49~50, LB 실측) — 로컬 5seed 평균도 fold C만
+음수로 판정 보류였는데 실제 LB에서 챔피언 대비 −4.75로 확정 기각 ·
+표본크기(`asof_pitcher_n`) 조건부 앙상블 블렌드(exp52) — 진단 결과 CatBoost vs
+LightGBM 우열이 n이 아니라 fold(학습기간) 단위로 갈려 조건부 규칙 설계 전제 자체가
+성립 안 함 ·
 `far_off`·`overlap` 누적 피처(−19~+27) · 타자 정체성·`li`·WE·`inning`·구종 배합 ·
 카운트 조건부 투수 이력(−30.9) · Trackman ID 매핑 · test 기반 importance weighting ·
 fold A/B 단독 판단
