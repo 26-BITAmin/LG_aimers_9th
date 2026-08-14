@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import platform
 import sys
 import time
 from dataclasses import asdict
@@ -20,13 +22,20 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
+import sklearn
 
 SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from evaluation import calibration_table, grouped_metrics, probability_metrics
-from features import FeatureConfig, ID_COL, TARGET_COL, prepare_fold_features
+from features import (
+    FeatureConfig,
+    ID_COL,
+    TARGET_COL,
+    prepare_fold_features,
+    prepare_inference_features,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -80,7 +89,7 @@ def main() -> None:
         include_season=not args.exclude_season,
         include_player_ids=not args.exclude_player_ids,
     )
-    x_train, x_valid, categorical, prior = prepare_fold_features(
+    x_train, x_valid, categorical, category_maps, prior = prepare_fold_features(
         train_df, valid_df, config=feature_config
     )
     y_train = train_df[TARGET_COL].to_numpy(dtype=np.int8)
@@ -121,13 +130,34 @@ def main() -> None:
     prediction = np.clip(model.predict_proba(x_valid)[:, 1], 0.0, 1.0)
 
     overall = probability_metrics(y_valid, prediction)
+    configuration = {
+        "valid_season": args.valid_season,
+        "train_game_type": args.train_game_type,
+        "include_season": not args.exclude_season,
+        "include_player_ids": not args.exclude_player_ids,
+        "recency_weighted": not args.no_recency_weight,
+        "half_life": None if args.no_recency_weight else args.half_life,
+        "feature_config": asdict(feature_config),
+        "parameters": params,
+    }
+    configuration_id = hashlib.sha256(
+        json.dumps(configuration, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    ).hexdigest()[:12]
     overall.update(
         {
+            "configuration_id": configuration_id,
             "valid_season": args.valid_season,
             "train_seasons": sorted(int(v) for v in train_df["season"].unique()),
             "train_rows": int(len(train_df)),
             "valid_rows": int(len(valid_df)),
+            "all_data_rows": int(len(data)),
+            "all_data_columns": int(data.shape[1]),
+            "target_sum": int(data[TARGET_COL].sum()),
+            "train_file_size_bytes": int(args.train_path.stat().st_size),
             "feature_count": int(x_train.shape[1]),
+            "feature_columns": list(x_train.columns),
+            "categorical_columns": categorical,
+            "category_map_sizes": {k: len(v) for k, v in category_maps.items()},
             "target_prior_from_train": prior,
             "recency_weighted": not args.no_recency_weight,
             "half_life": None if args.no_recency_weight else args.half_life,
@@ -135,8 +165,15 @@ def main() -> None:
             "include_season": not args.exclude_season,
             "include_player_ids": not args.exclude_player_ids,
             "train_seconds": train_seconds,
-            "total_seconds": time.perf_counter() - started,
             "parameters": params,
+            "python_version": platform.python_version(),
+            "package_versions": {
+                "joblib": joblib.__version__,
+                "lightgbm": lgb.__version__,
+                "numpy": np.__version__,
+                "pandas": pd.__version__,
+                "scikit_learn": sklearn.__version__,
+            },
         }
     )
 
@@ -154,16 +191,49 @@ def main() -> None:
     ).sort_values("importance_gain", ascending=False).to_csv(
         args.output_dir / "feature_importance.csv", index=False
     )
+    model_path = args.output_dir / "model.joblib"
+    feature_columns = list(x_train.columns)
     joblib.dump(
         {
             "model": model,
-            "feature_columns": list(x_train.columns),
+            "feature_columns": feature_columns,
             "categorical_columns": categorical,
+            "category_maps": category_maps,
             "feature_config": asdict(feature_config),
             "target_prior": prior,
+            "configuration_id": configuration_id,
         },
-        args.output_dir / "model.joblib",
+        model_path,
         compress=3,
+    )
+
+    # Verify that the serialized bundle can recreate the exact validation input
+    # and prediction without fitting or reading any other validation rows.
+    reloaded = joblib.load(model_path)
+    reload_config = FeatureConfig(**reloaded["feature_config"])
+    x_valid_reloaded = prepare_inference_features(
+        valid_df,
+        config=reload_config,
+        target_prior=float(reloaded["target_prior"]),
+        category_maps=reloaded["category_maps"],
+        feature_columns=reloaded["feature_columns"],
+    )
+    pd.testing.assert_frame_equal(x_valid, x_valid_reloaded, check_exact=True)
+    reloaded_prediction = np.clip(
+        reloaded["model"].predict_proba(x_valid_reloaded)[:, 1], 0.0, 1.0
+    )
+    reload_max_abs_diff = float(np.max(np.abs(prediction - reloaded_prediction)))
+    if reload_max_abs_diff > 1e-12:
+        raise RuntimeError(
+            f"serialized prediction mismatch: max_abs_diff={reload_max_abs_diff}"
+        )
+    overall.update(
+        {
+            "reload_feature_frame_equal": True,
+            "reload_max_abs_diff": reload_max_abs_diff,
+            "model_size_bytes": int(model_path.stat().st_size),
+            "total_seconds": time.perf_counter() - started,
+        }
     )
     with (args.output_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(overall, f, ensure_ascii=False, indent=2)

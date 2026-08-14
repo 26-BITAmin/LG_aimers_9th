@@ -29,6 +29,7 @@ RAW_CATEGORICAL_COLUMNS = [
 ]
 
 DERIVED_CATEGORICAL_COLUMNS = ["count_state", "hand_matchup"]
+CategoryMaps = dict[str, list[str]]
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class FeatureConfig:
     batter_prior_strength: float = 300.0
     include_season: bool = True
     include_player_ids: bool = True
+    include_game_type: bool = True
 
 
 def add_rowwise_features(
@@ -105,41 +107,62 @@ def add_rowwise_features(
         out = out.drop(columns=["pitcher_id", "batter_id"])
     if not config.include_season:
         out = out.drop(columns=["season"])
+    if not config.include_game_type:
+        out = out.drop(columns=["game_type"])
+    return out
+
+
+def categorical_columns(frame: pd.DataFrame) -> list[str]:
+    """Return categorical columns that are present in a feature frame."""
+    return [
+        c
+        for c in RAW_CATEGORICAL_COLUMNS + DERIVED_CATEGORICAL_COLUMNS
+        if c in frame.columns
+    ]
+
+
+def fit_category_maps(train: pd.DataFrame, categorical: list[str]) -> CategoryMaps:
+    """Learn stable category vocabularies from the training fold only."""
+    return {
+        col: train[col].astype("string").fillna("__MISSING__").unique().tolist()
+        for col in categorical
+    }
+
+
+def apply_category_maps(frame: pd.DataFrame, category_maps: CategoryMaps) -> pd.DataFrame:
+    """Apply stored category vocabularies; unseen values become code -1."""
+    out = frame.copy()
+    missing_columns = sorted(set(category_maps) - set(out.columns))
+    if missing_columns:
+        raise ValueError(f"categorical columns are missing: {missing_columns}")
+
+    for col, categories in category_maps.items():
+        values = out[col].astype("string").fillna("__MISSING__")
+        out[col] = pd.Categorical(values, categories=categories).codes.astype("int32")
+
+    for col in out.columns:
+        if col in category_maps:
+            continue
+        if pd.api.types.is_float_dtype(out[col]):
+            out[col] = out[col].astype("float32")
+        elif pd.api.types.is_integer_dtype(out[col]):
+            out[col] = pd.to_numeric(out[col], downcast="integer")
     return out
 
 
 def encode_categories_train_only(
     train: pd.DataFrame,
     valid: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
-    """Ordinal-encode categories with vocabularies learned from train only.
-
-    Unseen validation/test values become -1, which LightGBM treats as missing
-    for categorical features.
-    """
-    train = train.copy()
-    valid = valid.copy()
-    categorical = [
-        c
-        for c in RAW_CATEGORICAL_COLUMNS + DERIVED_CATEGORICAL_COLUMNS
-        if c in train.columns
-    ]
-    for col in categorical:
-        tr = train[col].astype("string").fillna("__MISSING__")
-        va = valid[col].astype("string").fillna("__MISSING__")
-        categories = pd.Index(tr.unique())
-        train[col] = pd.Categorical(tr, categories=categories).codes.astype("int32")
-        valid[col] = pd.Categorical(va, categories=categories).codes.astype("int32")
-
-    for frame in (train, valid):
-        for col in frame.columns:
-            if col in categorical:
-                continue
-            if pd.api.types.is_float_dtype(frame[col]):
-                frame[col] = frame[col].astype("float32")
-            elif pd.api.types.is_integer_dtype(frame[col]):
-                frame[col] = pd.to_numeric(frame[col], downcast="integer")
-    return train, valid, categorical
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str], CategoryMaps]:
+    """Encode categories using vocabularies learned from the training fold."""
+    categorical = categorical_columns(train)
+    category_maps = fit_category_maps(train, categorical)
+    return (
+        apply_category_maps(train, category_maps),
+        apply_category_maps(valid, category_maps),
+        categorical,
+        category_maps,
+    )
 
 
 def prepare_fold_features(
@@ -147,12 +170,63 @@ def prepare_fold_features(
     valid_df: pd.DataFrame,
     *,
     config: FeatureConfig,
-) -> tuple[pd.DataFrame, pd.DataFrame, list[str], float]:
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str], CategoryMaps, float]:
     """Build a leakage-safe pair of training and validation matrices."""
     prior = float(train_df[TARGET_COL].mean())
     x_train = add_rowwise_features(train_df, target_prior=prior, config=config)
     x_valid = add_rowwise_features(valid_df, target_prior=prior, config=config)
-    x_train, x_valid, categorical = encode_categories_train_only(x_train, x_valid)
+    x_train, x_valid, categorical, category_maps = encode_categories_train_only(
+        x_train, x_valid
+    )
     if list(x_train.columns) != list(x_valid.columns):
         raise RuntimeError("train and validation feature columns do not match")
+    return x_train, x_valid, categorical, category_maps, prior
+
+
+def prepare_catboost_fold_features(
+    train_df: pd.DataFrame,
+    valid_df: pd.DataFrame,
+    *,
+    config: FeatureConfig,
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str], float]:
+    """Build CatBoost matrices while preserving native categorical values.
+
+    The target prior is learned from the training fold only. Categorical values
+    are converted to strings so CatBoost can build ordered statistics without
+    reading or aggregating other validation/test rows.
+    """
+    prior = float(train_df[TARGET_COL].mean())
+    x_train = add_rowwise_features(train_df, target_prior=prior, config=config)
+    x_valid = add_rowwise_features(valid_df, target_prior=prior, config=config)
+    categorical = categorical_columns(x_train)
+
+    if list(x_train.columns) != list(x_valid.columns):
+        raise RuntimeError("train and validation feature columns do not match")
+    for col in categorical:
+        x_train[col] = (
+            x_train[col].astype("string").fillna("__MISSING__").astype(str)
+        )
+        x_valid[col] = (
+            x_valid[col].astype("string").fillna("__MISSING__").astype(str)
+        )
     return x_train, x_valid, categorical, prior
+
+
+def prepare_inference_features(
+    df: pd.DataFrame,
+    *,
+    config: FeatureConfig,
+    target_prior: float,
+    category_maps: CategoryMaps,
+    feature_columns: list[str],
+) -> pd.DataFrame:
+    """Transform raw validation/test rows with a fitted feature bundle."""
+    features = add_rowwise_features(df, target_prior=target_prior, config=config)
+    features = apply_category_maps(features, category_maps)
+    expected = set(feature_columns)
+    actual = set(features.columns)
+    if expected != actual:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise RuntimeError(f"inference feature mismatch: missing={missing}, extra={extra}")
+    return features.loc[:, feature_columns]
