@@ -134,3 +134,7 @@ exp48_bootstrap_ctx_correction,B,,,,,219839,286,0,9f6a53a,"delta=26.43 95%CI=[7.
 exp48_bootstrap_ctx_correction,C,,,,,223497,291,0,9f6a53a,"delta=21.26 95%CI=[6.85,38.19] -- CI excludes 0, significant. ALL 3 FOLDS CONFIRMED, adopted as new champion"
 submission_lb_ctx_correction,LB2025,834.4388750151,,,,,,0,,"actual leaderboard submission: exp32 ensemble + exp46 post-hoc ctx logit correction (hand+count4, beta=1.0). vs prior LB 817.8984371354 (exp32 alone): +16.54. new champion, submit/submit.zip replaced"
 exp50_team_hier_seed_avg,B,474.719,474.734,474.719,0.00019,219839,286,4,9f6a53a,"5-seed reconfirm of exp49 (team-hier feature) vs exp47 baseline mean, seed=4"
+exp50_team_hier_seed_avg,C,621.0,655.166,621.0,0.00924,223497,291,4,9f6a53a,"5-seed reconfirm of exp49 (team-hier feature) vs exp47 baseline mean, seed=4"
+exp50_team_hier_seed_avg_summary,A,,,,,217024,281,0-4,79799d1,"5-seed mean=561.9 std=6.06 vs exp47 baseline mean=557.4: Delta=+4.53. SE_diff~3.0 (both means from 5 seeds) -> z~1.5, not significant"
+exp50_team_hier_seed_avg_summary,B,,,,,219839,286,0-4,79799d1,"5-seed mean=474.2 std=1.92 vs baseline mean=466.5: Delta=+7.72. SE_diff~3.8 -> z~2.0, borderline"
+exp50_team_hier_seed_avg_summary,C,,,,,223497,291,0-4,79799d1,"5-seed mean=620.0 std=4.81 vs baseline mean=623.5: Delta=-3.47. SE_diff~4.8 -> z~-0.7, not significant. PRIMARY TUNING FOLD NEGATIVE (small, noisy) -- sign inconsistent with A/B. PARKED, not adopted: evidence too weak for the drift-primary fold to justify shipping"
