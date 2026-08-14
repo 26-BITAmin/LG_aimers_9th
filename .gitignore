@@ -21,6 +21,7 @@ venv/
 
 # Data
 data/*
+submission/*
 
 # Model checkpoints
 *.pt
