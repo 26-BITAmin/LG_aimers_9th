@@ -35,7 +35,7 @@ def run_fold(df, fold_name, feature_cols, cat_cols, lgb_params, use_custom,
              num_boost_round=2000, early_stopping_rounds=50, seed=0,
              use_trend=False, use_failmode=False, use_ballstrike=False,
              use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False,
-             use_team_hier=False):
+             use_team_hier=False, use_ewma=False):
     train_mask, valid_mask = F.split(df, fold_name)
     fit_df, valid_df = feat.build_fold_frames(df, train_mask, valid_mask, use_custom=use_custom,
                                                use_trend=use_trend, use_failmode=use_failmode,
@@ -43,7 +43,8 @@ def run_fold(df, fold_name, feature_cols, cat_cols, lgb_params, use_custom,
                                                use_failmode_platoon=use_failmode_platoon,
                                                use_n_exposed=use_n_exposed,
                                                use_season_trend=use_season_trend,
-                                               use_team_hier=use_team_hier)
+                                               use_team_hier=use_team_hier,
+                                               use_ewma=use_ewma)
 
     Xt = fit_df[feature_cols].copy()
     Xv = valid_df[feature_cols].copy()
@@ -96,7 +97,7 @@ def run_experiment(label, feature_cols, cat_cols, lgb_params, use_custom,
                     early_stopping_rounds=50, seed=0, notes="",
                     use_trend=False, use_failmode=False, use_ballstrike=False,
                     use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False,
-                    use_team_hier=False):
+                    use_team_hier=False, use_ewma=False):
     t0 = time.time()
     df = load_train()
     print(f"=== {label} ===  features={len(feature_cols)}  custom={use_custom}")
@@ -110,7 +111,8 @@ def run_experiment(label, feature_cols, cat_cols, lgb_params, use_custom,
                                                    use_failmode_platoon=use_failmode_platoon,
                                                    use_n_exposed=use_n_exposed,
                                                    use_season_trend=use_season_trend,
-                                                   use_team_hier=use_team_hier)
+                                                   use_team_hier=use_team_hier,
+                                                   use_ewma=use_ewma)
         results[fn] = res
         log_result(label, fn, res, seed=seed, notes=notes)
         print(f"  fold {fn}: score={res['score']:.1f}  pts_res={res['pts_res']:.1f}  "

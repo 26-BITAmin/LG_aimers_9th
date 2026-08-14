@@ -85,8 +85,11 @@ SEASON_TREND_FEATURES = ["asof_success_R_last_season_blend_static", "asof_succes
 
 TEAM_HIER_FEATURES = ["asof_success_R_team_blend_static"]
 
+EWMA_FEATURES = ["asof_success_R_ewma_static"]
+
 K_BLEND = 30.0
 K_TEAM = 500.0
+K_EWMA_HALFLIFE = 150.0  # 투구 단위 반감기 -- 대략 prev3~5게임 스케일, 튜닝 안 함
 
 
 def _components(with_failmode, with_ballstrike):
@@ -120,7 +123,8 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
                              with_failmode_platoon: bool = False,
                              with_n_exposed: bool = False,
                              with_season_trend: bool = False,
-                             with_team_hier: bool = False) -> pd.DataFrame:
+                             with_team_hier: bool = False,
+                             with_ewma: bool = False) -> pd.DataFrame:
     """학습(fit) 구간 안에서 커스텀 피처를 만든다.
 
     ★ 시즌 단위 frozen snapshot — 행 단위 strictly-prior cumsum이 **아니다**.
@@ -144,7 +148,8 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
         + (FAILMODE_PLATOON_FEATURES if with_failmode_platoon else []) \
         + (N_EXPOSED_FEATURES if with_n_exposed else []) \
         + (SEASON_TREND_FEATURES if with_season_trend else []) \
-        + (TEAM_HIER_FEATURES if with_team_hier else [])
+        + (TEAM_HIER_FEATURES if with_team_hier else []) \
+        + (EWMA_FEATURES if with_ewma else [])
     seasons = sorted(fit_df["season"].unique())
     frames = []
     for s in seasons:
@@ -156,12 +161,14 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
             lookup = fit_pitcher_lookup(prior, components=comps, platoon_components=platoon_comps,
                                          with_season_trend=with_season_trend)
             team_lookup, league_rate = fit_team_lookup(prior) if with_team_hier else (None, None)
+            ewma_lookup = fit_pitcher_ewma(prior) if with_ewma else None
             static_feats = apply_static_features(season_rows, lookup, components=comps,
                                                    platoon_components=platoon_comps,
                                                    with_n_exposed=with_n_exposed,
                                                    with_season_trend=with_season_trend,
                                                    with_team_hier=with_team_hier,
-                                                   team_lookup=team_lookup, league_rate=league_rate)
+                                                   team_lookup=team_lookup, league_rate=league_rate,
+                                                   with_ewma=with_ewma, ewma_lookup=ewma_lookup)
         frames.append(pd.concat([season_rows, static_feats], axis=1))
     return pd.concat(frames, axis=0)
 
@@ -241,6 +248,29 @@ def fit_team_lookup(fit_df: pd.DataFrame, target: str = TARGET):
     return g[["n_team", "rate_team"]], league_rate
 
 
+def fit_pitcher_ewma(fit_df: pd.DataFrame, target: str = TARGET,
+                      half_life: float = K_EWMA_HALFLIFE) -> pd.DataFrame:
+    """R전용, 투구(행) 단위 지수감쇠 "최근 폼" -- `row_id` 연대순(CLAUDE.md 불변식)을 이용해
+    최근 투구일수록 가중치가 크다. career 평균(`asof_success_R2_static`, 감쇠 없음)과는
+    다른 축 -- "최근이 평생 평균에서 얼마나 벗어났는지"가 신호일 수 있다는 가설.
+
+    공식 prev1/3/5_game_rate(TREND_FEATURES)와도 다르다: 그건 F오염된 공식 컬럼이고
+    "게임" 단위인데, 여기는 게임 ID가 데이터에 없어(competition.md) 투구 단위로 감쇠시킨다.
+
+    fit_pitcher_lookup과 마찬가지로 fit_df(학습 구간, strictly-prior)에서만 호출한다.
+    """
+    R = fit_df.loc[fit_df["game_type"] == "R"].sort_values("row_id")
+    rank_from_end = R.groupby("pitcher_id").cumcount(ascending=False).to_numpy(dtype=np.float64)
+    w = np.power(0.5, rank_from_end / half_life)
+    y = R[target].to_numpy(dtype=np.float64)
+    pid = R["pitcher_id"].to_numpy(dtype=np.int64)
+    tmp = pd.DataFrame({"w": w, "wy": w * y}, index=pid)
+    agg = tmp.groupby(tmp.index).sum()
+    agg["rate_ewma"] = agg["wy"] / agg["w"]
+    agg.index.name = "pitcher_id"
+    return agg[["rate_ewma"]]
+
+
 def _team_hier_blend(pitcher_rate, pitcher_n, team_rate, team_n, league_rate,
                       k_pitcher=K_BLEND, k_team=K_TEAM):
     """3단 축소: 투수 표본이 적으면 팀 수준으로, 팀 표본도 적거나 결측이면 리그로 당긴다."""
@@ -269,7 +299,9 @@ def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float
                            with_season_trend: bool = False,
                            with_team_hier: bool = False,
                            team_lookup: pd.DataFrame = None,
-                           league_rate: float = None) -> pd.DataFrame:
+                           league_rate: float = None,
+                           with_ewma: bool = False,
+                           ewma_lookup: pd.DataFrame = None) -> pd.DataFrame:
     """valid/test 행에 얼어붙은 lookup을 join. 현재 행 자신의 pitcher_hand/batter_hand로
     same/diff 버킷을 선택한다 (이건 test 행 '자기 자신'의 피처이므로 허용됨).
 
@@ -330,6 +362,9 @@ def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float
         pitcher_n_arr = j["n_R2"].to_numpy(float)
         out["asof_success_R_team_blend_static"] = _team_hier_blend(
             base_rate, pitcher_n_arr, team_rate_arr, team_n_arr, league_rate)
+    if with_ewma:
+        ewma_key = df[["pitcher_id"]].join(ewma_lookup, on="pitcher_id")
+        out["asof_success_R_ewma_static"] = ewma_key["rate_ewma"].to_numpy(float)
     return pd.DataFrame(out, index=df.index)
 
 
@@ -337,7 +372,7 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
                        use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
                        use_ballstrike: bool = False, use_failmode_platoon: bool = False,
                        use_n_exposed: bool = False, use_season_trend: bool = False,
-                       use_team_hier: bool = False):
+                       use_team_hier: bool = False, use_ewma: bool = False):
     """train_mask/valid_mask(src.folds.split 결과)로부터 (fit_df, valid_df)를 만든다.
 
     use_custom=True면 CUSTOM_STATIC_FEATURES(+ use_failmode/use_ballstrike/use_failmode_platoon/
@@ -356,16 +391,19 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
                                           with_failmode_platoon=use_failmode_platoon,
                                           with_n_exposed=use_n_exposed,
                                           with_season_trend=use_season_trend,
-                                          with_team_hier=use_team_hier)
+                                          with_team_hier=use_team_hier,
+                                          with_ewma=use_ewma)
         lookup = fit_pitcher_lookup(fit_raw, components=comps, platoon_components=platoon_comps,
                                      with_season_trend=use_season_trend)
         team_lookup, league_rate = fit_team_lookup(fit_raw) if use_team_hier else (None, None)
+        ewma_lookup = fit_pitcher_ewma(fit_raw) if use_ewma else None
         static_feats = apply_static_features(valid_df, lookup, components=comps,
                                               platoon_components=platoon_comps,
                                               with_n_exposed=use_n_exposed,
                                               with_season_trend=use_season_trend,
                                               with_team_hier=use_team_hier,
-                                              team_lookup=team_lookup, league_rate=league_rate)
+                                              team_lookup=team_lookup, league_rate=league_rate,
+                                              with_ewma=use_ewma, ewma_lookup=ewma_lookup)
         valid_df = pd.concat([valid_df.reset_index(drop=True), static_feats.reset_index(drop=True)], axis=1)
     else:
         fit_df = fit_raw
@@ -380,7 +418,7 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
 def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
                   use_ballstrike: bool = False, use_failmode_platoon: bool = False,
                   use_n_exposed: bool = False, use_season_trend: bool = False,
-                  use_team_hier: bool = False):
+                  use_team_hier: bool = False, use_ewma: bool = False):
     cols = list(OFFICIAL_FEATURES)
     if use_custom:
         cols += CUSTOM_STATIC_FEATURES
@@ -396,6 +434,8 @@ def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool =
             cols += SEASON_TREND_FEATURES
         if use_team_hier:
             cols += TEAM_HIER_FEATURES
+        if use_ewma:
+            cols += EWMA_FEATURES
     if use_trend:
         cols += TREND_FEATURES
     return cols
