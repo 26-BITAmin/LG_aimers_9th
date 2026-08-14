@@ -147,6 +147,13 @@ CatBoost에서 `pitcher_team_id`/`batter_team_id` 제거(exp43~44) — fold A만
 표본크기(`asof_pitcher_n`) 조건부 앙상블 블렌드(exp52) — 진단 결과 CatBoost vs
 LightGBM 우열이 n이 아니라 fold(학습기간) 단위로 갈려 조건부 규칙 설계 전제 자체가
 성립 안 함 ·
+LightGBM/CatBoost 시드 앙상블(exp54~56, 59) — 개별 모델 단위로는 확실한 분산
+축소 효과(전 fold 양수)지만 50/50 블렌드+ctx보정에 통합하면 4가지 조합 전부
+CI가 0을 포함해 확정 안 됨(fold C는 CatBoost 시드평균이 원흉, −8.3), 90개 이상
+모델로 철저히 검증 후 완전 종결 ·
+사후 ctx보정 축 확장 — outs/base_state/top_bottom/inning3(exp57) 전부 무효과,
+hand×count4 결합축(exp58)도 데이터 희석으로 소폭 손해 — hand+count4 애디티브가
+이 메커니즘의 최종형 ·
 `far_off`·`overlap` 누적 피처(−19~+27) · 타자 정체성·`li`·WE·`inning`·구종 배합 ·
 카운트 조건부 투수 이력(−30.9) · Trackman ID 매핑 · test 기반 importance weighting ·
 fold A/B 단독 판단
