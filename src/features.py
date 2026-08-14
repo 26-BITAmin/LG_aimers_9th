@@ -47,7 +47,74 @@ PREV_COLS = [
 ]
 
 
-def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None):
+# ── 사후 로짓 보정항 (post-hoc logit adjustment) ──────────────────────
+# 모델 **입력**이 아니라, 예측이 끝난 로짓에 더하는 항이다.
+#
+#     δ(pitcher, 상황코드) = n/(n+k) · (그 셀 성공률 − 그 투수 전체 성공률)
+#
+# 학습에서 얼려두고(`src/ctxfit.py`), 추론에서는 행 단위 조회만 한다.
+# 피처가 아니므로 모델 재학습이 필요 없고, 학습셋 타깃 리크가 구조적으로 안 생긴다.
+#
+# ⚠️ **새 축을 추가할 때 고칠 곳은 CTX_CODERS 하나다.**
+#    §7.36에서 플래툰을 넣을 때 같은 로직이 train / verify / predict / build_submit
+#    네 곳에 흩어져 있어 verify_pipeline을 빠뜨렸고, **검증이 플래툰 없는 모델을
+#    통과시켰다.** 이 구조는 그 재발 경로 자체를 없애기 위한 것이다.
+#
+# 코더는 (정수 코드, 코드 개수 m)을 돌려준다. 키 = pitcher_id * m + code 이므로
+# **m을 나중에 바꾸면 옛 아티팩트의 키가 통째로 어긋난다.** 바꾸지 말 것.
+
+
+def _code_hand(df):
+    """타자 손잡이. 값은 {1,2}뿐이지만 s11 아티팩트와 키를 맞추려고 m=8을 유지한다."""
+    return df["batter_hand"].to_numpy(dtype=np.int64), 8
+
+
+def _code_count4(df):
+    """0=일반  1=3볼  2=2스트라이크  3=풀카운트급.  (train/test 모두 결측 없는 int)
+
+    카운트는 **실패 모드의 구성**을 바꾼다 — 3볼에서는 볼넷을 피하려 존 가운데로
+    몰고(실패 ①), 2스트라이크에서는 유인구로 존을 크게 벗어난다(실패 ②).
+    그 트레이드오프를 얼마나 잘 관리하는지가 투수마다 다른데, `asof_*`는 이것을
+    **카운트를 뭉갠 평균**으로만 담고 있다. (MODEL.md §7.37)
+    """
+    b = df["balls_before"].to_numpy(dtype=np.int64)
+    s = df["strikes_before"].to_numpy(dtype=np.int64)
+    return (b >= 3).astype(np.int64) + 2 * (s >= 2).astype(np.int64), 4
+
+
+CTX_CODERS = {"hand": _code_hand, "count4": _code_count4}
+
+
+def ctx_lookup(df, ax):
+    """축 하나의 δ를 행 단위로 조회한다. 미지 셀은 0.
+
+    ⚠️ **행 독립적이다.** df 전체에 대한 집계가 아니라 각 행이 자기 키로
+    searchsorted 할 뿐이다 (Trackman 조회와 같은 형태).
+    """
+    code, m = CTX_CODERS[ax["name"]](df)
+    kv = df["pitcher_id"].to_numpy(dtype=np.int64) * m + code
+    keys = ax["keys"]
+    j = np.clip(np.searchsorted(keys, kv), 0, len(keys) - 1)
+    return np.where(keys[j] == kv, ax["delta"][j], 0.0)
+
+
+def logit_adjust(df, art):
+    """모든 보정 축의 Σ β·δ 와 축별 적중률을 돌려준다.
+
+    학습의 참조행 · 검증 · 추론이 **전부 이 함수 하나를 통과해야 한다.**
+    세 경로가 같은 코드를 보는 것이 §7.36 버그의 유일한 구조적 예방책이다.
+    """
+    z = np.zeros(len(df), dtype=np.float64)
+    hits = {}
+    for ax in ((art.get("ctx") or []) if art else []):
+        d = ctx_lookup(df, ax)
+        hits[ax["name"]] = float(np.mean(d != 0.0))
+        z += float(ax["beta"]) * d
+    return z, hits
+
+
+def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None,
+                  clip=None, ctx=None):
     """train에서만 호출. 추론 시 필요한 상수들을 계산해 딕셔너리로 반환.
 
     tm_table: (pitcher_id, season) → Trackman 요약 피처 DataFrame.
@@ -55,7 +122,11 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
         여기서는 **순수 numpy 배열로 눌러서** 저장한다 — 추론 시 pandas 버전에
         의존하지 않고, 조회가 행 단위 searchsorted로 끝나게 하기 위함.
     """
-    art = {"priors": {}, "cat_maps": {},
+    # clip: {컬럼: (lo, hi)} — 꼬리 winsorize 경계. `src/clipfit.fit_clip`이 학습
+    # 데이터에서 뽑아 넘겨준다. 여기서는 **받아 적기만** 한다 (추론 경로에 분위수
+    # 계산이 들어가면 안 되므로 — build_submit.py의 AST 스캐너가 막는다).
+    art = {"priors": {}, "cat_maps": {}, "clip": dict(clip or {}),
+           "ctx": list(ctx or []),      # src/ctxfit.fit_ctx 이 만든다 (사후 로짓 보정 축)
            "smooth_k": {col: (k_pitcher if ncol in _PITCHER_N_COLS else k_batter)
                         for col, ncol in SMOOTH_SPEC}}
 
@@ -91,7 +162,17 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
     return art
 
 
-def _col64(g, col, fill):
+def _clip32(v, art, col):
+    """꼬리 winsorize. **float32 단계에서** 자른다 — `_col64`와 스무딩 경로가
+    같은 숫자를 보게 하려면 자르는 시점의 dtype이 같아야 한다 (아래 skew 사고 참조).
+    경계도 float32로 내려서 float64로 올릴 때 정확히 같은 값이 되게 한다."""
+    b = art.get("clip", {}).get(col) if art else None
+    if b is None:
+        return v
+    return np.clip(v, np.float32(b[0]), np.float32(b[1]))
+
+
+def _col64(g, col, fill, art=None):
     """float32로 한 번 내린 뒤 float64로 올린다.
 
     ⚠️ 이 두 단계를 건너뛰면 train/serve skew가 난다.
@@ -100,7 +181,7 @@ def _col64(g, col, fill):
     원본 정밀도를 더 많이 갖게 되어 두 경로의 차분 피처가 1 ULP씩 어긋나고,
     LightGBM의 max_bin 경계에 걸린 행에서 예측이 갈린다.
     """
-    v = g[col].to_numpy(dtype=np.float32).astype(np.float64)
+    v = _clip32(g[col].to_numpy(dtype=np.float32), art, col).astype(np.float64)
     return np.nan_to_num(v, nan=fill)
 
 
@@ -168,27 +249,29 @@ def build_features(df, art):
     n_map = {"asof_pitcher_n": n_p, "asof_batter_n": n_b, "asof_pitcher_pitchmix_n": n_m}
     sm = {}
     for col, ncol in SMOOTH_SPEC:
-        raw = g[col].to_numpy(dtype=np.float32)
+        # 꼬리를 먼저 자른 뒤 스무딩·파생으로 내려보낸다. 자르는 것은 값이 아니라
+        # **레버리지**다 — 행은 그대로 남고 극단값만 경계에 앉는다.
+        raw = _clip32(g[col].to_numpy(dtype=np.float32), art, col)
         out[col] = raw                                    # 원본 (NaN 그대로 → LGBM이 처리)
         s = _smooth(raw, n_map[ncol], art["priors"][col], art["smooth_k"][col])
         sm[col] = s
         out[col + "_sm"] = s.astype(np.float32)
 
     for col in PREV_COLS:
-        out[col] = g[col].to_numpy(dtype=np.float32)
+        out[col] = _clip32(g[col].to_numpy(dtype=np.float32), art, col)
 
     # ── 최근 폼 변화 (차분은 트리가 스스로 못 만든다) ────────
     pr = art["priors"]
-    p1 = _col64(g, "asof_pitcher_prev1_game_success_rate", pr["asof_pitcher_prev1_game_success_rate"])
-    p3 = _col64(g, "asof_pitcher_prev3_game_success_rate", pr["asof_pitcher_prev3_game_success_rate"])
-    p5 = _col64(g, "asof_pitcher_prev5_game_success_rate", pr["asof_pitcher_prev5_game_success_rate"])
+    p1 = _col64(g, "asof_pitcher_prev1_game_success_rate", pr["asof_pitcher_prev1_game_success_rate"], art)
+    p3 = _col64(g, "asof_pitcher_prev3_game_success_rate", pr["asof_pitcher_prev3_game_success_rate"], art)
+    p5 = _col64(g, "asof_pitcher_prev5_game_success_rate", pr["asof_pitcher_prev5_game_success_rate"], art)
     career = sm["asof_pitcher_success_rate"]
     out["form_p1_minus_career"] = (p1 - career).astype(np.float32)
     out["form_p3_minus_career"] = (p3 - career).astype(np.float32)
     out["form_p1_minus_p5"] = (p1 - p5).astype(np.float32)
     out["form_p3_minus_p5"] = (p3 - p5).astype(np.float32)
 
-    m1 = _col64(g, "asof_pitcher_prev1_game_middle_rate", pr["asof_pitcher_prev1_game_middle_rate"])
+    m1 = _col64(g, "asof_pitcher_prev1_game_middle_rate", pr["asof_pitcher_prev1_game_middle_rate"], art)
     out["form_mid_p1_minus_career"] = (m1 - sm["asof_pitcher_middle_rate"]).astype(np.float32)
 
     # ── 매치업 엣지: 투수 제구력 vs 타자가 겪어온 제구력 ─────
@@ -240,4 +323,5 @@ def build_features(df, art):
     return X
 
 
-__all__ = ["fit_artifacts", "build_features", "CATEGORICAL_COLS"]
+__all__ = ["fit_artifacts", "build_features", "logit_adjust", "ctx_lookup",
+           "CTX_CODERS", "CATEGORICAL_COLS"]

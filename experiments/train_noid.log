@@ -1,0 +1,39 @@
+Loading train.csv ...
+  (1475092, 49)  (4.4s)
+시즌별 가중치: {2019: 0.001, 2020: 0.0039, 2021: 0.0156, 2022: 0.0625, 2023: 0.25, 2024: 1.0}
+Trackman 모드=none  테이블=None
+features=80  (drop=['game_type'], ids=True)  (6.4s)
+  [1/20] base_42 완료  (36s)
+  [2/20] base_7 완료  (65s)
+  [3/20] base_2024 완료  (94s)
+  [4/20] base_1234 완료  (123s)
+  [5/20] base_31337 완료  (152s)
+  [6/20] wide_42 완료  (195s)
+  [7/20] wide_7 완료  (238s)
+  [8/20] wide_2024 완료  (279s)
+  [9/20] wide_1234 완료  (321s)
+  [10/20] wide_31337 완료  (363s)
+  [11/20] extra_42 완료  (392s)
+  [12/20] extra_7 완료  (422s)
+  [13/20] extra_2024 완료  (452s)
+  [14/20] extra_1234 완료  (484s)
+  [15/20] extra_31337 완료  (514s)
+  [16/20] lowff_42 완료  (536s)
+  [17/20] lowff_7 완료  (559s)
+  [18/20] lowff_2024 완료  (581s)
+  [19/20] lowff_1234 완료  (604s)
+  [20/20] lowff_31337 완료  (627s)
+  [mlp 1/8] emb4_42 완료  가중 0.0750  (export skew 4.2e-07)  (790s)
+  [mlp 2/8] emb4_7 완료  가중 0.0750  (export skew 4.5e-07)  (964s)
+  [mlp 3/8] emb4_2024 완료  가중 0.0750  (export skew 4.6e-07)  (1130s)
+  [mlp 4/8] emb4_1234 완료  가중 0.0750  (export skew 3.1e-07)  (1292s)
+  [mlp 5/8] emb4_31337 완료  가중 0.0750  (export skew 3.0e-07)  (1443s)
+  [mlp 6/8] noid_42 완료  가중 0.2083  (export skew 3.0e-07)  (1542s)
+  [mlp 7/8] noid_7 완료  가중 0.2083  (export skew 3.3e-07)  (1641s)
+  [mlp 8/8] noid_2024 완료  가중 0.2083  (export skew 3.6e-07)  (1733s)
+  블렌드: (1-0.4)·lgbm + 0.4·mlp   (로짓 상관 0.949)
+
+prior shift: ref(2024) pred_mean=0.4886 → target=0.4750
+  base=+0.00000  delta=-0.05506  → logit_delta=-0.05506
+
+Saved to D:\projects\LG aimers 야구\submit\model  (total 1733s)

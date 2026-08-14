@@ -52,7 +52,7 @@ def main():
           f"{'std비':>7s}   해석")
     print("-" * 62)
     for f in FOLDS:
-        z_lgb, z_mlp, y = cache[f]
+        z_lgb, z_mlp, y, _ = cache[f]
         Z = (1 - MLP_ALPHA) * z_lgb + MLP_ALPHA * z_mlp
         Xtr, ytr, w, Xva, yva, art = foldcache.fold_data(df, f)
         A, C, B, Cv, _, sizes = mlp.encode(Xtr, Xva, art)

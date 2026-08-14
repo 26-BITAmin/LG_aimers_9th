@@ -38,10 +38,12 @@ import pandas as pd
 
 from config import (DROP_FEATURES, FINAL_LGB_PARAMS, MLP_ALPHA, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
                     TRAIN_CSV, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
-from features import build_features, fit_artifacts
+import ctxfit
+import modelabel
+from features import build_features, fit_artifacts, logit_adjust
 from predict import Predictor
 from trackman_features import load_table
 from train import (reference_matrix, solve_delta, train_ensemble,
@@ -75,8 +77,10 @@ def main():
 
     ref_season = int(tr.season.max())
     w = recency_weight(tr.season.to_numpy(), RECENCY_HALF_LIFE, ref_season=ref_season)
+    ctx = ctxfit.fit_ctx(tr, TARGET_COL, CTX_AXES, CTX_K)
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
-                        k_batter=SMOOTH_K_BATTER, tm_table=load_table(TRACKMAN_MODE))
+                        k_batter=SMOOTH_K_BATTER, tm_table=load_table(TRACKMAN_MODE),
+                        ctx=ctx)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     Xtr = build_X(tr, art)
@@ -96,16 +100,34 @@ def main():
                              ref_season=ref_season, test_season=VALID_SEASON)[Xtr.columns]
     members, raw_ref = train_ensemble(Xtr, ytr, w, init_tr, X_ref, model_dir)
 
-    mlp_tags, mlp_enc = [], None
+    # ⚠️ 여기는 **배포와 같은 함수**를 호출해야 한다. 예전에 학습 루프가 train.py와
+    #    여기에 중복돼 "검증이 배포될 모델과 무관한 것을 통과시킨" 사고가 있었다
+    #    (MODEL.md §5). 반환값이 늘면 여기도 같이 고친다.
+    mlp_tags, mlp_wts, mlp_enc = [], [], None
     if USE_MLP:
-        mlp_tags, mlp_enc, z_mlp_ref = train_mlp_members(Xtr, ytr, w, X_ref, art,
-                                                         model_dir)
+        # 보조 라벨은 **학습 부분집합에서** 복원한다 (Xtr과 행이 정렬돼야 한다).
+        aux, aux_cov = modelabel.aux_labels(tr)
+        print(f"보조 라벨 복원 {aux_cov:.1%}")
+        mlp_tags, mlp_wts, mlp_enc, z_mlp_ref = train_mlp_members(
+            Xtr, ytr, w, X_ref, art, model_dir, y_aux=aux)
         raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref
+
+    # ⚠️ 배포(train.py)와 **같은 순서**여야 한다: 블렌드 → 보정 → prior shift.
+    #    예전에는 이 줄이 train.py와 여기에 **중복**돼 있어서 플래툰을 넣을 때
+    #    여기만 빠뜨렸고, 검증이 플래툰 없는 모델을 통과시켰다 (홀드아웃이 770.2로
+    #    s09와 소수점까지 같게 나온 것이 단서였다 — §5의 재발).
+    #    지금은 `logit_adjust` 한 함수를 셋이 공유하므로 축을 늘려도 여기는 안 고친다.
+    z_adj, hits = logit_adjust(tr[tr.season == ref_season], art)
+    for line in ctxfit.summary(ctx):
+        print(f"보정축 {line}")
+    print(f"보정축 참조행 적중 " + "  ".join(f"{k} {v:.1%}" for k, v in hits.items()))
+    raw_ref = raw_ref + z_adj
 
     delta = solve_delta(base + raw_ref, TARGET_PRIOR_2025)
     joblib.dump({"artifacts": art, "feature_cols": Xtr.columns.tolist(),
                  "logit_delta": base + delta, "members": members,
                  "mlp_members": mlp_tags, "mlp_enc": mlp_enc,
+                 "mlp_weights": mlp_wts,
                  "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0},
                 model_dir / "artifacts.joblib", compress=3)
 
@@ -118,23 +140,18 @@ def main():
     predictor = Predictor(str(model_dir))
     p_served = predictor.predict(va_served)
 
-    # 학습 경로에서 직접 계산한 값.
-    # ⚠️ `va`는 train.csv를 float32 dtype으로 읽은 것이고 `va_served`는 CSV에서
-    #    pandas 기본 추론(float64)으로 읽은 것이다. 이 두 경로가 갈리는 것이
-    #    예전에 실제로 났던 사고다 (features._col64 주석 참조).
-    #    MLP 인코더도 같은 위험이 있으므로 여기에 함께 태운다.
-    #    (torch ↔ numpy 등가성은 export 시점에 train_mlp_members가 이미 검사했다.)
-    Xva = build_X(va, art)[predictor.cols]
-    z = np.zeros(len(Xva))
-    for bst_ in predictor.boosters:
-        z += bst_.predict(Xva, raw_score=True)
-    z /= len(predictor.boosters)
-    if predictor.alpha > 0:
-        zm = np.zeros(len(Xva))
-        for m_ in predictor.mlps:
-            zm += m_.logit(Xva)
-        z = (1 - predictor.alpha) * z + predictor.alpha * (zm / len(predictor.mlps))
-    p_direct = _sigmoid(z + predictor.delta)
+    # 이 검사가 잡으려는 것은 **dtype 경로 차이**다.
+    # `va`는 train.csv를 float32 dtype으로 읽은 것이고 `va_served`는 CSV에서
+    # pandas 기본 추론(float64)으로 읽은 것이다. 이 둘이 갈리는 것이 예전에 실제로
+    # 났던 사고다 (features._col64 주석 참조). MLP 인코더도 같은 위험이 있다.
+    # (torch ↔ numpy 등가성은 export 시점에 train_mlp_members가 이미 검사했다.)
+    #
+    # ⚠️ 예전에는 여기서 블렌드 수식을 **다시 구현**했다. 그래서 배포 쪽에 멤버별
+    #    가중을 넣었을 때 이쪽만 균등 평균으로 남아 **검증이 거짓 실패**했다
+    #    (max diff 8.7e-03). §5의 학습 루프 중복 사고와 같은 구조다.
+    #    → 같은 `predictor.predict()`에 **dtype만 다른 프레임**을 넣는다.
+    #      비교 대상이 dtype 하나로 좁혀지고, 수식 중복이 사라진다.
+    p_direct = predictor.predict(va.drop(columns=[TARGET_COL]))
 
     d = np.abs(p_served - p_direct).max()
     print(f"  max|serve - direct| = {d:.3e}   {'✅ OK' if d < 1e-9 else '❌ SKEW!'}")

@@ -186,13 +186,36 @@ def describe(meta):
        이름으로 설정을 구분하는 게 이 함수의 존재 이유다 —
        **새 하이퍼파라미터를 배포에 넣으면 여기에도 넣어야 한다.**
     """
-    parts = ["p" + f"{meta['target_prior_2025']:.3f}".split(".")[1]]     # 0.475 -> p475
-    parts.append("h" + str(meta["recency_half_life"]).replace("0.", "").replace(".", ""))
-    parts.append("f" + str(meta["n_features"]))                          # 피처 수
+    #   `p475`(prior)   s13에서 뺌. s01 이후 12회 불변이고 표에 'prior' 열로 있다
+    parts = []
+    # 자리를 비운 것들 — 전부 **여러 제출에 걸쳐 안 바뀌었고** SUBMISSIONS.md에 열로 있다.
+    #   `f80`(피처 수)   s11에서 뺌. s05 이후 불변
+    #   `h5`(recency)    s12에서 뺌. s04 이후 불변이고 §7.23에서 재검증·기각됐다
+    # 30자 제한에 걸리면 **이번에 바뀐 축이 아니라 안 바뀐 축을 뺀다.**
     e = "e" + str(meta.get("n_members", len(meta.get("seeds", []))))
     if meta.get("use_mlp"):
         e += "m" + str(len(meta.get("mlp_members", [])))
         e += "a" + f"{float(meta.get('mlp_alpha', 0)):.2f}".split(".")[1]  # 0.40 -> a40
+        # noid 비중 (MODEL.md §7.27). 균등(.375)이면 생략 — 옛 태그와 호환된다.
+        nw = float((meta.get("mlp_variant_weight") or {}).get("noid", 0.0))
+        tw = sum(float(v) for v in (meta.get("mlp_variant_weight") or {}).values())
+        if tw > 0 and abs(nw / tw - 0.375) > 1e-6:
+            e += "n" + f"{nw / tw * 10:.0f}"      # 0.625 -> n6 (정확한 값은 meta.json)
+    # 사후 로짓 보정 축의 β (MODEL.md §7.36 hand · §7.37 count4).
+    # 축이 늘면 태그도 늘어난다 — 축마다 접두 1~2자로 붙인다. 없으면 생략(옛 태그 호환).
+    ABBR = {"hand": "pl", "count4": "c"}                    # 1.5 -> pl15,  1.0 -> c10
+    for name, beta in (meta.get("ctx_axes") or {}).items():
+        if beta:
+            e += ABBR.get(name, name[:2]) + f"{float(beta) * 10:.0f}"
+    # 다중 과제 보조 헤드 λ (MODEL.md §7.41). 0이면 생략 — 옛 태그와 호환된다.
+    ax = float(meta.get("mlp_aux_lambda") or 0.0)
+    if ax:
+        e += "x" + f"{ax * 10:.0f}"
+        # 축 개수는 **2가 아닐 때만** 붙인다 → s13의 `x10`이 그대로 유지된다.
+        # λ만으로는 헤드 2개짜리와 4개짜리가 같은 태그를 받는다 (§7.42).
+        nax = len(meta.get("mlp_aux_modes") or [])
+        if nax and nax != 2:
+            e += f"h{nax}"
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
@@ -209,9 +232,13 @@ def next_zip_path(meta, suffix=""):
         if head.isdigit():
             used.append(int(head))
     name = f"s{max(used)+1:02d}_{describe(meta)}{suffix}.zip"
+    # ⚠️ 예전에는 넘치면 **뒤를 잘랐다.** 그런데 태그는 뒤로 갈수록 최근에 추가된
+    #    설정이라(alpha, noid 비중 …) 자르면 정확히 이번에 바뀐 것이 사라진다 —
+    #    s08(a=.30)과 s09(a=.40)의 이름이 같아졌던 사고의 재발 경로다.
+    #    조용히 자르지 않고 여기서 멈춘다. `describe()`를 줄이는 게 올바른 대응이다.
     if len(name) > MAX_NAME:
-        name = name[:MAX_NAME - 4] + ".zip"
-        print(f"  ⚠️ 파일명이 {MAX_NAME}자를 넘어 잘랐다 → {name}")
+        raise SystemExit(f"파일명이 {MAX_NAME}자를 넘는다 ({len(name)}자): {name}\n"
+                         f"  describe()의 태그를 줄일 것. 자르면 이번에 바뀐 설정이 사라진다.")
     return ROOT / name
 
 
@@ -231,6 +258,19 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
     cfg = str(meta["n_features"])
     if meta.get("use_mlp"):
         cfg += f"+MLP{len(meta.get('mlp_members', []))}(a{meta.get('mlp_alpha')})"
+    # 사후 로짓 보정 축. s11에서는 이 줄이 없어서 표에 플래툰이 안 찍혔고 손으로 채웠다 —
+    # `describe()`와 같은 종류의 누락이다. 배포에 들어간 것은 전부 여기 나와야 한다.
+    NICE = {"hand": "플래툰", "count4": "카운트"}
+    for name, beta in (meta.get("ctx_axes") or {}).items():
+        if beta:
+            cfg += f"+{NICE.get(name, name)} β{beta}"
+    # 보조 헤드 λ. describe()·log_submission() 둘 다 고쳐야 한다 — 이 누락이 세 번째다
+    # (s11 플래툰, s12 카운트, s13 보조헤드). 배포에 넣은 것은 **전부** 여기 나와야 한다.
+    if meta.get("mlp_aux_lambda"):
+        AXN = {"middle": "몰림", "reverse": "반대", "ball": "볼", "strike": "스트라이크"}
+        ax = [AXN.get(m, m) for m in (meta.get("mlp_aux_modes") or [])]
+        cfg += (f"+보조헤드 λ{meta['mlp_aux_lambda']}"
+                + (f"({'·'.join(ax)})" if ax else ""))
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")

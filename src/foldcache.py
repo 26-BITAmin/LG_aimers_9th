@@ -49,9 +49,29 @@ def _key():
     return hashlib.sha1(s.encode()).hexdigest()[:10]
 
 
-def fold_data(df, valid_season):
-    tr = df[df.season < valid_season]
-    va = df[df.season == valid_season]
+SPLIT_MONTH = 7          # 7월 이후 = 후반기 (KBO 정규시즌 3~10월)
+
+# 이름 → (학습 마스크, 검증 마스크). `foldsurvey.py`의 신호량 조사 결과:
+#   2021  973.2   2022 1849.2   2023  -10.2   2024  741.9
+#   2023 후반기 676.5           2024 후반기 656.1
+# **2023 시즌만 망가져 있다** (2022→2023 구조적 단절). 학습에 2023 전반기를 넣으면
+# 676.5로 살아난다 — 시즌이 예측 불가능한 게 아니라 드리프트 문제다.
+SPLITS = {
+    2021: lambda s, m: (s < 2021, s == 2021),
+    2022: lambda s, m: (s < 2022, s == 2022),
+    2023: lambda s, m: (s < 2023, s == 2023),
+    2024: lambda s, m: (s < 2024, s == 2024),
+    "2023H2": lambda s, m: ((s < 2023) | ((s == 2023) & (m < SPLIT_MONTH)),
+                            (s == 2023) & (m >= SPLIT_MONTH)),
+    "2024H2": lambda s, m: ((s < 2024) | ((s == 2024) & (m < SPLIT_MONTH)),
+                            (s == 2024) & (m >= SPLIT_MONTH)),
+}
+
+
+def fold_data(df, fold):
+    """fold는 시즌 정수 또는 SPLITS의 키. 학습은 항상 검증보다 시간상 앞이다."""
+    mtr, mva = SPLITS[fold](df.season.to_numpy(), df.game_month.to_numpy())
+    tr, va = df[mtr], df[mva]
     w = recency_weight(tr.season.to_numpy(), RECENCY_HALF_LIFE,
                        ref_season=int(tr.season.max()))
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
@@ -117,7 +137,9 @@ def compute(f, df, t0):
     z_mlp = np.mean(zs, axis=0)
     print(f"  mlp {len(zs)}개 평균  단독 {mlp.score(z_mlp, yva):.1f}"
           f"  ({time.time()-t0:.0f}s)")
-    return z_lgb, z_mlp, yva
+    # 멤버별 z도 같이 돌려준다 — 멤버 수를 바꾸는 실험(s08의 3→8 같은)이
+    # 재학습 없이 가능해진다. 평균만 저장하면 그 질문을 다시 물을 수 없다.
+    return z_lgb, z_mlp, yva, np.stack(zs)
 
 
 def load(folds, verbose=True):
@@ -133,7 +155,9 @@ def load(folds, verbose=True):
         p = CACHE / f"fold{f}_{k}.npz"
         if p.exists():
             with np.load(p) as d:
-                out[f] = (d["z_lgb"], d["z_mlp"], d["y"])
+                # members는 나중에 추가됐다. 예전 캐시에는 없으므로 없으면 None
+                out[f] = (d["z_lgb"], d["z_mlp"], d["y"],
+                          d["members"] if "members" in d.files else None)
             if verbose:
                 print(f"  캐시 적중: {p.name}")
         else:
@@ -143,20 +167,24 @@ def load(folds, verbose=True):
         df = load_csv(TRAIN_CSV)
         for f in need:
             print(f"\n=== fold {f} 계산 (캐시 없음) ===")
-            z_lgb, z_mlp, y = compute(f, df, t0)
+            z_lgb, z_mlp, y, mem = compute(f, df, t0)
             np.savez_compressed(CACHE / f"fold{f}_{k}.npz",
-                                z_lgb=z_lgb, z_mlp=z_mlp, y=y)
+                                z_lgb=z_lgb, z_mlp=z_mlp, y=y, members=mem)
             for p in CACHE.glob(f"part_fold{f}_{k}_*.npz"):
                 p.unlink()          # 완성됐으니 조각은 치운다
-            out[f] = (z_lgb, z_mlp, y)
+            out[f] = (z_lgb, z_mlp, y, mem)     # 캐시 적중 경로와 **같은 모양**이어야 한다
             gc.collect()
     return out
 
 
 if __name__ == "__main__":
-    folds = [int(x) for x in sys.argv[1:]] or [2023, 2024]
+    # fold 이름은 시즌 정수이거나 "2023H2" 같은 문자열이다. int()로 강제하면 후자가 죽는다
+    folds = [int(x) if x.isdigit() else x for x in sys.argv[1:]] or [2023, 2024]
+    bad = [f for f in folds if f not in SPLITS]
+    if bad:
+        raise SystemExit(f"모르는 fold: {bad}\n가능: {list(SPLITS)}")
     d = load(folds)
     print(f"\n지문 {_key()}   캐시 위치 {CACHE}")
-    for f, (a, b, y) in d.items():
+    for f, (a, b, y, _) in d.items():
         print(f"  fold {f}: n={len(y):,}  lgb {mlp.score(a, y):.1f}"
               f"  mlp {mlp.score(b, y):.1f}")

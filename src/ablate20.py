@@ -69,7 +69,7 @@ def main():
     data = foldcache.load(FOLDS)
     Z, Y = {}, {}
     for f in FOLDS:
-        z_lgb, z_mlp, y = data[f]
+        z_lgb, z_mlp, y, _ = data[f]
         Z[f] = (1 - MLP_ALPHA) * z_lgb + MLP_ALPHA * z_mlp
         Y[f] = y
         print(f"fold {f}: n={len(y):,}  std(z_lgb)={z_lgb.std():.4f} "

@@ -81,7 +81,7 @@ def main():
     df = load_csv(TRAIN_CSV)
     for f in FOLDS:
         print(f"\n=== valid={f} ===")
-        z_lgb, z_mlp, y = cache[f]
+        z_lgb, z_mlp, y, _ = cache[f]
         Z[f] = (1 - MLP_ALPHA) * z_lgb + MLP_ALPHA * z_mlp
         Y[f] = y
         print(f"  현재 블렌드 BSS = {mlp.score(Z[f], y):.1f}"

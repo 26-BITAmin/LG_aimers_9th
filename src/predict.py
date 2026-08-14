@@ -9,7 +9,7 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 
-from features import build_features
+from features import build_features, logit_adjust
 from mlp_infer import MLPPredictor
 
 CLIP_EPS = 1e-6
@@ -21,6 +21,9 @@ class Predictor:
         self.art = bundle["artifacts"]
         self.cols = bundle["feature_cols"]
         self.delta = float(bundle["logit_delta"])
+        # 사후 로짓 보정 축은 self.art["ctx"] 안에 β까지 함께 들어 있다.
+        # (번들과 아티팩트 두 곳에 β를 두면 어긋난다 — 한 곳으로 모았다)
+        self.ctx_hits = {}
 
         # MLP 멤버 — torch가 아니라 npz + numpy 순전파다 (mlp_infer.py 참조)
         self.alpha = float(bundle.get("mlp_alpha") or 0.0)
@@ -32,6 +35,14 @@ class Predictor:
                     self.mlps.append(MLPPredictor({k: z[k] for k in z.files}, enc))
             if not self.mlps:
                 self.alpha = 0.0
+        # 멤버별 가중 (config.MLP_VARIANT_WEIGHT에서 나온다). 없으면 균등 —
+        # 옛 아티팩트를 그대로 읽을 수 있어야 한다.
+        self.mlp_w = bundle.get("mlp_weights") or None
+        if self.mlp_w is not None:
+            self.mlp_w = [float(v) for v in self.mlp_w]
+            if len(self.mlp_w) != len(self.mlps):
+                raise ValueError(f"mlp_weights({len(self.mlp_w)}) != "
+                                 f"멤버 수({len(self.mlps)})")
         # model_file= 이 아니라 model_str= 로 읽는다.
         # LightGBM의 C 파일 API는 Windows에서 경로를 ANSI 코드페이지로 해석하므로
         # 경로에 비ASCII 문자가 있으면 조용히 깨진다. 파일 I/O는 파이썬에 맡긴다.
@@ -76,9 +87,22 @@ class Predictor:
         # (표준화 상수 · 범주 LUT · 결측 대체값이 전부 학습 때 동결돼 있다).
         if self.alpha > 0:
             zm = np.zeros(len(X))
-            for m in self.mlps:
-                zm += m.logit(X)
-            z = (1.0 - self.alpha) * z + self.alpha * (zm / len(self.mlps))
+            if self.mlp_w is None:
+                for m in self.mlps:
+                    zm += m.logit(X)
+                zm /= len(self.mlps)
+            else:
+                # 가중은 학습 시점에 정규화돼 있다 (합 = 1). 여기서 또 나누지 않는다.
+                for m, wt in zip(self.mlps, self.mlp_w):
+                    zm += wt * m.logit(X)
+            z = (1.0 - self.alpha) * z + self.alpha * zm
+
+        # 사후 로짓 보정 (투수 × 상황 δ) — **블렌드 이후, prior shift 이전**.
+        # 이 순서는 검증에서 잰 순서와 같아야 한다 (2 fold에서 β 스윕한 그 지점).
+        # 순서를 바꾸면 solve_delta가 다른 로짓을 보게 되어 목표 prior를 못 맞춘다.
+        # train.py · verify_pipeline.py가 **같은 함수**를 부른다.
+        z_adj, self.ctx_hits = logit_adjust(test_df, self.art)
+        z = z + z_adj
 
         # prior shift — 학습 때 고정된 스칼라(base+delta)의 행 단위 적용
         p = 1.0 / (1.0 + np.exp(-(z + self.delta)))

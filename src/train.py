@@ -29,12 +29,16 @@ import lightgbm as lgb
 import numpy as np
 
 from config import (DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
-                    MLP_ALPHA, MLP_SEEDS, MLP_VARIANTS, MODEL_DIR, N_ROUNDS,
+                    MLP_ALPHA, MLP_AUX_LAMBDA, MLP_AUX_MODES, MLP_SEEDS,
+                    MLP_VARIANT_WEIGHT, MLP_VARIANTS,
+                    MODEL_DIR, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
-from features import build_features, fit_artifacts
+import ctxfit
+import modelabel
+from features import build_features, fit_artifacts, logit_adjust
 from trackman_features import load_table
 from validation import _logit, _sigmoid
 
@@ -105,7 +109,7 @@ def train_ensemble(X, y, w, init_score, X_ref, model_dir, t0=None):
     return members, raw / len(members)
 
 
-def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None):
+def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None, *, y_aux):
     """MLP 멤버를 학습해 **numpy 가중치(npz)로** 내보내고 참조 로짓을 반환한다.
 
     ⚠️ torch는 학습에만 쓴다. 추론은 `mlp_infer.py`의 numpy 순전파다
@@ -113,6 +117,11 @@ def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None):
         CUDA 유무 위험이 통째로 사라진다).
 
     ⚠️ 학습 루프는 `mlp.train_mlp` 한 곳에만 둔다. 여기서는 호출만 한다.
+
+    ⚠️ `y_aux`는 **키워드 전용 필수 인자**다 (기본값 없음). 일부러 그렇게 뒀다 —
+       §7.36에서 플래툰을 넣을 때 `verify_pipeline.py`를 빠뜨려 **검증이 그 기능 없는
+       모델을 통과시켰다.** 기본값 None을 주면 같은 사고가 조용히 재발한다.
+       여기에 인자를 추가할 때는 항상 이 형태로 두어 **호출부가 시끄럽게 죽게** 한다.
     """
     import numpy as _np
 
@@ -124,12 +133,24 @@ def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None):
     A, C = mlp.encode_apply(X, enc)
     A_ref, C_ref = mlp.encode_apply(X_ref, enc)
 
-    tags, z_ref = [], _np.zeros(len(X_ref))
+    # 변형별 비중(config.MLP_VARIANT_WEIGHT)을 멤버 단위 가중으로 펼친다.
+    # 변형 안에서는 균등(시드 평균 = 순수 분산 축소), 변형 사이만 비중을 준다.
+    vw = {v: MLP_VARIANT_WEIGHT.get(v, 1.0) for v in MLP_VARIANTS}
+    tot = sum(vw.values())
+    assert tot > 0, "MLP_VARIANT_WEIGHT의 합이 0이다"
+
+    tags, weights, z_ref = [], [], _np.zeros(len(X_ref))
     n = sum(k for _, k in MLP_VARIANTS.values())
     for vname, (cfg, nseed) in MLP_VARIANTS.items():
+        wm = vw[vname] / tot / nseed          # 이 변형의 멤버 하나가 갖는 가중
         for seed in MLP_SEEDS[:nseed]:
+            # 보조 헤드는 **두 변형 모두**에 단다 (MODEL.md §7.41 — `둘 다`가
+            # `emb4만`보다 양 fold에서 낫다: +20.55/+9.91 vs +16.09/+7.27).
+            # `export_weights`는 m.aux를 읽지 않으므로 npz에는 주 헤드만 들어간다
+            # → mlp_infer.py와 추론 시간이 그대로다.
             m, _ = mlp.train_mlp(A, C, y, w, A_ref, C_ref, enc["sizes"], seed=seed,
-                                 verbose=False, **cfg)
+                                 verbose=False, y_aux=y_aux,
+                                 **dict(cfg, aux=MLP_AUX_LAMBDA))
             W = mlp.export_weights(m)
             tag = f"{vname}_{seed}"
             _np.savez(model_dir / f"mlp_{tag}.npz", **W)
@@ -142,10 +163,13 @@ def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None):
                                    f"max|torch-numpy| = {d:.3e}")
 
             tags.append(tag)
-            z_ref += z_np
-            print(f"  [mlp {len(tags)}/{n}] {tag} 완료 "
-                  f"(export skew {d:.1e})  ({time.time()-t0:.0f}s)")
-    return tags, enc, z_ref / len(tags)
+            weights.append(wm)
+            z_ref += wm * z_np
+            print(f"  [mlp {len(tags)}/{n}] {tag} 완료  가중 {wm:.4f}"
+                  f"  (export skew {d:.1e})  ({time.time()-t0:.0f}s)")
+    # z_ref는 이미 가중합이다. 여기서 또 나누면 delta가 어긋난다.
+    assert abs(sum(weights) - 1.0) < 1e-9, f"가중 합이 1이 아니다: {sum(weights)}"
+    return tags, weights, enc, z_ref
 
 
 def solve_delta(z_ref, target_mean, tol=1e-11, max_iter=300):
@@ -182,8 +206,11 @@ def main():
     tm_table = load_table(TRACKMAN_MODE)
     print(f"Trackman 모드={TRACKMAN_MODE}  테이블="
           f"{None if tm_table is None else tm_table.shape}")
+    ctx = ctxfit.fit_ctx(df, TARGET_COL, CTX_AXES, CTX_K)
+    for line in ctxfit.summary(ctx):
+        print(f"보정축 {line}")
     art = fit_artifacts(df, weights=w, k_pitcher=SMOOTH_K_PITCHER,
-                        k_batter=SMOOTH_K_BATTER, tm_table=tm_table)
+                        k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     def build_X(d):
@@ -215,13 +242,30 @@ def main():
     members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
 
     # ── MLP 멤버 (로짓 블렌드) ───────────────────────────────
-    mlp_tags, mlp_enc = [], None
+    mlp_tags, mlp_wts, mlp_enc = [], [], None
     if USE_MLP:
-        mlp_tags, mlp_enc, z_mlp_ref = train_mlp_members(X, y, w, X_ref, art,
-                                                         MODEL_DIR, t0)
+        # 보조 라벨 — asof 누적의 증분에서 복원한다. **학습 타깃 전용**이다.
+        aux, aux_cov = modelabel.aux_labels(df)
+        print(f"  보조 라벨 복원 {aux_cov:.1%}  λ={MLP_AUX_LAMBDA}  "
+              f"축 {list(MLP_AUX_MODES)} ({aux.shape[1]}개)")
+        mlp_tags, mlp_wts, mlp_enc, z_mlp_ref = train_mlp_members(
+            X, y, w, X_ref, art, MODEL_DIR, t0, y_aux=aux)
         print(f"  블렌드: (1-{MLP_ALPHA})·lgbm + {MLP_ALPHA}·mlp   "
               f"(로짓 상관 {np.corrcoef(raw_ref, z_mlp_ref)[0,1]:.3f})")
         raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref
+
+    # ── 사후 로짓 보정도 delta보다 **먼저** 얹는다 ──────────────
+    # predict.py의 순서(블렌드 → 보정 → prior shift)와 같아야 한다.
+    # `logit_adjust`는 추론·검증과 **같은 함수**다 — 축을 늘려도 여기는 안 고친다.
+    # ⚠️ 참조행(REF_SEASON)의 δ 적중률은 추론행(2025)보다 높다 — §6 버그 2와 같은
+    #    구조다. 다만 δ는 투수 자기 평균으로부터의 편차라 **평균이 0에 붙어 있고**
+    #    (실측 hand −0.0001 / count4 +0.0007) 미적중은 0으로 떨어지므로 레벨 영향이
+    #    사실상 없다. 조회 키에 season이 안 들어가는 것이 Trackman과의 결정적 차이다.
+    z_adj, hits = logit_adjust(df[df.season == REF_SEASON], art)
+    if len(art["ctx"]):
+        print(f"보정축 참조행 적중 " + "  ".join(f"{k} {v:.1%}" for k, v in hits.items())
+              + f"   로짓 기여 평균 {z_adj.mean():+.5f}")
+        raw_ref = raw_ref + z_adj
 
     # ── prior shift: BASE + DELTA를 하나의 스칼라로 ──────────
     # ⚠️ 블렌드 **이후**의 로짓으로 delta를 푼다. 순서가 바뀌면 목표 prior를 못 맞춘다.
@@ -233,22 +277,32 @@ def main():
     print(f"  base={base:+.5f}  delta={delta:+.5f}  → logit_delta={logit_delta:+.5f}")
 
     # ── 저장 ────────────────────────────────────────────────
+    # β는 art["ctx"] 안에 축별로 들어 있다 — 번들에 따로 두지 않는다 (두 곳에 두면 어긋난다)
     joblib.dump({"artifacts": art, "feature_cols": cols, "logit_delta": logit_delta,
                  "members": members, "mlp_members": mlp_tags, "mlp_enc": mlp_enc,
+                 "mlp_weights": mlp_wts,
                  "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0},
                 MODEL_DIR / "artifacts.joblib", compress=3)
     (MODEL_DIR / "meta.json").write_text(json.dumps({
         "seeds": list(SEED_ENSEMBLE), "variants": list(ENSEMBLE_VARIANTS),
         "n_members": len(members), "n_rounds": N_ROUNDS,
         "use_mlp": USE_MLP, "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0,
+        "mlp_aux_lambda": MLP_AUX_LAMBDA if USE_MLP else 0.0,
+        # ⚠️ 축 목록도 반드시 남긴다. λ만 남기면 헤드 2개짜리와 4개짜리가
+        #    meta.json에서 구분이 안 되고, describe()의 태그도 같아진다.
+        #    (이 종류의 누락이 s11 플래툰 · s12 카운트 · s13 λ 세 번 있었다.)
+        "mlp_aux_modes": list(MLP_AUX_MODES) if USE_MLP else [],
         "mlp_seeds": list(MLP_SEEDS) if USE_MLP else [],
         "mlp_members": mlp_tags, "mlp_variants": MLP_VARIANTS,
+        "mlp_variant_weight": MLP_VARIANT_WEIGHT, "mlp_weights": mlp_wts,
         "recency_half_life": RECENCY_HALF_LIFE, "use_init_score": USE_INIT_SCORE,
         "use_player_ids": USE_PLAYER_IDS, "drop_features": list(DROP_FEATURES),
         "smooth_k": SMOOTH_K_PITCHER, "trackman_mode": TRACKMAN_MODE,
         "target_prior_2025": TARGET_PRIOR_2025, "ref_season": REF_SEASON,
         "base_logit": base, "delta": delta, "logit_delta": logit_delta,
         "n_features": len(cols), "train_rows": int(len(df)),
+        "ctx_axes": {a["name"]: a["beta"] for a in ctx}, "ctx_k": CTX_K,
+        "ctx_cells": {a["name"]: int(len(a["keys"])) for a in ctx},
         "lgb_params": FINAL_LGB_PARAMS, "lightgbm_version": lgb.__version__,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 

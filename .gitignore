@@ -59,3 +59,8 @@ logs/
 
 # fold 예측 캐시 (재생성 가능, 수 MB)
 experiments/cache/
+
+# LG Aimers 배포 교육자료 (강의 PDF·핸즈온 노트북, 총 20MB).
+# 작업 산출물이 아니고 재배포도 곤란하므로 추적하지 않는다.
+0*_*.pdf
+00_Hands_on_Tabular_ML.ipynb
