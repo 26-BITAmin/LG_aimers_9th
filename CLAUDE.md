@@ -91,7 +91,8 @@ pts_res = 1e5 * (1 - mean((p - bias - y)**2) / den)     # 오라클 절편 = 해
 
 - 학습에서 `game_type=="F" & season<=2022` 105,308행은 **항상 제외** (튜닝 대상 아님)
 - 평가는 R 전용. 클러스터 부트스트랩은 **투수 단위** (경기 ID가 데이터에 없음)
-- 판정: ① A/B/C 부호 일관성 → ② 점수 환산 크기 → ③ CI
+- 판정: ⓪ seed 노이즈 게이트(2σ, exp47 실측: A=9.6·B=12.1·C=15.2pts, LightGBM 단일
+  기준) → ① A/B/C 부호 일관성 → ② 점수 환산 크기 → ③ CI (wonwoo `decide.py` 도입)
 - 층화 축: `asof_pitcher_n` 구간 / `game_type` / `pitcher_team_id==13` / 볼카운트 / 월
 
 **실험 하나 = `results.csv` 한 줄.** 스냅샷("depth=8 → 452점")은 쓰지 마라.

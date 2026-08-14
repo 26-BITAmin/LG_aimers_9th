@@ -17,14 +17,16 @@ from .train_utils import load_train, log_result
 def run_fold_cb(df, fold_name, feature_cols, cat_cols, cb_params, use_custom,
                 num_boost_round=3000, early_stopping_rounds=100, seed=0,
                 use_trend=False, use_failmode=False, use_ballstrike=False,
-                use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False):
+                use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False,
+                use_team_hier=False):
     train_mask, valid_mask = F.split(df, fold_name)
     fit_df, valid_df = feat.build_fold_frames(df, train_mask, valid_mask, use_custom=use_custom,
                                                use_trend=use_trend, use_failmode=use_failmode,
                                                use_ballstrike=use_ballstrike,
                                                use_failmode_platoon=use_failmode_platoon,
                                                use_n_exposed=use_n_exposed,
-                                               use_season_trend=use_season_trend)
+                                               use_season_trend=use_season_trend,
+                                               use_team_hier=use_team_hier)
 
     Xt = fit_df[feature_cols].copy()
     Xv = valid_df[feature_cols].copy()
@@ -58,7 +60,8 @@ def run_experiment_cb(label, feature_cols, cat_cols, cb_params, use_custom,
                        fold_names=("A", "B", "C"), num_boost_round=3000,
                        early_stopping_rounds=100, seed=0, notes="",
                        use_trend=False, use_failmode=False, use_ballstrike=False,
-                       use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False):
+                       use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False,
+                       use_team_hier=False):
     t0 = time.time()
     df = load_train()
     print(f"=== {label} (CatBoost) ===  features={len(feature_cols)}  custom={use_custom}")
@@ -68,7 +71,8 @@ def run_experiment_cb(label, feature_cols, cat_cols, cb_params, use_custom,
             df, fn, feature_cols, cat_cols, cb_params, use_custom, num_boost_round,
             early_stopping_rounds, seed, use_trend=use_trend, use_failmode=use_failmode,
             use_ballstrike=use_ballstrike, use_failmode_platoon=use_failmode_platoon,
-            use_n_exposed=use_n_exposed, use_season_trend=use_season_trend)
+            use_n_exposed=use_n_exposed, use_season_trend=use_season_trend,
+            use_team_hier=use_team_hier)
         results[fn] = res
         log_result(label, fn, res, seed=seed, notes=notes)
         print(f"  fold {fn}: score={res['score']:.1f}  pts_res={res['pts_res']:.1f}  "

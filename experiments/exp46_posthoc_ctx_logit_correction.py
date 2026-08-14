@@ -52,7 +52,9 @@ K_SHRINK = 200.0  # wonwoo와 동일 축소 강도(k_pitcher와 같은 자릿수
 
 
 def code_hand(df):
-    return df["batter_hand"].to_numpy(dtype=np.int64), 2
+    # batter_hand 실제 값은 1=좌, 2=우 (CLAUDE.md) -- 0-index로 매핑해야 pid*m+code 키가
+    # 인접 pitcher_id와 충돌하지 않는다 (원래 코드가 1/2를 그대로 써서 IndexError 발생).
+    return df["batter_hand"].to_numpy(dtype=np.int64) - 1, 2
 
 
 def code_count4(df):

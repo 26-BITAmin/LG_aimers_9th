@@ -87,6 +87,13 @@ def main():
     lookup.reset_index().to_csv(os.path.join(MODEL_DIR, "pitcher_lookup.csv"), index=False)
     print("  saved pitcher_lookup.csv")
 
+    print("Fitting post-hoc ctx logit correction (hand+count4, exp46/exp48)...")
+    ctx_art = feat.fit_ctx(fit_df, ["hand", "count4"])
+    for axis_name, a in ctx_art.items():
+        pd.DataFrame({"key": a["keys"], "delta": a["delta"]}).to_csv(
+            os.path.join(MODEL_DIR, f"ctx_{axis_name}.csv"), index=False)
+        print(f"  saved ctx_{axis_name}.csv ({len(a['keys']):,} keys)")
+
     print("Done.")
 
 

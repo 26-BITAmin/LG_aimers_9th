@@ -41,3 +41,5 @@ catboost_info/
 
 # 제출용 모델 아티팩트 — data/*.csv 제외 규칙의 예외
 !/submit/model/pitcher_lookup.csv
+!/submit/model/ctx_hand.csv
+!/submit/model/ctx_count4.csv

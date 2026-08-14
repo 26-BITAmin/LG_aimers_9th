@@ -83,7 +83,10 @@ N_EXPOSED_FEATURES = ["asof_success_R2_n_static"]
 
 SEASON_TREND_FEATURES = ["asof_success_R_last_season_blend_static", "asof_success_R_season_slope_static"]
 
+TEAM_HIER_FEATURES = ["asof_success_R_team_blend_static"]
+
 K_BLEND = 30.0
+K_TEAM = 500.0
 
 
 def _components(with_failmode, with_ballstrike):
@@ -116,7 +119,8 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
                              with_ballstrike: bool = False,
                              with_failmode_platoon: bool = False,
                              with_n_exposed: bool = False,
-                             with_season_trend: bool = False) -> pd.DataFrame:
+                             with_season_trend: bool = False,
+                             with_team_hier: bool = False) -> pd.DataFrame:
     """학습(fit) 구간 안에서 커스텀 피처를 만든다.
 
     ★ 시즌 단위 frozen snapshot — 행 단위 strictly-prior cumsum이 **아니다**.
@@ -139,7 +143,8 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
         + (BALLSTRIKE_FEATURES if with_ballstrike else []) \
         + (FAILMODE_PLATOON_FEATURES if with_failmode_platoon else []) \
         + (N_EXPOSED_FEATURES if with_n_exposed else []) \
-        + (SEASON_TREND_FEATURES if with_season_trend else [])
+        + (SEASON_TREND_FEATURES if with_season_trend else []) \
+        + (TEAM_HIER_FEATURES if with_team_hier else [])
     seasons = sorted(fit_df["season"].unique())
     frames = []
     for s in seasons:
@@ -150,10 +155,13 @@ def build_training_features(fit_df: pd.DataFrame, with_failmode: bool = False,
         else:
             lookup = fit_pitcher_lookup(prior, components=comps, platoon_components=platoon_comps,
                                          with_season_trend=with_season_trend)
+            team_lookup, league_rate = fit_team_lookup(prior) if with_team_hier else (None, None)
             static_feats = apply_static_features(season_rows, lookup, components=comps,
                                                    platoon_components=platoon_comps,
                                                    with_n_exposed=with_n_exposed,
-                                                   with_season_trend=with_season_trend)
+                                                   with_season_trend=with_season_trend,
+                                                   with_team_hier=with_team_hier,
+                                                   team_lookup=team_lookup, league_rate=league_rate)
         frames.append(pd.concat([season_rows, static_feats], axis=1))
     return pd.concat(frames, axis=0)
 
@@ -218,6 +226,32 @@ def fit_pitcher_lookup(fit_df: pd.DataFrame, target: str = TARGET,
     return lookup
 
 
+def fit_team_lookup(fit_df: pd.DataFrame, target: str = TARGET):
+    """R전용 팀별 정적(frozen) lookup + 리그 전체 평균 — 투수→팀→리그 3단 축소의
+    중간·최상위 계층. 신인/저표본 투수가 곧장 리그 평균으로 뭉개지지 않고 자기
+    팀 수준(코칭스태프·포수진 등 체계 효과 가설)으로 먼저 당겨지게 한다.
+
+    fit_pitcher_lookup과 마찬가지로 fit_df(학습 구간, strictly-prior)에서만 호출한다.
+    """
+    R = fit_df.loc[fit_df["game_type"] == "R"]
+    league_rate = float(R[target].mean()) if len(R) else np.nan
+    g = R.groupby("pitcher_team_id")[target].agg(["sum", "count"])
+    g.columns = ["succ", "n_team"]
+    g["rate_team"] = g["succ"] / g["n_team"]
+    return g[["n_team", "rate_team"]], league_rate
+
+
+def _team_hier_blend(pitcher_rate, pitcher_n, team_rate, team_n, league_rate,
+                      k_pitcher=K_BLEND, k_team=K_TEAM):
+    """3단 축소: 투수 표본이 적으면 팀 수준으로, 팀 표본도 적거나 결측이면 리그로 당긴다."""
+    team_filled = np.where(np.isfinite(team_rate), team_rate, league_rate)
+    w_team = np.where(np.isfinite(team_n), team_n / (team_n + k_team), 0.0)
+    team_blend = w_team * team_filled + (1 - w_team) * league_rate
+    pitcher_filled = np.where(np.isfinite(pitcher_rate), pitcher_rate, team_blend)
+    w_p = np.where(np.isfinite(pitcher_n), pitcher_n / (pitcher_n + k_pitcher), 0.0)
+    return w_p * pitcher_filled + (1 - w_p) * team_blend
+
+
 def _platoon_blend(base_rate, rate_same, n_same, rate_diff, n_diff, same_hand, k_blend):
     """success 피처(exp04)에서 검증된 same/diff-hand 선택 + credibility-blend 로직.
     platoon_n이 작을수록(=콜드스타트) base_rate 쪽으로 당겨진다 (w = n/(n+k_blend))."""
@@ -232,7 +266,10 @@ def _platoon_blend(base_rate, rate_same, n_same, rate_diff, n_diff, same_hand, k
 def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float = K_BLEND,
                            components=(), platoon_components=(),
                            with_n_exposed: bool = False,
-                           with_season_trend: bool = False) -> pd.DataFrame:
+                           with_season_trend: bool = False,
+                           with_team_hier: bool = False,
+                           team_lookup: pd.DataFrame = None,
+                           league_rate: float = None) -> pd.DataFrame:
     """valid/test 행에 얼어붙은 lookup을 join. 현재 행 자신의 pitcher_hand/batter_hand로
     same/diff 버킷을 선택한다 (이건 test 행 '자기 자신'의 피처이므로 허용됨).
 
@@ -284,13 +321,23 @@ def apply_static_features(df: pd.DataFrame, lookup: pd.DataFrame, k_blend: float
         slope = blend_last - rate_earlier
         out["asof_success_R_last_season_blend_static"] = blend_last
         out["asof_success_R_season_slope_static"] = slope
+    if with_team_hier:
+        # 팀 lookup은 df 자기 자신의 pitcher_team_id로 조회 -- same/diff-hand 매치업
+        # 선택과 동일한 "test 행 자기 자신의 피처" 패턴이라 리크가 아니다.
+        team_key = df[["pitcher_team_id"]].join(team_lookup, on="pitcher_team_id")
+        team_rate_arr = team_key["rate_team"].to_numpy(float)
+        team_n_arr = team_key["n_team"].to_numpy(float)
+        pitcher_n_arr = j["n_R2"].to_numpy(float)
+        out["asof_success_R_team_blend_static"] = _team_hier_blend(
+            base_rate, pitcher_n_arr, team_rate_arr, team_n_arr, league_rate)
     return pd.DataFrame(out, index=df.index)
 
 
 def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Series,
                        use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
                        use_ballstrike: bool = False, use_failmode_platoon: bool = False,
-                       use_n_exposed: bool = False, use_season_trend: bool = False):
+                       use_n_exposed: bool = False, use_season_trend: bool = False,
+                       use_team_hier: bool = False):
     """train_mask/valid_mask(src.folds.split 결과)로부터 (fit_df, valid_df)를 만든다.
 
     use_custom=True면 CUSTOM_STATIC_FEATURES(+ use_failmode/use_ballstrike/use_failmode_platoon/
@@ -308,13 +355,17 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
                                           with_ballstrike=use_ballstrike,
                                           with_failmode_platoon=use_failmode_platoon,
                                           with_n_exposed=use_n_exposed,
-                                          with_season_trend=use_season_trend)
+                                          with_season_trend=use_season_trend,
+                                          with_team_hier=use_team_hier)
         lookup = fit_pitcher_lookup(fit_raw, components=comps, platoon_components=platoon_comps,
                                      with_season_trend=use_season_trend)
+        team_lookup, league_rate = fit_team_lookup(fit_raw) if use_team_hier else (None, None)
         static_feats = apply_static_features(valid_df, lookup, components=comps,
                                               platoon_components=platoon_comps,
                                               with_n_exposed=use_n_exposed,
-                                              with_season_trend=use_season_trend)
+                                              with_season_trend=use_season_trend,
+                                              with_team_hier=use_team_hier,
+                                              team_lookup=team_lookup, league_rate=league_rate)
         valid_df = pd.concat([valid_df.reset_index(drop=True), static_feats.reset_index(drop=True)], axis=1)
     else:
         fit_df = fit_raw
@@ -328,7 +379,8 @@ def build_fold_frames(df: pd.DataFrame, train_mask: pd.Series, valid_mask: pd.Se
 
 def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool = False,
                   use_ballstrike: bool = False, use_failmode_platoon: bool = False,
-                  use_n_exposed: bool = False, use_season_trend: bool = False):
+                  use_n_exposed: bool = False, use_season_trend: bool = False,
+                  use_team_hier: bool = False):
     cols = list(OFFICIAL_FEATURES)
     if use_custom:
         cols += CUSTOM_STATIC_FEATURES
@@ -342,6 +394,8 @@ def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool =
             cols += N_EXPOSED_FEATURES
         if use_season_trend:
             cols += SEASON_TREND_FEATURES
+        if use_team_hier:
+            cols += TEAM_HIER_FEATURES
     if use_trend:
         cols += TREND_FEATURES
     return cols
@@ -349,3 +403,73 @@ def feature_list(use_custom: bool, use_trend: bool = False, use_failmode: bool =
 
 def categorical_list(use_custom: bool):
     return CATEGORICAL_FEATURES
+
+
+# ── 사후 로짓 보정 (post-hoc logit correction, exp46/model.md) ───────────────
+#
+# 모델 **입력이 아니라** 앙상블 예측이 끝난 로짓에 더하는 항 -- 재학습 불필요, train
+# fit / valid·test lookup 구조라 리크 구조가 안 생긴다 (wonwoo 브랜치 아이디어 재구현,
+# 우리 재구현 과정에서 batter_hand 1/2 인덱싱 버그를 발견해 수정했음 — 아래 _ctx_code_hand
+# 참조). exp46: fold A/B/C 전부 부호 일치, hand+count4 조합이 exp47 seed 노이즈 게이트도
+# 통과. exp48(부트스트랩 CI)로 최종 확인 중.
+#
+#     δ(pitcher, 상황코드) = n/(n+k) · (그 셀 성공률 − 그 투수 전체 성공률)   [train에서만 fit]
+#     logit(p_corrected) = logit(p_ensemble) + Σ_axis β·δ                    [valid/test는 조회만]
+
+CTX_K = 200.0
+
+
+def _ctx_code_hand(df):
+    """타자 손잡이. 실제 값은 {1,2}(CLAUDE.md) -- 0-index로 매핑해야 pid*m+code 키가
+    인접 pitcher_id와 충돌하지 않는다."""
+    return df["batter_hand"].to_numpy(dtype=np.int64) - 1, 2
+
+
+def _ctx_code_count4(df):
+    """0=평상시 1=3볼 2=2스트라이크 3=풀카운트급."""
+    b = df["balls_before"].to_numpy(dtype=np.int64)
+    s = df["strikes_before"].to_numpy(dtype=np.int64)
+    return (b >= 3).astype(np.int64) + 2 * (s >= 2).astype(np.int64), 4
+
+
+CTX_CODERS = {"hand": _ctx_code_hand, "count4": _ctx_code_count4}
+
+
+def fit_ctx(fit_df: pd.DataFrame, axis_names, target: str = TARGET, k: float = CTX_K):
+    """train(fit_df)에서만 호출. 사후 보정 축(들)의 δ를 fit해 딕셔너리로 반환."""
+    y = fit_df[target].to_numpy(dtype=np.float64)
+    pid = fit_df["pitcher_id"].to_numpy(dtype=np.int64)
+    upid, invp = np.unique(pid, return_inverse=True)
+    n_p = np.bincount(invp).astype(np.float64)
+    rate_p = np.bincount(invp, weights=y) / n_p
+
+    out = {}
+    for name in axis_names:
+        code, m = CTX_CODERS[name](fit_df)
+        key = pid * m + code
+        u, inv = np.unique(key, return_inverse=True)
+        n = np.bincount(inv).astype(np.float64)
+        t = np.bincount(inv, weights=y)
+        rp = rate_p[np.searchsorted(upid, u // m)]
+        delta = (n / (n + k)) * (t / n - rp)
+        out[name] = {"m": m, "keys": u, "delta": delta}
+    return out
+
+
+def ctx_lookup(df: pd.DataFrame, axis_name: str, art: dict):
+    """valid/test 행에서 조회만 -- df 자기 자신의 pitcher_id + 상황코드로 searchsorted."""
+    a = art[axis_name]
+    code, m = CTX_CODERS[axis_name](df)
+    kv = df["pitcher_id"].to_numpy(dtype=np.int64) * m + code
+    keys = a["keys"]
+    j = np.clip(np.searchsorted(keys, kv), 0, len(keys) - 1)
+    return np.where(keys[j] == kv, a["delta"][j], 0.0)
+
+
+def logit(p):
+    p = np.clip(p, 1e-6, 1 - 1e-6)
+    return np.log(p / (1 - p))
+
+
+def sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))

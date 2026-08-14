@@ -13,6 +13,10 @@ TARGET_COL = "control_success"
 CAT_COLS = ["top_bottom", "game_type", "base_state", "game_month", "game_dayofweek",
             "pitcher_hand", "batter_hand", "pitcher_team_id", "batter_team_id"]
 
+# 사후 로짓 보정 (exp46/exp48, model.md). beta=1.0 고정 -- 튜닝 안 함, exp46에서 쓴 값 그대로.
+CTX_AXES = ("hand", "count4")
+CTX_BETA = 1.0
+
 
 # =======================
 # 데이터 로드 유틸
@@ -105,6 +109,14 @@ def main():
     lookup = pd.read_csv(LOOKUP_PATH).set_index("pitcher_id")
     print(f" OK. lookup pitchers={len(lookup)}")
 
+    ctx_art = {}
+    for axis_name in CTX_AXES:
+        ctx_path = os.path.join(MODEL_DIR, f"ctx_{axis_name}.csv")
+        d = pd.read_csv(ctx_path)
+        ctx_art[axis_name] = {"keys": d["key"].astype("int64").to_numpy(),
+                               "delta": d["delta"].astype("float64").to_numpy()}
+    print(f" ctx axes loaded: {list(ctx_art.keys())}")
+
     # ---- 테스트 데이터 로드 ----
     print("Load test data...")
     test = load_test(TEST_PATH)
@@ -132,8 +144,19 @@ def main():
         X_cb[c] = X_cb[c].astype(str)
     p_cb = cb_model.predict_proba(X_cb)[:, 1] if len(X_cb) else []
 
-    preds = 0.5 * p_lgb + 0.5 * p_cb if len(X) else []
-    print(f" preds={len(preds)}")
+    p_ens = 0.5 * p_lgb + 0.5 * p_cb if len(X) else []
+    print(f" ensemble preds={len(p_ens)}")
+
+    # ---- 사후 로짓 보정 (exp46/exp48) -- full 행 자기 자신의 pitcher_id + 상황코드로
+    # 조회만 한다 (재학습 없음, 리크 없음) ----
+    if len(full):
+        z = 0.0
+        for axis_name in CTX_AXES:
+            z = z + feat.ctx_lookup(full, axis_name, ctx_art)
+        preds = feat.sigmoid(feat.logit(p_ens) + CTX_BETA * z)
+    else:
+        preds = p_ens
+    print(f" preds (post ctx correction)={len(preds)}")
 
     # ---- sample_submission 기반 결과 생성 ----
     print("Build submission...")
