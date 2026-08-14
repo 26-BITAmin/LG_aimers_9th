@@ -130,6 +130,12 @@ label, fold, delta_pts, ci_lo, ci_hi, slope, n_va, seed, git_sha
 ## 폐기 목록 — 다시 제안하지 말 것
 
 RF 튜닝 · isotonic/Platt/기울기 보정(held-out −13.4/−2.5) ·
+절편(prior-shift) 보정 — nested-proxy(exp06)·추세선 외삽(exp40) 둘 다 fold 부호
+큰 폭 불일치로 기각 (+83.2는 RF 앵커 전용, `season` 피처·시즌-동결 asof 피처가
+있는 우리 모델엔 안 전이됨. R base rate가 계단형이라 3시즌 창 외삽이 불안정) ·
+최근 시즌 지수 가중치(recency weight, exp38~39) — 3시즌 fold 창에서 효과 잡음과
+구분 안 됨 (wonwoo 브랜치는 6시즌 창이라 다름) ·
+CatBoost `depth` 10 이상(exp37) — 8이 정점, 10은 fold C −42.8로 반전 ·
 `far_off`·`overlap` 누적 피처(−19~+27) · 타자 정체성·`li`·WE·`inning`·구종 배합 ·
 카운트 조건부 투수 이력(−30.9) · Trackman ID 매핑 · test 기반 importance weighting ·
 fold A/B 단독 판단
