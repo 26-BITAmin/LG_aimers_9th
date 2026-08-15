@@ -437,16 +437,22 @@ def _predict_routed_catboost(frame: pd.DataFrame, predictor: dict) -> np.ndarray
             f"unsupported {routing_column} values: {unexpected}; null={values.isna().any()}"
         )
 
-    is_f = values.eq(route_value).to_numpy()
-    is_base = ~is_f
+    # Older pandas versions can expose nullable-boolean comparisons as an
+    # object ndarray. Applying ``~`` to Python bool objects yields -1/-2,
+    # which pandas then interprets as row labels instead of a boolean mask.
+    # Force a native bool array and route by integer positions so inference is
+    # independent of both the pandas version and the frame index.
+    is_f = values.eq(route_value).fillna(False).to_numpy(dtype=np.bool_)
+    base_positions = np.flatnonzero(np.logical_not(is_f))
+    f_positions = np.flatnonzero(is_f)
     routed = np.empty(len(frame), dtype=np.float64)
-    if is_base.any():
-        routed[is_base] = predict_catboost_model(
-            frame.loc[is_base], predictor, "catboost_base"
+    if len(base_positions):
+        routed[base_positions] = predict_catboost_model(
+            frame.iloc[base_positions], predictor, "catboost_base"
         )
-    if is_f.any():
-        routed[is_f] = predict_catboost_model(
-            frame.loc[is_f], predictor, "catboost_f_route"
+    if len(f_positions):
+        routed[f_positions] = predict_catboost_model(
+            frame.iloc[f_positions], predictor, "catboost_f_route"
         )
     if not np.isfinite(routed).all():
         raise RuntimeError("routed CatBoost returned non-finite predictions")

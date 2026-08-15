@@ -498,11 +498,12 @@ def verify_serialization_routing_and_row_independence(
     f_route_all = runtime.predict_catboost_model(
         audit, predictor, "catboost_f_route"
     )
-    is_f = audit["game_type"].astype(str).eq("F").to_numpy()
+    is_f = audit["game_type"].astype(str).eq("F").to_numpy(dtype=np.bool_)
+    is_r = np.logical_not(is_f)
     expected_routed = np.where(is_f, f_route_all, base_all)
     routing_diffs = {
         "all_vs_expected": max_abs_diff(routed_catboost, expected_routed),
-        "r_vs_base": max_abs_diff(routed_catboost[~is_f], base_all[~is_f]),
+        "r_vs_base": max_abs_diff(routed_catboost[is_r], base_all[is_r]),
         "f_vs_f_route": max_abs_diff(routed_catboost[is_f], f_route_all[is_f]),
     }
     if max(routing_diffs.values()) > 1e-12:
@@ -544,7 +545,7 @@ def verify_serialization_routing_and_row_independence(
         "routing_max_abs_difference": routing_diffs,
         "row_independence_max_abs_difference": independence_diffs,
         "routing_audit_rows": int(len(audit)),
-        "routing_audit_r_rows": int((~is_f).sum()),
+        "routing_audit_r_rows": int(is_r.sum()),
         "routing_audit_f_rows": int(is_f.sum()),
         "catboost_base_target_prior": base_prior,
         "catboost_f_route_target_prior": f_route_prior,
