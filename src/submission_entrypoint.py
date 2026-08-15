@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-contained inference entrypoint for DACON submission schemas 2 and 3.
+"""Self-contained inference entrypoint for DACON submission schemas 2, 3, and 4.
 
 The evaluator places test.csv and sample_submission.csv in ./data and expects
 ./output/submission.csv. Every engineered feature depends only on the current
@@ -17,6 +17,17 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+
+try:
+    import torch
+    import torch.nn as nn
+    from tabm import EnsembleView, LinearEnsemble, make_tabm_backbone
+except ImportError:  # Schemas 2 and 3 do not require the neural runtime.
+    torch = None
+    nn = None
+    EnsembleView = None
+    LinearEnsemble = None
+    make_tabm_backbone = None
 
 
 ID_COL = "row_id"
@@ -47,6 +58,69 @@ DERIVED_CATEGORICAL_COLUMNS = [
     "pitcher_team_hand",
     "batter_team_hand",
 ]
+
+
+if nn is not None:
+
+    class EmbeddingTabM(nn.Module):
+        """Submission-time TabM with shared categorical embeddings."""
+
+        def __init__(
+            self,
+            *,
+            n_num_features: int,
+            cardinalities: list[int],
+            embedding_dimensions: list[int],
+            k: int,
+            n_blocks: int,
+            d_block: int,
+            dropout: float,
+        ) -> None:
+            super().__init__()
+            if len(cardinalities) != len(embedding_dimensions):
+                raise ValueError(
+                    "categorical cardinalities and embedding dimensions differ"
+                )
+            self.embeddings = nn.ModuleList(
+                [
+                    nn.Embedding(cardinality, dimension)
+                    for cardinality, dimension in zip(
+                        cardinalities, embedding_dimensions, strict=True
+                    )
+                ]
+            )
+            d_in = n_num_features + sum(embedding_dimensions)
+            chunks = [1] * n_num_features + embedding_dimensions
+            self.ensemble_view = EnsembleView(k=k)
+            self.backbone = make_tabm_backbone(
+                d_in=d_in,
+                n_blocks=n_blocks,
+                d_block=d_block,
+                dropout=dropout,
+                k=k,
+                arch_type="tabm",
+                start_scaling_init="normal",
+                start_scaling_init_chunks=chunks,
+            )
+            self.output = LinearEnsemble(d_block, 1, k=k)
+
+        def forward(self, x_num, x_cat):
+            parts = [x_num]
+            parts.extend(
+                embedding(x_cat[:, index])
+                for index, embedding in enumerate(self.embeddings)
+            )
+            x = torch.cat(parts, dim=-1)
+            x = self.ensemble_view(x)
+            x = self.backbone(x)
+            return self.output(x)
+
+else:
+
+    class EmbeddingTabM:  # pragma: no cover - used only for a clearer error.
+        def __init__(self, *args, **kwargs) -> None:
+            del args, kwargs
+            raise ImportError("schema 4 requires torch and tabm")
 
 
 @dataclass(frozen=True)
@@ -323,6 +397,147 @@ def prepare_catboost_features(frame: pd.DataFrame, metadata: dict) -> pd.DataFra
     return select_feature_columns(out, metadata["feature_columns"], "CatBoost")
 
 
+def _tabm_target_encoding_keys(frame: pd.DataFrame, groups: dict) -> pd.DataFrame:
+    columns = sorted(
+        {
+            column
+            for definition in groups.values()
+            for column in definition["columns"]
+            if column != "count_state"
+        }
+    )
+    keys = frame.loc[:, columns].reset_index(drop=True).copy()
+    keys["count_state"] = (
+        frame["balls_before"].to_numpy(dtype=np.int16) * 3
+        + frame["strikes_before"].to_numpy(dtype=np.int16)
+    )
+    return keys
+
+
+def _apply_tabm_group_statistics(
+    destination_keys: pd.DataFrame,
+    stats: pd.DataFrame,
+    *,
+    group_columns: list[str],
+    prior: float,
+    strength: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    destination = destination_keys.loc[:, group_columns].copy()
+    destination["__position"] = np.arange(len(destination), dtype=np.int64)
+    joined = destination.merge(
+        stats,
+        on=group_columns,
+        how="left",
+        sort=False,
+        validate="many_to_one",
+    ).sort_values("__position", kind="stable")
+    if not np.array_equal(
+        joined["__position"].to_numpy(),
+        np.arange(len(destination), dtype=np.int64),
+    ):
+        raise RuntimeError("TabM target-encoding merge changed row order")
+    count = joined["__effective_count"].fillna(0.0).to_numpy(dtype=np.float64)
+    numerator = joined["__weighted_target"].fillna(0.0).to_numpy(dtype=np.float64)
+    encoded = (numerator + strength * prior) / (count + strength)
+    return encoded.astype(np.float32), count.astype(np.float32)
+
+
+def prepare_tabm_features(
+    frame: pd.DataFrame,
+    metadata: dict,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply only fitted training constants to the supplied rows."""
+
+    config = FeatureConfig(**metadata["feature_config"])
+    rowwise = add_rowwise_features(
+        frame,
+        target_prior=float(metadata["target_prior"]),
+        config=config,
+    )
+    expected_rowwise = set(metadata["rowwise_feature_columns"])
+    if set(rowwise.columns) != expected_rowwise:
+        missing = sorted(expected_rowwise - set(rowwise.columns))
+        extra = sorted(set(rowwise.columns) - expected_rowwise)
+        raise ValueError(
+            f"TabM rowwise feature mismatch: missing={missing}, extra={extra}"
+        )
+
+    target_encoding = metadata["target_encoding"]
+    groups = target_encoding["groups"]
+    keys = _tabm_target_encoding_keys(frame, groups)
+    encoded_columns: dict[str, np.ndarray] = {}
+    prior = float(target_encoding["prior"])
+    for group_name, definition in groups.items():
+        mean, count = _apply_tabm_group_statistics(
+            keys,
+            definition["stats"],
+            group_columns=list(definition["columns"]),
+            prior=prior,
+            strength=float(definition["strength"]),
+        )
+        encoded_columns[f"te_{group_name}_mean"] = mean
+        encoded_columns[f"te_{group_name}_delta"] = mean - prior
+        encoded_columns[f"te_{group_name}_log_count"] = np.log1p(count)
+
+    numeric_columns = metadata["rowwise_numeric_columns"]
+    numeric = rowwise.loc[:, numeric_columns].replace([np.inf, -np.inf], np.nan)
+    numeric = pd.concat(
+        [numeric.reset_index(drop=True), pd.DataFrame(encoded_columns)], axis=1
+    )
+    expected_pre_missing = metadata["pre_missing_numeric_columns"]
+    if list(numeric.columns) != expected_pre_missing:
+        raise RuntimeError("TabM numerical feature order changed before imputation")
+    medians = pd.Series(metadata["numeric_medians"], dtype="float64").reindex(
+        expected_pre_missing
+    )
+    if medians.isna().any():
+        raise RuntimeError("TabM numerical medians are incomplete")
+    filled = numeric.fillna(medians)
+    missing_sources = metadata["missing_indicator_sources"]
+    if missing_sources:
+        indicator_names = {
+            column: f"{column}__missing" for column in missing_sources
+        }
+        indicators = (
+            numeric.loc[:, missing_sources]
+            .isna()
+            .astype("float32")
+            .rename(columns=indicator_names)
+        )
+        filled = pd.concat([filled, indicators], axis=1)
+    final_columns = metadata["numeric_feature_columns"]
+    if list(filled.columns) != final_columns:
+        raise RuntimeError("TabM numerical feature order changed after imputation")
+    means = pd.Series(metadata["numeric_means"], dtype="float64").reindex(
+        final_columns
+    )
+    stds = pd.Series(metadata["numeric_stds"], dtype="float64").reindex(
+        final_columns
+    )
+    if means.isna().any() or stds.isna().any() or (stds <= 0.0).any():
+        raise RuntimeError("TabM numerical scaling constants are invalid")
+    x_num = ((filled - means) / stds).clip(-10.0, 10.0).to_numpy(
+        dtype=np.float32, copy=True
+    )
+    if not np.isfinite(x_num).all():
+        raise RuntimeError("TabM numerical features contain non-finite values")
+
+    categorical_columns = metadata["categorical_columns"]
+    x_cat = np.empty((len(frame), len(categorical_columns)), dtype=np.int32)
+    for index, column in enumerate(categorical_columns):
+        values = rowwise[column].astype("string").fillna("__MISSING__")
+        categories = metadata["category_maps"][column]
+        # pandas code -1 is unknown; shifting by one reserves code 0 for it.
+        codes = pd.Categorical(values, categories=categories).codes.astype("int32")
+        x_cat[:, index] = codes + 1
+    cardinalities = np.asarray(metadata["cardinalities"], dtype=np.int64)
+    if len(cardinalities) and (
+        (x_cat < 0).any() or (x_cat >= cardinalities[None, :]).any()
+    ):
+        raise RuntimeError("TabM categorical code is outside its cardinality")
+    return x_num, x_cat
+
+
 def safe_logit(probability: np.ndarray) -> np.ndarray:
     clipped = np.clip(np.asarray(probability, dtype=np.float64), EPSILON, 1.0 - EPSILON)
     return np.log(clipped) - np.log1p(-clipped)
@@ -345,7 +560,7 @@ def load_predictor(model_dir: Path) -> dict:
     model_dir = Path(model_dir)
     metadata = joblib.load(model_dir / "artifacts.joblib")
     schema_version = metadata.get("schema_version")
-    if schema_version not in (2, 3):
+    if schema_version not in (2, 3, 4):
         raise RuntimeError(f"unsupported artifact schema: {metadata.get('schema_version')}")
     threads = max(1, min(6, os.cpu_count() or 1))
     lgbm_model = lgb.Booster(
@@ -370,6 +585,34 @@ def load_predictor(model_dir: Path) -> dict:
                 str(model_dir / metadata[model_key]["model_filename"])
             )
             predictor[f"{model_key}_model"] = model
+    if schema_version == 4:
+        if torch is None or nn is None:
+            raise ImportError("schema 4 requires torch and tabm")
+        torch.set_num_threads(threads)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        tabm_metadata = metadata["tabm"]
+        architecture = tabm_metadata["architecture"]
+        tabm_model = EmbeddingTabM(
+            n_num_features=int(tabm_metadata["n_num_features"]),
+            cardinalities=[int(value) for value in tabm_metadata["cardinalities"]],
+            embedding_dimensions=[
+                int(value) for value in tabm_metadata["embedding_dimensions"]
+            ],
+            k=int(architecture["k"]),
+            n_blocks=int(architecture["n_blocks"]),
+            d_block=int(architecture["d_block"]),
+            dropout=float(architecture["dropout"]),
+        )
+        state_path = model_dir / tabm_metadata["model_filename"]
+        try:
+            state = torch.load(state_path, map_location="cpu", weights_only=True)
+        except TypeError:
+            state = torch.load(state_path, map_location="cpu")
+        tabm_model.load_state_dict(state, strict=True)
+        tabm_model.to(device)
+        tabm_model.eval()
+        predictor["tabm_model"] = tabm_model
+        predictor["tabm_device"] = device
     return predictor
 
 
@@ -476,16 +719,96 @@ def predict_components(frame: pd.DataFrame, predictor: dict) -> tuple[np.ndarray
     return lgbm_probability, catboost_probability
 
 
+def predict_tabm_probabilities(frame: pd.DataFrame, predictor: dict) -> np.ndarray:
+    metadata = predictor["metadata"]
+    if metadata.get("schema_version") != 4:
+        raise RuntimeError("TabM prediction is available only for schema 4")
+    validate_raw_input(frame, metadata)
+    if len(frame) == 0:
+        return np.empty(0, dtype=np.float64)
+    x_num, x_cat = prepare_tabm_features(frame, metadata["tabm"])
+    model = predictor["tabm_model"]
+    device = predictor["tabm_device"]
+    batch_size = int(
+        metadata["tabm"][
+            "inference_batch_size_gpu"
+            if device.type == "cuda"
+            else "inference_batch_size_cpu"
+        ]
+    )
+    predictions = []
+    model.eval()
+    with torch.inference_mode():
+        for start in range(0, len(frame), batch_size):
+            stop = min(start + batch_size, len(frame))
+            batch_num = torch.from_numpy(x_num[start:stop]).to(
+                device, non_blocking=True
+            )
+            batch_cat = torch.from_numpy(x_cat[start:stop]).to(
+                device, dtype=torch.long, non_blocking=True
+            )
+            with torch.autocast(
+                device_type=device.type,
+                dtype=torch.float16,
+                enabled=device.type == "cuda",
+            ):
+                logits = model(batch_num, batch_cat).squeeze(-1)
+            probability = torch.sigmoid(logits.float()).mean(dim=1)
+            predictions.append(probability.cpu().numpy())
+    output = np.concatenate(predictions).astype(np.float64)
+    if len(output) != len(frame) or not np.isfinite(output).all():
+        raise RuntimeError("TabM returned invalid predictions")
+    return np.clip(output, EPSILON, 1.0 - EPSILON)
+
+
 def predict_probabilities(frame: pd.DataFrame, predictor: dict) -> np.ndarray:
     lgbm_probability, catboost_probability = predict_components(frame, predictor)
     blend = predictor["metadata"]["blend"]
     if blend["method"] != "logit":
         raise RuntimeError(f"unsupported blend method: {blend['method']}")
-    prediction = blend_logit(
+    base_prediction = blend_logit(
         lgbm_probability,
         catboost_probability,
         lgbm_weight=float(blend["lgbm_weight"]),
     )
+    metadata = predictor["metadata"]
+    if metadata["schema_version"] == 4:
+        neural_blend = metadata["neural_blend"]
+        if neural_blend["method"] != "probability":
+            raise RuntimeError(
+                f"unsupported neural blend method: {neural_blend['method']}"
+            )
+        if neural_blend.get("scope") != "R_only":
+            raise RuntimeError(
+                f"unsupported neural blend scope: {neural_blend.get('scope')}"
+            )
+        tree_weight = float(neural_blend["tree_weight"])
+        tabm_weight = float(neural_blend["tabm_weight"])
+        if (
+            tree_weight < 0.0
+            or tabm_weight < 0.0
+            or not np.isclose(tree_weight + tabm_weight, 1.0, atol=1e-12)
+        ):
+            raise RuntimeError("invalid neural blend weights")
+        routing_column = metadata["routing"]["column"]
+        values = frame[routing_column].astype("string")
+        is_r = (
+            values.eq(str(metadata["routing"]["base_value"]))
+            .fillna(False)
+            .to_numpy(dtype=np.bool_)
+        )
+        r_positions = np.flatnonzero(is_r)
+        prediction = base_prediction.copy()
+        if len(r_positions):
+            tabm_probability = predict_tabm_probabilities(
+                frame.iloc[r_positions], predictor
+            )
+            prediction[r_positions] = (
+                tree_weight * base_prediction[r_positions]
+                + tabm_weight * tabm_probability
+            )
+    else:
+        prediction = base_prediction
     if len(prediction) != len(frame) or not np.isfinite(prediction).all():
         raise RuntimeError("model returned invalid predictions")
     return np.clip(prediction, 0.0, 1.0)
