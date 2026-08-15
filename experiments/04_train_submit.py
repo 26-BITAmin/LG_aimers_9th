@@ -562,7 +562,8 @@ def main() -> None:
     gc.collect()
 
     end_to_end = verify_end_to_end(package_dir, args.data_dir)
-    zip_path = output_dir / "submit_lgbm_catboost_logit6535.zip"
+    # DACON submission filenames must be 30 characters or fewer.
+    zip_path = output_dir / "submit_01.zip"
     zip_summary = build_and_verify_zip(package_dir, zip_path)
 
     summary = {
