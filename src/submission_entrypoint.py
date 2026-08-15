@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-contained inference entrypoint for the second DACON submission.
+"""Self-contained inference entrypoint for DACON submission schemas 2 and 3.
 
 The evaluator places test.csv and sample_submission.csv in ./data and expects
 ./output/submission.csv. Every engineered feature depends only on the current
@@ -344,21 +344,33 @@ def blend_logit(
 def load_predictor(model_dir: Path) -> dict:
     model_dir = Path(model_dir)
     metadata = joblib.load(model_dir / "artifacts.joblib")
-    if metadata.get("schema_version") != 2:
+    schema_version = metadata.get("schema_version")
+    if schema_version not in (2, 3):
         raise RuntimeError(f"unsupported artifact schema: {metadata.get('schema_version')}")
     threads = max(1, min(6, os.cpu_count() or 1))
     lgbm_model = lgb.Booster(
         params={"num_threads": threads},
         model_file=str(model_dir / metadata["lgbm"]["model_filename"]),
     )
-    catboost_model = CatBoostClassifier()
-    catboost_model.load_model(str(model_dir / metadata["catboost"]["model_filename"]))
-    return {
+    predictor = {
         "metadata": metadata,
         "lgbm_model": lgbm_model,
-        "catboost_model": catboost_model,
         "threads": threads,
     }
+    if schema_version == 2:
+        catboost_model = CatBoostClassifier()
+        catboost_model.load_model(
+            str(model_dir / metadata["catboost"]["model_filename"])
+        )
+        predictor["catboost_model"] = catboost_model
+    else:
+        for model_key in ("catboost_base", "catboost_f_route"):
+            model = CatBoostClassifier()
+            model.load_model(
+                str(model_dir / metadata[model_key]["model_filename"])
+            )
+            predictor[f"{model_key}_model"] = model
+    return predictor
 
 
 def validate_raw_input(frame: pd.DataFrame, metadata: dict) -> None:
@@ -372,6 +384,75 @@ def validate_raw_input(frame: pd.DataFrame, metadata: dict) -> None:
         raise ValueError("test row_id must be non-null and unique")
 
 
+def predict_catboost_model(
+    frame: pd.DataFrame,
+    predictor: dict,
+    model_key: str,
+) -> np.ndarray:
+    """Predict every supplied row with one serialized CatBoost model."""
+
+    metadata = predictor["metadata"]
+    validate_raw_input(frame, metadata)
+    if model_key not in metadata:
+        raise ValueError(f"unknown CatBoost metadata key: {model_key}")
+    model_lookup = {
+        "catboost": "catboost_model",
+        "catboost_base": "catboost_base_model",
+        "catboost_f_route": "catboost_f_route_model",
+    }
+    predictor_key = model_lookup.get(model_key)
+    if predictor_key is None or predictor_key not in predictor:
+        raise ValueError(f"CatBoost model is not loaded: {model_key}")
+    features = prepare_catboost_features(frame, metadata[model_key])
+    pool = Pool(
+        features,
+        cat_features=metadata[model_key]["categorical_columns"],
+    )
+    probability = np.clip(
+        predictor[predictor_key].predict_proba(
+            pool, thread_count=predictor["threads"]
+        )[:, 1],
+        EPSILON,
+        1.0 - EPSILON,
+    )
+    return probability
+
+
+def _predict_routed_catboost(frame: pd.DataFrame, predictor: dict) -> np.ndarray:
+    metadata = predictor["metadata"]
+    routing = metadata["routing"]
+    routing_column = routing["column"]
+    if routing_column not in frame:
+        raise ValueError(f"test.csv is missing routing column: {routing_column}")
+    values = frame[routing_column].astype("string")
+    base_value = str(routing["base_value"])
+    route_value = str(routing["f_route_value"])
+    unexpected = sorted(
+        str(value)
+        for value in values.dropna().unique()
+        if str(value) not in {base_value, route_value}
+    )
+    if values.isna().any() or unexpected:
+        raise ValueError(
+            f"unsupported {routing_column} values: {unexpected}; null={values.isna().any()}"
+        )
+
+    is_f = values.eq(route_value).to_numpy()
+    is_base = ~is_f
+    routed = np.empty(len(frame), dtype=np.float64)
+    if is_base.any():
+        routed[is_base] = predict_catboost_model(
+            frame.loc[is_base], predictor, "catboost_base"
+        )
+    if is_f.any():
+        routed[is_f] = predict_catboost_model(
+            frame.loc[is_f], predictor, "catboost_f_route"
+        )
+    if not np.isfinite(routed).all():
+        raise RuntimeError("routed CatBoost returned non-finite predictions")
+    return routed
+
+
 def predict_components(frame: pd.DataFrame, predictor: dict) -> tuple[np.ndarray, np.ndarray]:
     metadata = predictor["metadata"]
     validate_raw_input(frame, metadata)
@@ -380,18 +461,12 @@ def predict_components(frame: pd.DataFrame, predictor: dict) -> tuple[np.ndarray
         predictor["lgbm_model"].predict(lgbm_features), EPSILON, 1.0 - EPSILON
     )
     del lgbm_features
-    catboost_features = prepare_catboost_features(frame, metadata["catboost"])
-    catboost_pool = Pool(
-        catboost_features,
-        cat_features=metadata["catboost"]["categorical_columns"],
-    )
-    catboost_probability = np.clip(
-        predictor["catboost_model"].predict_proba(
-            catboost_pool, thread_count=predictor["threads"]
-        )[:, 1],
-        EPSILON,
-        1.0 - EPSILON,
-    )
+    if metadata["schema_version"] == 2:
+        catboost_probability = predict_catboost_model(
+            frame, predictor, "catboost"
+        )
+    else:
+        catboost_probability = _predict_routed_catboost(frame, predictor)
     return lgbm_probability, catboost_probability
 
 
