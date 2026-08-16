@@ -61,7 +61,8 @@ ALL_FOLDS = [2021, 2022, 2023, 2024]      # 레짐 경계 진단용
 SEEDS = (42, 7, 2024)
 
 
-def run_fold(df, valid_season, *, tm_table=None, half_life=RECENCY_HALF_LIFE,
+def run_fold(df, valid_season, *, tm_table=None, tmb_table=None,
+             half_life=RECENCY_HALF_LIFE,
              params=FINAL_LGB_PARAMS, drop=DROP_FEATURES, use_ids=USE_PLAYER_IDS,
              rounds=N_ROUNDS, seeds=SEEDS, k=SMOOTH_K_PITCHER):
     tr = df[df.season < valid_season]
@@ -70,7 +71,7 @@ def run_fold(df, valid_season, *, tm_table=None, half_life=RECENCY_HALF_LIFE,
     w = (np.ones(len(tr)) if half_life is None          # None = 동일 가중
          else recency_weight(tr.season.to_numpy(), half_life, ref_season=ref))
     art = fit_artifacts(tr, weights=w, k_pitcher=k, k_batter=SMOOTH_K_BATTER,
-                        tm_table=tm_table)
+                        tm_table=tm_table, tmb_table=tmb_table)
 
     def X(d):
         x = build_features(d, art)

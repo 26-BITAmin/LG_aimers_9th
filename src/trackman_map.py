@@ -48,8 +48,26 @@ N_HALF = 24          # 12이닝까지 (연장 포함). 그 이상은 잘라낸�
 GAME_COST_MAX = 30   # 하프이닝 투구 수 벡터의 L1 거리 허용치
 
 
-def load_main():
-    df = pd.read_csv(DATA_DIR / "train.csv", usecols=MAIN_COLS)
+def _read_csv(path, usecols, tries=6, wait=5.0):
+    """PermissionError 재시도 래퍼.
+
+    Windows에서 350MB급 CSV는 백신 실시간 검사가 공유 모드를 잠가 간헐적으로
+    `PermissionError`를 던진다 (파일 권한 문제가 아니다 — os.access는 True다).
+    수 초 뒤 풀리므로 재시도한다.
+    """
+    for i in range(tries):
+        try:
+            return pd.read_csv(path, usecols=usecols)
+        except PermissionError:
+            if i == tries - 1:
+                raise
+            print(f"    [retry {i+1}/{tries-1}] {Path(path).name} 잠김 — {wait:.0f}s 대기")
+            time.sleep(wait)
+
+
+def load_main(extra_cols=None):
+    """extra_cols: 경기 복원에 필요한 컬럼 외에 함께 읽을 컬럼 (읽기 1회로 끝낸다)."""
+    df = _read_csv(DATA_DIR / "train.csv", MAIN_COLS + list(extra_cols or []))
     pair = (np.minimum(df.pitcher_team_id, df.batter_team_id).astype(np.int64) * 100
             + np.maximum(df.pitcher_team_id, df.batter_team_id))
     key = df.season.astype(np.int64) * 10000 + df.game_month * 100 + df.game_dayofweek
@@ -61,8 +79,8 @@ def load_main():
     return df
 
 
-def load_tm():
-    df = pd.read_csv(DATA_DIR / "trackman_history.csv", usecols=TM_COLS)
+def load_tm(extra_cols=None):
+    df = _read_csv(DATA_DIR / "trackman_history.csv", TM_COLS + list(extra_cols or []))
     df["half"] = (df.inning.astype(np.int64) * 2 + (df.top_bottom == "Bottom")).astype(np.int16)
     df["is_top"] = (df.top_bottom == "Top")
     df = df.rename(columns={"trackman_game_id": "game"})

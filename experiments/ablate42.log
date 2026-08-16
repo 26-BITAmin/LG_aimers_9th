@@ -1,0 +1,43 @@
+타자 테이블 (3203, 28)
+  all 26개 / dev 10개 / mix 5개
+  dev: ['tmb_n', 'tmb_share_fastball_dev', 'tmb_share_breaking_dev', 'tmb_share_offspeed_dev', 'tmb_share_other_dev', 'tmb_velo_mean_dev', 'tmb_spin_mean_dev', 'tmb_ivb_mean_dev', 'tmb_hb_mean_dev', 'tmb_zone_drop_dev']
+  mix: ['tmb_n', 'tmb_share_fastball', 'tmb_share_breaking', 'tmb_share_offspeed', 'tmb_share_other']
+
+  valid=2023  base                      -11.1 ±   0.8   (71s)
+  valid=2023  tmb_all                    19.2 ±   3.4   (162s)
+  valid=2023  tmb_dev                    36.7 ±  10.1   (246s)
+  valid=2023  tmb_mix                    46.7 ±   7.6   (315s)
+  valid=2023  tmb_shuf                   14.8 ±   9.3   (397s)
+  valid=2024  base                      740.2 ±   1.9   (477s)
+  valid=2024  tmb_all                   736.6 ±   9.5   (583s)
+  valid=2024  tmb_dev                   739.2 ±   2.1   (675s)
+  valid=2024  tmb_mix                   736.5 ±   3.5   (766s)
+  valid=2024  tmb_shuf                  714.5 ±   8.0   (870s)
+
+설정                          2023      2024       평균차
+-----------------------------------------------------
+base                       -11.1     740.2
+tmb_all                     19.2     736.6
+tmb_dev                     36.7     739.2
+tmb_mix                     46.7     736.5
+tmb_shuf                    14.8     714.5
+
+=== 채택 판정 ===
+  근거: game_type 제거는 fold간 1.1배로 모여 LB까지 살아남았고,
+        Trackman은 6배로 흩어져 LB에서 뒤집혔다.
+  tmb_all
+    fold별 효과: [30.3 -3.6]   평균 +13.3  (표준오차 3.0)
+    ① 노이즈 초과 O   ② 부호 일치 X   ③ 크기 3배 이내 X (실제 inf배)
+    → 보류
+  tmb_dev
+    fold별 효과: [47.8 -1. ]   평균 +23.4  (표준오차 3.0)
+    ① 노이즈 초과 O   ② 부호 일치 X   ③ 크기 3배 이내 X (실제 inf배)
+    → 보류
+  tmb_mix
+    fold별 효과: [57.8 -3.7]   평균 +27.0  (표준오차 2.5)
+    ① 노이즈 초과 O   ② 부호 일치 X   ③ 크기 3배 이내 X (실제 inf배)
+    → 보류
+  tmb_shuf
+    fold별 효과: [ 25.9 -25.7]   평균 +0.1  (표준오차 3.6)
+    ① 노이즈 초과 X   ② 부호 일치 X   ③ 크기 3배 이내 X (실제 inf배)
+    → 보류
