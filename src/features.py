@@ -12,6 +12,8 @@
 import numpy as np
 import pandas as pd
 
+import contam            # 오염 보정 조회 (학습/추론 공용). 제출 zip에 같이 들어간다.
+
 # 이 모듈은 config를 import하지 않는다 — 제출 zip에 그대로 복사되어
 # 추론 시에도 동일한 코드가 돌아야 하기 때문. 튜닝 상수는 artifacts에 동결된다.
 
@@ -114,7 +116,7 @@ def logit_adjust(df, art):
 
 
 def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None,
-                  clip=None, ctx=None):
+                  clip=None, ctx=None, contam_axes=None, tmb_table=None):
     """train에서만 호출. 추론 시 필요한 상수들을 계산해 딕셔너리로 반환.
 
     tm_table: (pitcher_id, season) → Trackman 요약 피처 DataFrame.
@@ -130,13 +132,17 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
            "smooth_k": {col: (k_pitcher if ncol in _PITCHER_N_COLS else k_batter)
                         for col, ncol in SMOOTH_SPEC}}
 
-    if tm_table is not None:
-        cols = [c for c in tm_table.columns if c not in ("pitcher_id", "season")]
-        key = (tm_table["pitcher_id"].to_numpy(dtype=np.int64) * 10000
-               + tm_table["season"].to_numpy(dtype=np.int64))
+    # 투수 테이블과 타자 테이블은 조회 키의 ID 컬럼만 다르다 (§7.50).
+    for slot, idcol, table in (("tm", "pitcher_id", tm_table),
+                               ("tmb", "batter_id", tmb_table)):
+        if table is None:
+            continue
+        cols = [c for c in table.columns if c not in (idcol, "season")]
+        key = (table[idcol].to_numpy(dtype=np.int64) * 10000
+               + table["season"].to_numpy(dtype=np.int64))
         order = np.argsort(key)
-        art["tm"] = {"keys": key[order],
-                     "values": tm_table[cols].to_numpy(dtype=np.float32)[order],
+        art[slot] = {"keys": key[order],
+                     "values": table[cols].to_numpy(dtype=np.float32)[order],
                      "cols": list(cols)}
 
     w = np.ones(len(train_df)) if weights is None else np.asarray(weights, dtype=np.float64)
@@ -158,6 +164,17 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
     for col in CATEGORICAL_INT:
         vals = sorted(int(v) for v in train_df[col].dropna().unique())
         art["cat_maps"][col] = {v: i for i, v in enumerate(vals)}
+
+    # pre-2023 F 오염 보정표 (§7.48·§7.49). train에서만 만들어 여기에 동결한다.
+    # `modelabel`은 config를 import하므로 **함수 안에서** 늦게 import한다 —
+    # 제출 zip에는 features.py와 contam.py만 들어가고 이 경로는 실행되지 않는다.
+    if contam_axes:
+        import contam_fit as _cfit          # fit 전용 (제출물에 안 들어간다)
+        from modelabel import recover as _recover
+        lab, _, _ = _recover(train_df)
+        rev = np.where(np.isnan(lab["reverse"]), 0.0, np.round(lab["reverse"]))
+        art["contam"] = _cfit.fit_contam(train_df, rev)
+        art["contam"]["axes"] = tuple(contam_axes)
 
     return art
 
@@ -247,11 +264,31 @@ def build_features(df, art):
     # ── 경험적 베이즈 스무딩 ───────────────────────────────
     # 원본 rate(결측 유지)와 스무딩 rate를 **둘 다** 넣고 모델이 고르게 한다.
     n_map = {"asof_pitcher_n": n_p, "asof_batter_n": n_b, "asof_pitcher_pitchmix_n": n_m}
+
+    # ── pre-2023 F 오염 보정 (§7.48·§7.49) ──────────────────
+    # 여기서 고쳐야 스무딩·form_*·matchup_*·fail_share가 **전부** 보정된 값을 본다.
+    # 원본 컬럼을 갈아끼우는 것이므로 삽입 위치가 곧 전파 범위다.
+    # 축 목록도 artifacts에서 온다 — 이 모듈은 config를 import하지 않는다.
+    cadj = {}
+    ct = art.get("contam") if art else None
+    if ct:
+        axes = ct.get("axes", ("p", "b"))
+        if "p" in axes:
+            ap = contam.adjust(g, ct, "p").astype(np.float32)
+            cadj["asof_pitcher_reverse_rate"] = ap    # 누락된 '반대'를 되돌려 준다
+            cadj["asof_pitcher_success_rate"] = -ap   # 그만큼 성공이 아니었다
+        if "b" in axes:
+            cadj["asof_batter_success_rate"] = -contam.adjust(
+                g, ct, "b").astype(np.float32)
+
     sm = {}
     for col, ncol in SMOOTH_SPEC:
         # 꼬리를 먼저 자른 뒤 스무딩·파생으로 내려보낸다. 자르는 것은 값이 아니라
         # **레버리지**다 — 행은 그대로 남고 극단값만 경계에 앉는다.
-        raw = _clip32(g[col].to_numpy(dtype=np.float32), art, col)
+        v0 = g[col].to_numpy(dtype=np.float32)
+        if col in cadj:                               # NaN은 NaN으로 남는다
+            v0 = np.clip(v0 + cadj[col], 0.0, 1.0)
+        raw = _clip32(v0, art, col)
         out[col] = raw                                    # 원본 (NaN 그대로 → LGBM이 처리)
         s = _smooth(raw, n_map[ncol], art["priors"][col], art["smooth_k"][col])
         sm[col] = s
@@ -299,9 +336,14 @@ def build_features(df, art):
     # 각 행이 자기 (pitcher_id, season) 키로 조회할 뿐이다 —
     # df 전체에 대한 집계가 아니므로 행 독립성이 유지된다.
     # `season`은 조회 키로만 쓰고 모델 피처로는 내보내지 않는다.
-    if "tm" in art:
-        tm = art["tm"]
-        k = (g["pitcher_id"].to_numpy(dtype=np.int64) * 10000
+    # 투수 테이블("tm", 키 = pitcher_id)과 타자 테이블("tmb", 키 = batter_id)이
+    # 같은 조회 코드를 쓴다 — §7.50의 타자 매핑으로 후자가 생겼다.
+    for slot, idcol, flag in (("tm", "pitcher_id", "tm_matched"),
+                              ("tmb", "batter_id", "tmb_matched")):
+        if slot not in art:
+            continue
+        tm = art[slot]
+        k = (g[idcol].to_numpy(dtype=np.int64) * 10000
              + g["season"].to_numpy(dtype=np.int64))
         pos = np.searchsorted(tm["keys"], k)
         pos_c = np.clip(pos, 0, len(tm["keys"]) - 1)
@@ -309,7 +351,7 @@ def build_features(df, art):
         vals = tm["values"][pos_c]
         for j, c in enumerate(tm["cols"]):
             out[c] = np.where(hit, vals[:, j], np.nan).astype(np.float32)
-        out["tm_matched"] = hit.astype(np.float32)
+        out[flag] = hit.astype(np.float32)
 
     # ── 범주형 → 정수 코드 (미지값 -1) ──────────────────────
     for col in CATEGORICAL_STR:

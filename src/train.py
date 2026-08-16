@@ -28,7 +28,7 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 
-from config import (DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
+from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
                     MLP_ALPHA, MLP_AUX_LAMBDA, MLP_AUX_MODES, MLP_SEEDS,
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
@@ -210,7 +210,8 @@ def main():
     for line in ctxfit.summary(ctx):
         print(f"보정축 {line}")
     art = fit_artifacts(df, weights=w, k_pitcher=SMOOTH_K_PITCHER,
-                        k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx)
+                        k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx,
+                        contam_axes=CONTAM_AXES)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     def build_X(d):
@@ -292,6 +293,9 @@ def main():
         #    meta.json에서 구분이 안 되고, describe()의 태그도 같아진다.
         #    (이 종류의 누락이 s11 플래툰 · s12 카운트 · s13 λ 세 번 있었다.)
         "mlp_aux_modes": list(MLP_AUX_MODES) if USE_MLP else [],
+        # 오염 보정 축 (§7.49). 위 경고와 같은 이유로 반드시 남긴다 —
+        # 이게 없으면 s13과 s14의 파일명이 번호만 빼고 똑같아진다.
+        "contam_axes": list(CONTAM_AXES or []),
         "mlp_seeds": list(MLP_SEEDS) if USE_MLP else [],
         "mlp_members": mlp_tags, "mlp_variants": MLP_VARIANTS,
         "mlp_variant_weight": MLP_VARIANT_WEIGHT, "mlp_weights": mlp_wts,

@@ -36,7 +36,7 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-from config import (DROP_FEATURES, FINAL_LGB_PARAMS, MLP_ALPHA, N_ROUNDS,
+from config import (CONTAM_AXES, DROP_FEATURES, FINAL_LGB_PARAMS, MLP_ALPHA, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
                     SMOOTH_K_PITCHER, CTX_AXES, CTX_K, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
                     TRAIN_CSV, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
@@ -80,7 +80,7 @@ def main():
     ctx = ctxfit.fit_ctx(tr, TARGET_COL, CTX_AXES, CTX_K)
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
                         k_batter=SMOOTH_K_BATTER, tm_table=load_table(TRACKMAN_MODE),
-                        ctx=ctx)
+                        ctx=ctx, contam_axes=CONTAM_AXES)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     Xtr = build_X(tr, art)

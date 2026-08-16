@@ -321,4 +321,11 @@ CTX_AXES = [("hand", 1.5), ("count4", 1.0)]
 PLATOON_K = CTX_K
 PLATOON_BETA = dict(CTX_AXES)["hand"]
 
+# ── pre-2023 F 오염 보정 (§7.48·§7.49) ────────────────────────────────
+# 2019~2022 F 구간은 "포수 요구 반대" 기준이 걸리지 않은 채 라벨링됐고,
+# `asof_*`가 커리어 누적이라 그 누락분이 2025 행까지 따라온다.
+# "p" = 투수 축(reverse/success), "b" = 타자 축(batter success).
+# None 이면 보정을 끈다. LGBM 단독 측정: P +24.3 / PB +30.6 (fold2024, §7.49).
+CONTAM_AXES = ("p", "b")
+
 CLIP_EPS = 1e-6

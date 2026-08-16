@@ -32,7 +32,7 @@ SUBMIT = ROOT / "submit"
 
 # src → submit 으로 복사되는 파일 (단일 진실 소스는 항상 src/)
 # mlp_infer.py는 **numpy 전용** 순전파다 — torch는 제출물에 들어가지 않는다.
-COPY_FILES = ["features.py", "predict.py", "mlp_infer.py"]
+COPY_FILES = ["features.py", "predict.py", "mlp_infer.py", "contam.py"]
 
 # 추론 코드에서 test 데이터프레임에 대해 호출되면 안 되는 것들 (CLAUDE.md §3.2)
 FORBIDDEN_CALLS = {
@@ -216,6 +216,11 @@ def describe(meta):
         nax = len(meta.get("mlp_aux_modes") or [])
         if nax and nax != 2:
             e += f"h{nax}"
+    # pre-2023 F 오염 보정 축 (MODEL.md §7.49). 끄면 생략 — 옛 태그와 호환된다.
+    #   cfp = 투수 축만,  cfpb = 투수+타자
+    ca = meta.get("contam_axes") or ()
+    if ca:
+        e += "cf" + "".join(ca)
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다

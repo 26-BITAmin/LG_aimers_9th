@@ -64,3 +64,6 @@ experiments/cache/
 # 작업 산출물이 아니고 재배포도 곤란하므로 추적하지 않는다.
 0*_*.pdf
 00_Hands_on_Tabular_ML.ipynb
+
+# build_submit.py 산출물 (원본은 src/contam.py)
+submit/contam.py

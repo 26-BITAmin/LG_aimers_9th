@@ -28,7 +28,7 @@ import lightgbm as lgb
 import numpy as np
 
 import mlp
-from config import (DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
+from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
                     MLP_SEEDS, MLP_VARIANTS, N_ROUNDS, RECENCY_HALF_LIFE,
                     SEED_ENSEMBLE, SMOOTH_K_BATTER, SMOOTH_K_PITCHER,
                     TARGET_COL, TRAIN_CSV, USE_PLAYER_IDS)
@@ -45,7 +45,8 @@ def _key():
               sorted(DROP_FEATURES), USE_PLAYER_IDS, LGB_SEEDS,
               sorted((k, sorted(v.items())) for k, v in ENSEMBLE_VARIANTS.items()),
               sorted((k, sorted(c.items()), n) for k, (c, n) in MLP_VARIANTS.items()),
-              MLP_SEEDS, SMOOTH_K_PITCHER, SMOOTH_K_BATTER])
+              MLP_SEEDS, SMOOTH_K_PITCHER, SMOOTH_K_BATTER,
+              CONTAM_AXES])
     return hashlib.sha1(s.encode()).hexdigest()[:10]
 
 
@@ -75,7 +76,7 @@ def fold_data(df, fold):
     w = recency_weight(tr.season.to_numpy(), RECENCY_HALF_LIFE,
                        ref_season=int(tr.season.max()))
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
-                        k_batter=SMOOTH_K_BATTER)
+                        k_batter=SMOOTH_K_BATTER, contam_axes=CONTAM_AXES)
 
     def X(d):
         x = build_features(d, art)
