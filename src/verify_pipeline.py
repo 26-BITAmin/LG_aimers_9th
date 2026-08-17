@@ -38,7 +38,7 @@ import pandas as pd
 
 from config import (CONTAM_AXES, DROP_FEATURES, FINAL_LGB_PARAMS, MLP_ALPHA, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, ASOF_BETA, ASOF_COLS, ASOF_STRENGTH, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, ASOF_AXES, ASOF_STRENGTH, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
                     TRAIN_CSV, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
@@ -81,8 +81,7 @@ def main():
     ctx = ctxfit.fit_ctx(tr, TARGET_COL, CTX_AXES, CTX_K)
     # ⚠️ §7.36의 재발 방지 — 배포에 새 보정 축이 생기면 **여기도** 고쳐야 한다.
     #    그때 이 파일을 빠뜨려서 검증이 플래툰 없는 모델을 통과시켰다.
-    asof = (asofdelta.fit_asof(tr, ASOF_BETA, ASOF_STRENGTH, ASOF_COLS)
-            if (ASOF_BETA or ASOF_COLS) else None)
+    asof = asofdelta.fit_asof_axes(tr, ASOF_AXES, ASOF_STRENGTH)
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
                         k_batter=SMOOTH_K_BATTER, tm_table=load_table(TRACKMAN_MODE),
                         ctx=ctx, contam_axes=CONTAM_AXES, asof=asof)

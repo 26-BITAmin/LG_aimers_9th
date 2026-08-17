@@ -191,10 +191,10 @@ def describe(meta):
     # 자리를 비운 것들 — 전부 **여러 제출에 걸쳐 안 바뀌었고** SUBMISSIONS.md에 열로 있다.
     #   `f80`(피처 수)   s11에서 뺌. s05 이후 불변
     #   `h5`(recency)    s12에서 뺌. s04 이후 불변이고 §7.23에서 재검증·기각됐다
+    #   `m8`(MLP 멤버 수) s17에서 뺌. s09 이후 8회 불변이고 `a40`이 MLP 사용을 이미 알린다
     # 30자 제한에 걸리면 **이번에 바뀐 축이 아니라 안 바뀐 축을 뺀다.**
     e = "e" + str(meta.get("n_members", len(meta.get("seeds", []))))
     if meta.get("use_mlp"):
-        e += "m" + str(len(meta.get("mlp_members", [])))
         e += "a" + f"{float(meta.get('mlp_alpha', 0)):.2f}".split(".")[1]  # 0.40 -> a40
         # noid 비중 (MODEL.md §7.27). 균등(.375)이면 생략 — 옛 태그와 호환된다.
         nw = float((meta.get("mlp_variant_weight") or {}).get("noid", 0.0))
@@ -203,10 +203,14 @@ def describe(meta):
             e += "n" + f"{nw / tw * 10:.0f}"      # 0.625 -> n6 (정확한 값은 meta.json)
     # 사후 로짓 보정 축의 β (MODEL.md §7.36 hand · §7.37 count4).
     # 축이 늘면 태그도 늘어난다 — 축마다 접두 1~2자로 붙인다. 없으면 생략(옛 태그 호환).
-    #   `pl15`(hand β)  s15에서 뺌. s11 이후 4회 불변이고 meta.json에 ctx_axes로 있다
+    #   `pl15`(hand β)   s15에서 뺌. s11 이후 4회 불변이고 meta.json에 ctx_axes로 있다
+    #   `c10`(count4 β)  s17에서 뺌. s12 이후 5회 불변. 같은 이유·같은 대체 수단이다.
+    # ⚠️ MUTE에 넣는 것은 "값이 안 바뀐다"는 뜻이 아니라 "지금까지 안 바뀌었다"는 뜻이다.
+    #    이 축을 다시 건드리는 실험을 하면 **여기서 빼야** 태그가 두 제출을 구분한다.
     ABBR = {"hand": "pl", "count4": "c"}                    # 1.5 -> pl15,  1.0 -> c10
+    MUTE = {"hand", "count4"}
     for name, beta in (meta.get("ctx_axes") or {}).items():
-        if beta and name != "hand":
+        if beta and name not in MUTE:
             e += ABBR.get(name, name[:2]) + f"{float(beta) * 10:.0f}"
     # 다중 과제 보조 헤드 λ (MODEL.md §7.41). 0이면 생략 — 옛 태그와 호환된다.
     ax = float(meta.get("mlp_aux_lambda") or 0.0)
@@ -226,12 +230,10 @@ def describe(meta):
     #   사후 가산  0.02 -> as2   (β는 δ축보다 두 자릿수 작으므로 ×100)
     #   컬럼       gap_success+n_szn -> ac2   (ac + 컬럼 수)
     # 끄면 생략 — 옛 태그와 호환된다.
-    ab = float(meta.get("asof_beta") or 0.0)
-    ac = meta.get("asof_cols") or []
-    if ab:
-        e += "as" + f"{ab * 100:.0f}"
-    if ac:
-        e += "ac" + str(len(ac))
+    AB = {"gap_success": "as", "gap_bsuccess": "bs"}
+    for name, beta in (meta.get("asof_axes") or {}).items():
+        if beta:
+            e += AB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
@@ -293,10 +295,10 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
     if meta.get("contam_axes"):
         CN = {"p": "투수", "b": "타자"}
         cfg += "+F오염보정(" + "·".join(CN.get(c, c) for c in meta["contam_axes"]) + ")"
-    if meta.get("asof_beta"):
-        cfg += f"+시즌진행분 β{meta['asof_beta']}"
-    if meta.get("asof_cols"):
-        cfg += "+시즌진행분 컬럼(" + "·".join(meta["asof_cols"]) + ")"
+    NA = {"gap_success": "투수", "gap_bsuccess": "타자"}
+    for name, beta in (meta.get("asof_axes") or {}).items():
+        if beta:
+            cfg += f"+시즌진행분 {NA.get(name, name)} β{beta}"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")

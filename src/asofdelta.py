@@ -187,50 +187,65 @@ def shrink(hits_szn, n_szn, r_career, league, n_career=None):
     return (hits_szn + strength * prior) / (np.maximum(n_szn, 0.0) + strength)
 
 
-def fit_asof(train_df, beta, strength=200.0, cols=()):
-    """배포용 아티팩트 하나로 눌러 담는다. **train에서만 호출.**
+# ── 사후 가산 축 레지스트리 ──────────────────────────────────────────
+# ⚠️ **새 축을 추가할 때 고칠 곳은 여기 하나다** (`features.CTX_CODERS`와 같은 규약).
+#    `features.asof_lookup`은 이 명세를 아티팩트에서 읽으므로 투수/타자를 구분하지
+#    않는다. train / verify / predict / build_submit이 자동으로 같은 것을 본다.
+#
+#   gap_success   투수의 올해 성공률 − 커리어   (§7.55, LB +26.14, 배율 0.93)
+#   gap_bsuccess  타자가 올해 상대해온 제구 수준 − 커리어  (§7.57)
+#     └ `gap_success`와 **거의 직교**하다: 증분 잔차 t가 6.70 → 6.53으로만 준다.
+#       다른 엔티티이기 때문이다. §7.34 G의 `batter_id` 천장 −25.7은 **레벨**을
+#       잰 것이고 이건 **변화**다 — 같은 관문이 아니다.
+ASOF_SPEC = {
+    "gap_success": dict(id="pitcher_id", n_col="asof_pitcher_n",
+                        r_col="asof_pitcher_success_rate"),
+    "gap_bsuccess": dict(id="batter_id", n_col="asof_batter_n",
+                         r_col="asof_batter_success_rate"),
+}
 
-    `features.asof_lookup`이 소비하는 형태와 정확히 맞춰야 한다 — 그쪽은
-    numpy searchsorted 한 번으로 끝내고, 이 함수가 만든 상수 외에는 아무것도
-    보지 않는다. (제출 zip에는 `features.py`만 들어가고 이 파일은 안 들어간다 —
-    `fit_offsets`의 groupby가 AST 스캐너에 걸리기 때문. `contam` / `contam_fit`
-    분리와 같은 구조다.)
 
-    ⚠️ 표준화 통계(mu, sd)는 **학습 행에서만** 뽑는다. 검증/추론 행의 평균을 쓰면
-       그 자체가 리크다 (tmbfit의 교훈).
+def fit_asof_axes(train_df, axes, strength=200.0):
+    """배포용 축 리스트를 만든다. **train에서만 호출.**
+
+    axes: [(축이름, β), ...].  β=0인 축은 건너뛴다 (δ 축과 같은 규약).
     """
-    off = fit_offsets(train_df)["asof_pitcher_n"]
+    off_all = fit_offsets(train_df)
     league = float(train_df["control_success"].mean())
+    import features as _f              # 소비 측과 **같은 코드**로 통계를 뽑는다
 
-    a = {"keys": off["keys"], "n_off": off["n_off"],
-         "k_off": off["k_off"]["asof_pitcher_success_rate"],
-         # 컬럼 경로(§7.56)가 쓰는 추가 오프셋. 사후 가산만 쓸 때는 무시된다.
-         # `fit_offsets`가 어차피 전부 계산하므로 비용이 없다.
-         "k_off_middle": off["k_off"]["asof_pitcher_middle_rate"],
-         "mu": 0.0, "sd": 1.0, "beta": 0.0,      # mu/sd를 먼저 0/1로 두고 원단위를 잰다
-         "league": league, "strength": float(strength)}
+    out = []
+    for name, beta in axes:
+        if not beta:
+            continue
+        spec = ASOF_SPEC[name]
+        off = off_all[spec["n_col"]]
+        a = dict(spec, name=name, keys=off["keys"], n_off=off["n_off"],
+                 k_off=off["k_off"][spec["r_col"]],
+                 mu=0.0, sd=1.0, beta=0.0,   # mu/sd를 먼저 0/1로 두고 원단위를 잰다
+                 league=league, strength=float(strength))
+        raw = _f.asof_lookup(train_df, a)
+        # ⚠️ 표준화 통계는 **학습 행에서만** 뽑는다. 검증/추론 행의 평균을 쓰면
+        #    그 자체가 리크다 (tmbfit의 교훈).
+        a["mu"] = float(np.mean(raw))
+        a["sd"] = float(np.std(raw)) or 1.0
+        a["beta"] = float(beta)
+        out.append(a)
+    return out
 
-    import features as _f                          # 소비 측과 **같은 코드**로 통계를 뽑는다
-    raw = _f.asof_lookup(train_df, a)
-    a["mu"] = float(np.mean(raw))
-    a["sd"] = float(np.std(raw)) or 1.0
+
+def fit_asof(train_df, beta, strength=200.0):
+    """(구) 단일 축 API — **측정 스크립트 호환용**이다.
+
+    `gap_success` 축 하나를 새 형식으로 돌려준다. 소비 측(`features.logit_adjust`)은
+    리스트를 받으므로 호출부에서 `[a]`로 감싼다.
+
+    배포 경로는 `fit_asof_axes`를 쓴다 — 축이 둘 이상이기 때문이다 (§7.57).
+    """
+    a = fit_asof_axes(train_df, [("gap_success", beta or 1.0)], strength)[0]
     a["beta"] = float(beta)
-
-    # ── 컬럼 경로 (§7.56) ────────────────────────────────────────
-    # ⚠️ 사후 가산과 **배타적**이다. 둘 다 켜면 같은 정보를 두 번 넣게 되고
-    #    실측에서 손해였다 (col1_post 778.9 < col1 783.9, fold2024).
-    #    설정 실수로 조용히 겹치지 않도록 여기서 죽인다.
-    if cols:
-        if float(beta) != 0.0:
-            raise ValueError("ASOF_COLS와 ASOF_BETA는 동시에 켤 수 없다 "
-                             "(이중 계산 — MODEL.md §7.56). 하나를 0으로 둘 것.")
-        rawc, _ = _f._asof_raw(train_df, a)
-        miss = [c for c in cols if c not in rawc]
-        if miss:
-            raise KeyError(f"알 수 없는 시즌 진행분 컬럼: {miss}")
-        a["cols"] = {c: (float(np.mean(rawc[c])), float(np.std(rawc[c])) or 1.0)
-                     for c in cols}
     return a
 
 
-__all__ = ["DELTA_SPEC", "fit_offsets", "season_to_date", "shrink", "fit_asof"]
+__all__ = ["DELTA_SPEC", "ASOF_SPEC", "fit_offsets", "season_to_date",
+           "shrink", "fit_asof", "fit_asof_axes"]

@@ -44,7 +44,8 @@ import pandas as pd
 import asofdelta
 import ctxfit
 import foldcache
-from config import CTX_AXES, CTX_K, MLP_ALPHA, SEED, TARGET_COL, TRAIN_CSV
+from config import (ASOF_AXES, ASOF_STRENGTH, CTX_AXES, CTX_K, MLP_ALPHA, SEED,
+                    TARGET_COL, TRAIN_CSV)
 from ctxsplit import resid_t
 from data import load_csv
 from features import logit_adjust
@@ -72,8 +73,28 @@ def chi2_rows(c_szn, c_pre):
     return np.where(ok, out / 2.0, 0.0)
 
 
-def build(d, art, league):
-    """검증 시즌 행에 대해 시즌 진행분 피처를 만든다. **행 단위 조회뿐.**"""
+# 아직 잔차를 물어본 적 없는 축들 (§7.57). `DELTA_SPEC`에 다 들어 있는데
+# §7.54는 success · middle · 믹스 3개만 봤다.
+#   reverse  실패 3유형 중 "포수 요구와 반대 방향". §7.49의 오염 보정이 건드린 축이다
+#   ball/strike  판정 결과 쪽. success와 다른 것을 잰다
+#   타자 쪽  §7.34 G가 batter_id 축 천장을 −25.7로 쟀지만, 그건 **레벨**이었다.
+#            시즌 진행분은 레벨이 아니라 **변화**다 — 같은 관문이 아니다
+GAP_SPEC = [
+    ("gap_reverse", "asof_pitcher_reverse_rate", "asof_pitcher_n"),
+    ("gap_ball", "asof_pitcher_ball_rate", "asof_pitcher_n"),
+    ("gap_strike", "asof_pitcher_strike_rate", "asof_pitcher_n"),
+    ("gap_bsuccess", "asof_batter_success_rate", "asof_batter_n"),
+    ("gap_bmiddle", "asof_batter_middle_rate", "asof_batter_n"),
+]
+
+
+def build(d, art, league, priors=None):
+    """검증 시즌 행에 대해 시즌 진행분 피처를 만든다. **행 단위 조회뿐.**
+
+    `priors`: {rate 컬럼: 리그 평균}. cold-start(커리어 결측) 행의 대체값으로만 쓴다.
+    없으면 0.2로 둔다 — 그 행들은 어차피 소수이고, 없어도 축의 존폐 판정은 바뀌지 않는다.
+    """
+    priors = priors or {}
     st = asofdelta.season_to_date(d, art)
     out = {}
 
@@ -91,6 +112,14 @@ def build(d, art, league):
     r_mid = d["asof_pitcher_middle_rate"].to_numpy(dtype=np.float64)
     out["gap_middle"] = (asofdelta.shrink(st["asof_pitcher_middle_rate"], n_p, r_mid, 0.2)
                          - np.where(np.isfinite(r_mid), r_mid, 0.2))
+
+    # ── 미측정 축들 (§7.57) ───────────────────────────────────────
+    for name, rate, ncol in GAP_SPEC:
+        car = d[rate].to_numpy(dtype=np.float64)
+        pr = float(priors.get(rate, 0.2))
+        base = np.where(np.isfinite(car), car, pr)
+        out[name] = asofdelta.shrink(st[rate], st[ncol], car, pr) - base
+        out["n_szn_" + name.split("_")[1]] = st[ncol]
 
     # ── 믹스: 올해 − 커리어 (사용자 관찰의 직접 표현) ──────────────
     n_car = d["asof_pitcher_pitchmix_n"].to_numpy(dtype=np.float64)
@@ -127,12 +156,18 @@ def main():
 
         art = asofdelta.fit_offsets(df[tr])
         league = float(df.loc[tr, TARGET_COL].mean())
-        feat = build(d, art, league)
+        # cold-start 대체값은 **학습 시즌에서만** 뽑는다
+        priors = {r: float(np.nanmean(df.loc[tr, r].to_numpy(dtype=np.float64)))
+                  for _, r, _ in GAP_SPEC}
+        feat = build(d, art, league, priors)
 
-        # 대조군 — 시즌 안에서 pitcher_id만 섞어 같은 조회를 돌린다
+        # 대조군 — 시즌 안에서 ID를 섞어 같은 조회를 돌린다.
+        # ⚠️ **타자 축도 재므로 batter_id도 같이 섞어야 한다.** 투수만 섞으면
+        #    타자 컬럼의 대조군이 진짜와 똑같아져서 게이트가 무력화된다.
         dsh = d.copy()
         dsh["pitcher_id"] = rng.permutation(d["pitcher_id"].to_numpy())
-        fsh = build(dsh, art, league)
+        dsh["batter_id"] = rng.permutation(d["batter_id"].to_numpy())
+        fsh = build(dsh, art, league, priors)
 
         print("=" * 78)
         print(f"fold {fold}   기준 BSS {bss(yv, p0):.1f}   행 {len(d):,}"
@@ -158,6 +193,61 @@ def main():
               f"{'✓' if over else '✗':>12}")
     print("\n  둘 다 ✓ 이고 |t| 가 큰 것만 다음 단계(β 스윕 / 컬럼 추가)로 간다.")
     print("  ✗ 가 하나라도 있으면 §7.51 믹스(부호 반전)와 같은 자리다 → 닫는다.")
+
+    incremental(df, s, cached, [k for k, v in keep.items()
+                                if (v[0][0] > 0) == (v[1][0] > 0)
+                                and all(abs(t) > 2 * abs(c) for t, c in v)])
+
+
+def incremental(df, s, cached, cands):
+    """★ **배포된 `gap_success`를 얹은 뒤** 남는 잔차에 다시 묻는다.
+
+    왜 필요한가
+        `success = 1 − (몰림 + 반대 + …)` 이므로 `gap_reverse`는 `gap_success`와
+        구조적으로 겹친다. 위 1단계 기준선에는 배포된 asof 항이 **빠져 있어서**
+        같은 신호를 두 번 세고 있을 수 있다.
+
+        §7.37이 count4를 "배포 상태(블렌드 + 1.5·δ_hand) 위의 **증분**으로 쟀다"고
+        한 것과 같은 이유다. 축을 하나씩 쌓을 때는 항상 증분으로 재야 한다.
+    """
+    if not cands:
+        return
+    print("\n" + "=" * 78)
+    print(f"★ 증분 — 배포 상태(+ asof {[n for n, _ in ASOF_AXES]}) 뒤 남는 잔차")
+    print("=" * 78)
+    rng = np.random.default_rng(SEED)
+    out = {}
+    for fold in FOLDS:
+        tr, va = s < fold, s == fold
+        d = df[va].copy()
+        yv = cached[fold][2]
+        z = (1 - MLP_ALPHA) * cached[fold][0] + MLP_ALPHA * cached[fold][1]
+        ctx = ctxfit.fit_ctx(df[tr], TARGET_COL, CTX_AXES, CTX_K)
+        a = asofdelta.fit_asof_axes(df[tr], ASOF_AXES, ASOF_STRENGTH)
+        adj, _ = logit_adjust(d, {"ctx": ctx, "asof": a})       # ← 배포 상태 전부
+        p0 = shift_to_prior(1.0 / (1.0 + np.exp(-(z + adj))), yv.mean())
+        r = yv - p0
+
+        art = asofdelta.fit_offsets(df[tr])
+        league = float(df.loc[tr, TARGET_COL].mean())
+        priors = {c: float(np.nanmean(df.loc[tr, c].to_numpy(dtype=np.float64)))
+                  for _, c, _ in GAP_SPEC}
+        feat = build(d, art, league, priors)
+        dsh = d.copy()
+        dsh["pitcher_id"] = rng.permutation(d["pitcher_id"].to_numpy())
+        dsh["batter_id"] = rng.permutation(d["batter_id"].to_numpy())
+        fsh = build(dsh, art, league, priors)
+
+        print(f"\nfold {fold}  기준 BSS {bss(yv, p0):.1f}  (배포 전부 포함)")
+        print(f"  {'피처':<18}{'증분 t':>10}{'대조군 t':>11}{'1단계 t':>10}")
+        for c in cands:
+            _, t = resid_t(r, feat[c])
+            _, tc = resid_t(r, fsh[c])
+            out.setdefault(c, []).append(t)
+            print(f"  {c:<18}{t:>10.2f}{tc:>11.2f}")
+
+    print("\n  읽는 법: 1단계 t가 컸는데 증분 t가 0으로 죽으면 **`gap_success`와 같은 신호**다.")
+    print("           증분에서도 살아남아야 새 축이다.")
 
 
 if __name__ == "__main__":

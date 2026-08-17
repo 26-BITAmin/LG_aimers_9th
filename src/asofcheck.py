@@ -26,7 +26,7 @@ import asofdelta
 import ctxfit
 import foldcache
 import features as F
-from config import (ASOF_BETA, ASOF_STRENGTH, CTX_AXES, CTX_K, MLP_ALPHA,
+from config import (ASOF_AXES, ASOF_STRENGTH, CTX_AXES, CTX_K, MLP_ALPHA,
                     TARGET_COL, TRAIN_CSV)
 from data import load_csv
 from mixresid import build
@@ -42,8 +42,10 @@ def main():
     d = df[va].copy()
 
     # ── 배포 경로 ─────────────────────────────────────────────────
-    asof = asofdelta.fit_asof(df[tr], ASOF_BETA, ASOF_STRENGTH)
-    art = {"ctx": [], "asof": asof}
+    BETA = dict(ASOF_AXES)["gap_success"]
+    asof = asofdelta.fit_asof_axes(df[tr], [("gap_success", BETA)],
+                                   ASOF_STRENGTH)[0]
+    art = {"ctx": [], "asof": [asof]}
     v_dep = F.asof_lookup(d, asof)
 
     # ── 측정 경로 (mixresid.build + 학습행 통계로 표준화) ──────────
@@ -68,12 +70,12 @@ def main():
     z0 = z + adj
     base = bss(yv, shift_to_prior(1.0 / (1.0 + np.exp(-z0)), yv.mean()))
 
-    adj2, hits = F.logit_adjust(d, {"ctx": ctx, "asof": asof})   # δ + asof
+    adj2, hits = F.logit_adjust(d, {"ctx": ctx, "asof": [asof]})   # δ + asof
     got = bss(yv, shift_to_prior(1.0 / (1.0 + np.exp(-(z + adj2))), yv.mean())) - base
     print(f"\n② fold{FOLD} 이득 (배포 아티팩트 경유)  {got:+.2f}")
-    print(f"   §7.55 β 스윕 β={ASOF_BETA} 값        +23.52")
+    print(f"   §7.55 β 스윕 β={BETA} 값        +23.52")
     print(f"   차 {got - 23.52:+.2f}   {'✅' if abs(got - 23.52) < 0.05 else '❌'}")
-    print(f"   기준 BSS {base:.1f}   asof 적중 {hits.get('asof', 0):.1%}"
+    print(f"   기준 BSS {base:.1f}   asof 적중 {hits.get("gap_success", 0):.1%}"
           f"   로짓 기여 평균 {(adj2 - adj).mean():+.6f}")
 
     # ── ③ 행 독립성 ──────────────────────────────────────────────

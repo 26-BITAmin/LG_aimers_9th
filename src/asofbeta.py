@@ -39,7 +39,8 @@ import numpy as np
 import asofdelta
 import ctxfit
 import foldcache
-from config import CTX_AXES, CTX_K, MLP_ALPHA, SEED, TARGET_COL, TRAIN_CSV
+from config import (ASOF_AXES, ASOF_STRENGTH, CTX_AXES, CTX_K, MLP_ALPHA, SEED,
+                    TARGET_COL, TRAIN_CSV)
 from data import load_csv
 from features import logit_adjust
 from mixresid import build
@@ -134,5 +135,79 @@ def main():
     print("  ⚠️ fold2023은 단절 fold(기준 130.2). 판정은 fold2024와 대조군 대비로 한다.")
 
 
+def incr():
+    """★ **배포 상태(+ asof gap β) 위에** 새 축을 얹는 증분 스윕 (§7.57).
+
+    §7.37이 count4를 δ_hand 위의 증분으로 잰 것과 같은 설계다. 축을 쌓을 때
+    기준선에 이전 축이 빠져 있으면 같은 신호를 두 번 세게 된다.
+
+    후보 (`mixresid.incremental` 통과):
+        gap_bsuccess  증분 t +12.43 / +6.53 — `gap_success`와 **거의 직교**
+        gap_reverse   증분 t  −9.40 / −3.30 — 절반쯤 겹치지만 생존
+    """
+    df = load_csv(TRAIN_CSV)
+    s = df["season"].to_numpy()
+    cached = foldcache.load(FOLDS, verbose=False)
+    rng = np.random.default_rng(SEED)
+    from mixresid import GAP_SPEC
+    CANDS = ["gap_bsuccess", "gap_reverse"]
+    out = {}
+
+    print(f"기준선 = 블렌드 + δ{CTX_AXES} + **asof {ASOF_AXES}** (배포 전부)\n")
+    for fold in FOLDS:
+        tr, va = s < fold, s == fold
+        d = df[va].copy()
+        yv = cached[fold][2]
+        z = (1 - MLP_ALPHA) * cached[fold][0] + MLP_ALPHA * cached[fold][1]
+        ctx = ctxfit.fit_ctx(df[tr], TARGET_COL, CTX_AXES, CTX_K)
+        a = asofdelta.fit_asof_axes(df[tr], ASOF_AXES, ASOF_STRENGTH)
+        adj, _ = logit_adjust(d, {"ctx": ctx, "asof": a})
+        z0 = z + adj
+        base = bss(yv, shift_to_prior(1.0 / (1.0 + np.exp(-z0)), yv.mean()))
+
+        art = asofdelta.fit_offsets(df[tr])
+        league = float(df.loc[tr, TARGET_COL].mean())
+        priors = {c: float(np.nanmean(df.loc[tr, c].to_numpy(dtype=np.float64)))
+                  for _, c, _ in GAP_SPEC}
+        fv, ftr = build(d, art, league, priors), build(df[tr], art, league, priors)
+        dsh = d.copy()
+        dsh["pitcher_id"] = rng.permutation(d["pitcher_id"].to_numpy())
+        dsh["batter_id"] = rng.permutation(d["batter_id"].to_numpy())
+        fsh = build(dsh, art, league, priors)
+
+        def std(v, ref):
+            mu, sd = float(np.nanmean(ref)), float(np.nanstd(ref))
+            return np.nan_to_num((v - mu) / (sd if sd > 0 else 1.0))
+
+        def gain(v, b):
+            return bss(yv, shift_to_prior(1.0 / (1.0 + np.exp(-(z0 + b * v))),
+                                          yv.mean())) - base
+
+        print(f"fold {fold}  기준 {base:.1f}")
+        print(f"  {'피처':<22}" + "".join(f"{'β'+str(b):>9}" for b in BETAS))
+        for c in CANDS + [x + "[대조군]" for x in CANDS]:
+            key = c.replace("[대조군]", "")
+            v = std((fsh if "대조군" in c else fv)[key], ftr[key])
+            row = [gain(v, b) for b in BETAS]
+            out.setdefault(c, {})[fold] = row
+            print(f"  {c:<22}" + "".join(f"{g:>+9.2f}" for g in row))
+        print()
+
+    print("=" * 92)
+    print("판정 — 부호 · β 고원 · 대조군")
+    print("=" * 92)
+    for c, byf in out.items():
+        a2, b2 = np.array(byf[2023]), np.array(byf[2024])
+        both = (a2 > 0) & (b2 > 0)
+        i = int(np.argmax(np.minimum(a2, b2))) if both.any() else int(np.argmax(b2))
+        pl = [BETAS[j] for j in range(len(BETAS)) if both[j]]
+        # ⚠️ 폭은 **|β| 기준**이다. 음수 β 구간에서 max/min을 그대로 쓰면 0.5 같은
+        #    값이 나와 "폭 0배"로 찍힌다 (gap_reverse에서 실제로 그랬다).
+        span = (max(map(abs, pl)) / min(map(abs, pl))) if len(pl) > 1 else (1.0 if pl else 0.0)
+        print(f"  {c:<22} 최적 β={BETAS[i]:<7} f2023 {a2[i]:+8.2f}  f2024 {b2[i]:+8.2f}"
+              f"   양 fold 양수 β: {pl if pl else '없음'} (폭 {span:.0f}배)")
+    print("\n  기준: δ(count4) 8배 → 채택 / asof gap 10배 → 채택 / tm_ext_std 2배 → 기각")
+
+
 if __name__ == "__main__":
-    main()
+    incr() if "--incr" in sys.argv else main()

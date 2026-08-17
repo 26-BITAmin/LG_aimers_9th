@@ -45,9 +45,12 @@ import numpy as np
 
 import asofdelta
 import features as F
-from config import ASOF_BETA, ASOF_STRENGTH, SEED, TARGET_COL, TRAIN_CSV
+from config import ASOF_AXES, ASOF_STRENGTH, SEED, TARGET_COL, TRAIN_CSV
 from data import load_csv
 from evaluate import compare
+
+# §7.56 기록용. 배포된 투수 축의 β를 기준선으로 쓴다.
+ASOF_BETA = dict(ASOF_AXES)["gap_success"]
 
 COLS4 = ["gap_success", "r_szn_success", "n_szn", "gap_middle"]
 
