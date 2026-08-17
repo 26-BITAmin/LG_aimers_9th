@@ -168,13 +168,14 @@ def main():
             print(f"  {i.file_size:>10,}  {i.filename}")
     print(f"\n✅ {zip_path.name}  ({zip_path.stat().st_size/1e6:.1f} MB)")
 
+    record_history(zip_path, meta)
     log_submission(zip_path, meta, float(out["control_success"].mean()), elapsed)
 
 
 MAX_NAME = 30      # 제출 파일명 길이 제한
 
 
-def describe(meta):
+def describe_tokens(meta):
     """제출물을 구분하는 짧은 태그. 30자 제한이 있으므로 최대한 압축한다.
     전체 설정은 SUBMISSIONS.md에 있고, 파일명은 서로 구분만 되면 된다.
 
@@ -199,14 +200,14 @@ def describe(meta):
     #    불변 축이 남아 있지만 **다음 축에서는 이 방식이 한계에 닿는다.**
     #    그때는 태그를 늘리지 말고 `sNN` + meta.json 해시 4자리 같은 방식으로 바꾼다
     #    — 파일명은 서로 구분만 되면 되고, 설정 전문은 SUBMISSIONS.md와 meta.json에 있다.
-    e = ""
+    tok = {}
     if meta.get("use_mlp"):
-        e += "a" + f"{float(meta.get('mlp_alpha', 0)):.2f}".split(".")[1]  # 0.40 -> a40
+        tok["alpha"] = "a" + f"{float(meta.get('mlp_alpha', 0)):.2f}".split(".")[1]
         # noid 비중 (MODEL.md §7.27). 균등(.375)이면 생략 — 옛 태그와 호환된다.
         nw = float((meta.get("mlp_variant_weight") or {}).get("noid", 0.0))
         tw = sum(float(v) for v in (meta.get("mlp_variant_weight") or {}).values())
         if tw > 0 and abs(nw / tw - 0.375) > 1e-6:
-            e += "n" + f"{nw / tw * 10:.0f}"      # 0.625 -> n6 (정확한 값은 meta.json)
+            tok["noid"] = "n" + f"{nw / tw * 10:.0f}"   # 0.625 -> n6
     # 사후 로짓 보정 축의 β (MODEL.md §7.36 hand · §7.37 count4).
     # 축이 늘면 태그도 늘어난다 — 축마다 접두 1~2자로 붙인다. 없으면 생략(옛 태그 호환).
     #   `pl15`(hand β)   s15에서 뺌. s11 이후 4회 불변이고 meta.json에 ctx_axes로 있다
@@ -226,25 +227,26 @@ def describe(meta):
     ABBR = {"hand": "h", "count4": "c"}          # 1.875 -> h188,  1.25 -> c125
     for name, beta in (meta.get("ctx_axes") or {}).items():
         if beta:
-            e += ABBR.get(name, name[:2]) + f"{float(beta) * 100:.0f}"
+            tok["ctx:" + name] = ABBR.get(name, name[:2]) + f"{float(beta) * 100:.0f}"
     # 다중 과제 보조 헤드 λ (MODEL.md §7.41). 0이면 생략 — 옛 태그와 호환된다.
     #   `x10`(λ)  s18에서 뺌. s13 이후 5회 불변이고 meta.json에 mlp_aux_lambda로 있다.
     #             ⚠️ 헤드 구성을 다시 실험하면 이 블록을 되살려야 한다 (§7.42).
     ax = 0.0 if meta.get("mlp_aux_lambda") == 1.0 else float(meta.get("mlp_aux_lambda") or 0.0)
     if ax:
-        e += "x" + f"{ax * 10:.0f}"
+        t = "x" + f"{ax * 10:.0f}"
         # 축 개수는 **2가 아닐 때만** 붙인다 → s13의 `x10`이 그대로 유지된다.
         # λ만으로는 헤드 2개짜리와 4개짜리가 같은 태그를 받는다 (§7.42).
         nax = len(meta.get("mlp_aux_modes") or [])
         if nax and nax != 2:
-            e += f"h{nax}"
+            t += f"h{nax}"
+        tok["aux"] = t
     # pre-2023 F 오염 보정 축 (MODEL.md §7.49). 끄면 생략 — 옛 태그와 호환된다.
     #   cfp = 투수 축만,  cfpb = 투수+타자
     #   `cfpb`  s20에서 뺌. s14 이후 6회 불변이고 meta.json에 contam_axes로 있다.
     #           ctx β 두 개를 되살리느라 8자가 필요해서 자리를 만들었다.
     ca = meta.get("contam_axes") or ()
     if ca and set(ca) != {"p", "b"}:
-        e += "cf" + "".join(ca)
+        tok["contam"] = "cf" + "".join(ca)
     # 시즌 진행분 (MODEL.md §7.55 사후가산 · §7.56 컬럼). 둘은 배타적이다.
     #   사후 가산  0.02 -> as2   (β는 δ축보다 두 자릿수 작으므로 ×100)
     #   컬럼       gap_success+n_szn -> ac2   (ac + 컬럼 수)
@@ -252,59 +254,140 @@ def describe(meta):
     AB = {"gap_success": "as", "gap_bsuccess": "bs"}
     for name, beta in (meta.get("asof_axes") or {}).items():
         if beta:
-            e += AB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
+            tok["asof:" + name] = AB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
     # EB 수축 강도 (MODEL.md §7.63). 200은 한 번도 스윕 안 된 채 배포돼 있었다.
     # ⚠️ **배포 하이퍼파라미터인데 태그에 없었다.** s21에서 `next_zip_path`의 새 assert가
     #    잡았다 — 이번엔 β_b도 같이 바뀌어 우연히 구분됐지만, strength만 바꿨으면
     #    태그가 직전과 같았을 것이다. 기본값(200)일 때만 생략해 옛 태그와 호환한다.
     st = float(meta.get("asof_strength") or 0.0)
     if (meta.get("asof_axes") or {}) and st and st != 200.0:
-        e += f"k{st:.0f}"
+        tok["k"] = f"k{st:.0f}"
     # 레퍼토리 균형도 (MODEL.md §7.58).  r3_ent 0.02 -> me20  (asof와 같은 ×1000)
     MB = {"r3_ent": "me"}
     for name, beta in (meta.get("mix_axes") or {}).items():
         if beta:
-            e += MB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
-    parts.append(e)
+            tok["mix:" + name] = MB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
-        parts.insert(0, {"release": "tmR", "release_ext": "tmE"}.get(tm, "tmA"))
-    return "_".join(parts)
+        tok["tm"] = {"release": "tmR", "release_ext": "tmE"}.get(tm, "tmA")
+    return tok
+
+
+def describe(meta):
+    """전체 설정 태그 (SUBMISSIONS.md 기록용). **파일명에는 더 이상 안 쓴다.**
+
+    s21에서 22자가 되어 30자 예산(=4+22+4)을 정확히 채웠다. 대회 규칙이 30자이므로
+    다음 변경은 무조건 막힌다. → 파일명은 `next_zip_path`가 **변경분 + 지문**으로 만든다.
+    """
+    tm = describe_tokens(meta)
+    head = [tm["tm"]] if "tm" in tm else []
+    return "_".join(head + ["".join(v for k, v in tm.items() if k != "tm")])
+
+
+def fingerprint(tok):
+    """설정 토큰 전체의 4자리 지문. **충돌하지 않는 것이 유일한 요구사항이다.**
+
+    사람이 읽는 부분(변경분)은 짧아서 두 설정이 우연히 같은 힌트를 가질 수 있다.
+    지문이 그 경우를 막는다 — 파일명의 안전 기능은 여기에 있고, 앞쪽 토큰은 편의다.
+    """
+    import hashlib
+    payload = json.dumps(tok, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:4]
+
+
+HISTORY = SUBMIT / "history.json"
+
+
+def load_history():
+    if HISTORY.exists():
+        return json.loads(HISTORY.read_text(encoding="utf-8"))
+    return []
+
+
+def diff_tag(prev, cur):
+    """직전 제출 대비 **바뀐 토큰만** 이어 붙인다.
+
+    SUBMISSIONS.md의 행이 이미 "s19 + δ 표에 recency 가중" 형태로 **차분**을 적는다.
+    파일명도 같은 규약을 따르면 표와 이름이 서로를 설명한다.
+    축이 꺼진 경우(토큰 소멸)는 힌트로 안 보이지만, 지문이 구분을 보장한다.
+    """
+    add = [v for k, v in cur.items() if prev.get(k) != v]
+    if add:
+        return add
+    return ["off"] if set(prev) - set(cur) else []
 
 
 def next_zip_path(meta, suffix=""):
-    """이미 쓴 번호의 **최댓값 + 1**. 개수로 세면 파일을 지우거나 이름을 바꿨을 때
-    같은 번호가 다시 나와 기존 제출물을 덮어쓴다."""
-    used, prev = [0], {}
+    """`sNN_<바뀐 토큰><지문4>.zip` — **대회 규칙 30자**를 구조적으로 지킨다.
+
+    ⚠️ s21이 정확히 30자였다(`s21_a40h188c125as30bs30k35.zip`). 전체 설정을 이름에
+       넣는 방식은 축이 늘 때마다 예산을 먹어 s08/s09·s20에서 **두 번** 충돌을 냈고,
+       그때마다 "안 바뀐 축을 뺀다"로 버텼다. 더 뺄 것이 없다.
+
+    바꾼 것: 이름의 기능을 **전체 설정 표기 → 구분과 추적**으로 좁혔다.
+      · 앞쪽 토큰 = 직전 제출 대비 **바뀐 것만** (사람이 읽는 힌트)
+      · 뒤 4자리  = 전체 설정 지문 (충돌 방지 — 안전 기능은 여기 있다)
+      · 전체 설정 = `SUBMISSIONS.md` 표 + `model/meta.json` + `submit/history.json`
+
+    번호는 **이미 쓴 번호의 최댓값 + 1**이다. 개수로 세면 파일을 지우거나 이름을
+    바꿨을 때 같은 번호가 다시 나와 기존 제출물을 덮어쓴다.
+    """
+    used = [0]
     for p in ROOT.glob("s[0-9][0-9]_*.zip"):
         head = p.stem.split("_")[0][1:]
         if head.isdigit():
             used.append(int(head))
-            prev[int(head)] = p.stem.split("_", 1)[1] if "_" in p.stem else ""
-    tag = describe(meta)
-    name = f"s{max(used)+1:02d}_{tag}{suffix}.zip"
+    n = max(used) + 1
 
-    # ⚠️ **번호를 뺀 태그가 직전 제출과 같으면 멈춘다.**
-    #    s20에서 실제로 났다 — §7.61이 δ의 β를 바꿨는데 그 축이 `MUTE`에 있어서
-    #    태그가 s19와 문자 단위로 같게 나왔다. `MUTE`에 "다시 건드리면 여기서 빼라"는
-    #    경고 주석을 직접 달아놓고도 지나쳤고, 눈으로 파일명을 읽어서 잡았다.
+    tok = describe_tokens(meta)
+    hist = load_history()
+    prev = hist[-1]["tokens"] if hist else {}
+    fp = fingerprint(tok)
+
+    # ⚠️ **직전 제출과 설정이 완전히 같으면 멈춘다.** s20에서 실제로 났다 —
+    #    §7.61이 δ의 β를 바꿨는데 그 축이 `MUTE`에 있어서 태그가 s19와 문자 단위로
+    #    같게 나왔다. 경고 주석을 직접 달아놓고도 지나쳤고 눈으로 잡았다.
     #    **주석은 사람이 읽어야 작동하고 assert는 안 읽어도 작동한다.**
-    #    (같은 설정을 의도적으로 재현할 때는 suffix로 구분한다 — s04가 s01을
-    #     재현했던 경우처럼.)
-    last = prev.get(max(used))
-    if last is not None and not suffix and last == tag:
-        raise SystemExit(
-            f"태그가 직전 제출(s{max(used):02d})과 같다: `{tag}`\n"
-            f"  → 이번에 바꾼 축이 describe()에 안 들어가 있다. MUTE를 확인할 것.\n"
-            f"  → 같은 설정을 의도적으로 다시 내는 것이면 suffix= 를 줄 것.")
-    # ⚠️ 예전에는 넘치면 **뒤를 잘랐다.** 그런데 태그는 뒤로 갈수록 최근에 추가된
-    #    설정이라(alpha, noid 비중 …) 자르면 정확히 이번에 바뀐 것이 사라진다 —
-    #    s08(a=.30)과 s09(a=.40)의 이름이 같아졌던 사고의 재발 경로다.
-    #    조용히 자르지 않고 여기서 멈춘다. `describe()`를 줄이는 게 올바른 대응이다.
-    if len(name) > MAX_NAME:
-        raise SystemExit(f"파일명이 {MAX_NAME}자를 넘는다 ({len(name)}자): {name}\n"
-                         f"  describe()의 태그를 줄일 것. 자르면 이번에 바뀐 설정이 사라진다.")
+    #    (같은 설정을 의도적으로 재현할 때는 suffix로 구분한다 — s04가 s01을 재현한 경우.)
+    if prev and prev == tok and not suffix:
+        raise SystemExit("\n".join([
+            f"설정이 직전 제출(s{hist[-1]['n']:02d})과 **완전히 같다**.",
+            "  → 이번에 바꾼 것이 describe_tokens()에 안 들어가 있다.",
+            "  → 같은 설정을 의도적으로 다시 내는 것이면 suffix= 를 줄 것."]))
+
+    # 힌트는 **토큰 단위로** 들어가는 만큼만 넣는다. 글자로 자르면 `as30`이 `as3`이
+    # 되어 오히려 오해를 만든다 — 잘린 토큰보다 없는 토큰이 낫다.
+    # 30자는 대회 규칙이라 협상 대상이 아니고, 구분은 지문이 이미 보장한다.
+    room = MAX_NAME - len(f"s{n:02d}_{fp}{suffix}.zip")
+    hint, dropped = "", 0
+    for t in diff_tag(prev, tok):
+        if len(hint) + len(t) <= room:
+            hint += t
+        else:
+            dropped += 1
+    if dropped:
+        print(f"  ⚠️ 30자 예산으로 변경분 토큰 {dropped}개를 이름에서 생략했다"
+              f" (전체는 submit/history.json).")
+    name = f"s{n:02d}_{hint}{fp}{suffix}.zip"
+    assert len(name) <= MAX_NAME, name
     return ROOT / name
+
+
+def record_history(zip_path, meta):
+    """빌드된 제출물의 **전체 설정 토큰**을 남긴다.
+
+    이것이 있어야 다음 빌드가 "무엇이 바뀌었나"를 계산할 수 있다.
+    파일명에서 전체 설정을 뺀 대가로 생긴 기록 의무다.
+    """
+    tok = describe_tokens(meta)
+    hist = load_history()
+    n = int(zip_path.stem.split("_")[0][1:])
+    hist = [h for h in hist if h["n"] != n] + [
+        {"n": n, "file": zip_path.name, "tokens": tok,
+         "fingerprint": fingerprint(tok), "full_tag": describe(meta)}]
+    hist.sort(key=lambda h: h["n"])
+    HISTORY.write_text(json.dumps(hist, indent=1, ensure_ascii=False), encoding="utf-8")
+    print(f"  이력 기록: submit/history.json (s{n:02d}, 지문 {fingerprint(tok)})")
 
 
 def log_submission(zip_path, meta, pred_mean, elapsed):
