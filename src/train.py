@@ -33,9 +33,10 @@ from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PAR
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, ASOF_BETA, ASOF_STRENGTH, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
+import asofdelta
 import ctxfit
 import modelabel
 from features import build_features, fit_artifacts, logit_adjust
@@ -209,9 +210,14 @@ def main():
     ctx = ctxfit.fit_ctx(df, TARGET_COL, CTX_AXES, CTX_K)
     for line in ctxfit.summary(ctx):
         print(f"보정축 {line}")
+    # 시즌 진행분 (§7.55). β=0이면 fit 자체를 건너뛴다 — δ 축과 같은 규약.
+    asof = asofdelta.fit_asof(df, ASOF_BETA, ASOF_STRENGTH) if ASOF_BETA else None
+    if asof:
+        print(f"시즌진행분 gap: 오프셋 {len(asof['keys']):,}개  "
+              f"mu={asof['mu']:+.5f} sd={asof['sd']:.5f}  β={asof['beta']}")
     art = fit_artifacts(df, weights=w, k_pitcher=SMOOTH_K_PITCHER,
                         k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx,
-                        contam_axes=CONTAM_AXES)
+                        contam_axes=CONTAM_AXES, asof=asof)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     def build_X(d):
@@ -307,6 +313,12 @@ def main():
         "n_features": len(cols), "train_rows": int(len(df)),
         "ctx_axes": {a["name"]: a["beta"] for a in ctx}, "ctx_k": CTX_K,
         "ctx_cells": {a["name"]: int(len(a["keys"])) for a in ctx},
+        # 시즌 진행분 (§7.55). 위 경고와 같은 이유로 반드시 남긴다 —
+        # 이게 없으면 s14와 s15의 파일명이 번호만 빼고 똑같아진다.
+        "asof_beta": ASOF_BETA, "asof_strength": ASOF_STRENGTH,
+        "asof_keys": int(len(asof["keys"])) if asof else 0,
+        "asof_mu": float(asof["mu"]) if asof else 0.0,
+        "asof_sd": float(asof["sd"]) if asof else 1.0,
         "lgb_params": FINAL_LGB_PARAMS, "lightgbm_version": lgb.__version__,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 

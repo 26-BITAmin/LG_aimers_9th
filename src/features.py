@@ -100,6 +100,51 @@ def ctx_lookup(df, ax):
     return np.where(keys[j] == kv, ax["delta"][j], 0.0)
 
 
+# ── 시즌 진행분 (asof 차분) — MODEL.md §7.54·§7.55 ───────────────────
+# `asof_*`는 커리어 누적이다. 거기서 **train에서 얼린 시즌 시작 시점 상수**를 빼면
+# 그 행이 속한 시즌의 진행분이 나온다.
+#
+#     n_szn = asof_n − n_off(pitcher, season)          이번 시즌 던진 공
+#     k_szn = asof_rate × asof_n − k_off(...)          이번 시즌 성공 횟수
+#     gap   = EB(k_szn, n_szn) − 커리어 비율            "올해 − 커리어"
+#
+# **비율은 뺄 수 없고 횟수는 뺄 수 있다.** r×n이 정수 복원된다는 것이 전제이고
+# 측정했다 (max|r×n − round| < 0.008, 저장 6자리).
+#
+# ⚠️ **행 독립적이다.** 각 행이 자기 (pitcher_id, season) 키로 searchsorted 할 뿐이다
+#    (δ · Trackman 조회와 같은 형태). `df` 전체에 대한 집계가 없다.
+#    오프셋·표준화 상수는 전부 train에서만 만들어져 artifacts에 동결된다.
+
+
+def asof_lookup(df, a, with_hit=False):
+    """시즌 진행분 gap을 행 단위로 조회·계산해 **표준화**해서 돌려준다.
+
+    미등록(신인·데뷔 전) 투수는 오프셋 0으로 떨어지고, 그러면
+    커리어 = 시즌분이 되어 **정의상 옳다** (2024 검증에서 일치율 1.000000).
+
+    `with_hit=True`면 **오프셋 조회 적중 마스크**를 같이 준다.
+    ⚠️ 이 값을 진단으로 써야 한다 — `v != 0`을 세면 표준화 때문에 항상 100%가 나오고,
+       그러면 §6 버그 2(참조행과 추론행의 적중률 불일치)를 **가린다.**
+    """
+    kv = (df["pitcher_id"].to_numpy(dtype=np.int64) * 10000
+          + df["season"].to_numpy(dtype=np.int64))
+    keys = a["keys"]
+    j = np.clip(np.searchsorted(keys, kv), 0, max(len(keys) - 1, 0))
+    hit = (len(keys) > 0) & (keys[j] == kv)
+
+    n_now = df["asof_pitcher_n"].to_numpy(dtype=np.float64)
+    r_car = df["asof_pitcher_success_rate"].to_numpy(dtype=np.float64)
+    n_szn = np.maximum(n_now - np.where(hit, a["n_off"][j], 0.0), 0.0)
+    k_szn = np.clip(np.nan_to_num(r_car * n_now) - np.where(hit, a["k_off"][j], 0.0),
+                    0.0, None)
+
+    prior = np.where(np.isfinite(r_car), r_car, a["league"])
+    s = float(a["strength"])
+    gap = (k_szn + s * prior) / (n_szn + s) - prior
+    v = np.nan_to_num((gap - float(a["mu"])) / float(a["sd"]))
+    return (v, hit) if with_hit else v
+
+
 def logit_adjust(df, art):
     """모든 보정 축의 Σ β·δ 와 축별 적중률을 돌려준다.
 
@@ -112,11 +157,17 @@ def logit_adjust(df, art):
         d = ctx_lookup(df, ax)
         hits[ax["name"]] = float(np.mean(d != 0.0))
         z += float(ax["beta"]) * d
+
+    a = art.get("asof") if art else None
+    if a and float(a["beta"]) != 0.0:
+        v, hit = asof_lookup(df, a, with_hit=True)
+        hits["asof"] = float(np.mean(hit))       # ← 진짜 조회 적중률 (v!=0 이 아니다)
+        z += float(a["beta"]) * v
     return z, hits
 
 
 def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None,
-                  clip=None, ctx=None, contam_axes=None, tmb_table=None):
+                  clip=None, ctx=None, contam_axes=None, tmb_table=None, asof=None):
     """train에서만 호출. 추론 시 필요한 상수들을 계산해 딕셔너리로 반환.
 
     tm_table: (pitcher_id, season) → Trackman 요약 피처 DataFrame.
@@ -129,6 +180,7 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
     # 계산이 들어가면 안 되므로 — build_submit.py의 AST 스캐너가 막는다).
     art = {"priors": {}, "cat_maps": {}, "clip": dict(clip or {}),
            "ctx": list(ctx or []),      # src/ctxfit.fit_ctx 이 만든다 (사후 로짓 보정 축)
+           "asof": asof,                # src/asofdelta.fit_asof 이 만든다 (시즌 진행분)
            "smooth_k": {col: (k_pitcher if ncol in _PITCHER_N_COLS else k_batter)
                         for col, ncol in SMOOTH_SPEC}}
 
@@ -366,4 +418,4 @@ def build_features(df, art):
 
 
 __all__ = ["fit_artifacts", "build_features", "logit_adjust", "ctx_lookup",
-           "CTX_CODERS", "CATEGORICAL_COLS"]
+           "asof_lookup", "CTX_CODERS", "CATEGORICAL_COLS"]

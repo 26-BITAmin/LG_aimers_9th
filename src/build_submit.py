@@ -203,9 +203,10 @@ def describe(meta):
             e += "n" + f"{nw / tw * 10:.0f}"      # 0.625 -> n6 (정확한 값은 meta.json)
     # 사후 로짓 보정 축의 β (MODEL.md §7.36 hand · §7.37 count4).
     # 축이 늘면 태그도 늘어난다 — 축마다 접두 1~2자로 붙인다. 없으면 생략(옛 태그 호환).
+    #   `pl15`(hand β)  s15에서 뺌. s11 이후 4회 불변이고 meta.json에 ctx_axes로 있다
     ABBR = {"hand": "pl", "count4": "c"}                    # 1.5 -> pl15,  1.0 -> c10
     for name, beta in (meta.get("ctx_axes") or {}).items():
-        if beta:
+        if beta and name != "hand":
             e += ABBR.get(name, name[:2]) + f"{float(beta) * 10:.0f}"
     # 다중 과제 보조 헤드 λ (MODEL.md §7.41). 0이면 생략 — 옛 태그와 호환된다.
     ax = float(meta.get("mlp_aux_lambda") or 0.0)
@@ -221,6 +222,11 @@ def describe(meta):
     ca = meta.get("contam_axes") or ()
     if ca:
         e += "cf" + "".join(ca)
+    # 시즌 진행분 gap β (MODEL.md §7.55). 0이면 생략 — 옛 태그와 호환된다.
+    #   0.02 -> as2  (β는 δ축보다 두 자릿수 작으므로 ×100)
+    ab = float(meta.get("asof_beta") or 0.0)
+    if ab:
+        e += "as" + f"{ab * 100:.0f}"
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
@@ -276,6 +282,14 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
         ax = [AXN.get(m, m) for m in (meta.get("mlp_aux_modes") or [])]
         cfg += (f"+보조헤드 λ{meta['mlp_aux_lambda']}"
                 + (f"({'·'.join(ax)})" if ax else ""))
+    # 오염 보정 축(§7.49)과 시즌 진행분(§7.55). **s14는 이 줄이 없어서 손으로 채웠다** —
+    # s11 플래툰 · s12 카운트 · s13 보조헤드에 이은 네 번째·다섯 번째 누락이다.
+    # ⚠️ 배포에 새 축을 넣으면 `describe()`와 여기 **둘 다** 고친다.
+    if meta.get("contam_axes"):
+        CN = {"p": "투수", "b": "타자"}
+        cfg += "+F오염보정(" + "·".join(CN.get(c, c) for c in meta["contam_axes"]) + ")"
+    if meta.get("asof_beta"):
+        cfg += f"+시즌진행분 β{meta['asof_beta']}"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")
