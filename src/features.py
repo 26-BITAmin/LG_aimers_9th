@@ -116,7 +116,7 @@ def ctx_lookup(df, ax):
 #    오프셋·표준화 상수는 전부 train에서만 만들어져 artifacts에 동결된다.
 
 
-def asof_lookup(df, a, with_hit=False):
+def asof_lookup(df, a, with_hit=False, ct=None):
     """축 하나의 시즌 진행분 gap을 행 단위로 계산해 **표준화**해서 돌려준다.
 
     축은 **자기를 설명한다** — `id`/`n_col`/`r_col`이 아티팩트 안에 들어 있어서
@@ -148,6 +148,23 @@ def asof_lookup(df, a, with_hit=False):
     n_szn = np.maximum(n_now - np.where(hit, a["n_off"][j], 0.0), 0.0)
     k_szn = np.clip(np.nan_to_num(r_car * n_now) - np.where(hit, a["k_off"][j], 0.0),
                     0.0, None)
+
+    # ── pre-2023 F 오염 보정 (§7.60) ────────────────────────────────
+    # 이 경로는 원본 `asof_*`를 읽는다. `build_features`가 하는 보정(§7.49)이
+    # 여기엔 없었고, 그건 실수였다:
+    #
+    #   k_szn = k_now − k_off  는 **깨끗하다.** 오염 투구는 전부 개막 이전이라
+    #           두 항에 똑같이 들어가 상쇄된다 (2024·2025 투구는 새 기준).
+    #   r_car 는 **오염된 채로 남는다.** 그런데 gap은 이걸 기준선으로 뺀다.
+    #           → gap이 D/m 만큼 밀린다. 크기는 pre-2023 F 노출에 비례해 투수마다 다르다.
+    #             2024 행 측정: 55.2%가 노출, 평균 0.87σ, 최대 10.26σ.
+    #
+    # `cadj = (축, 부호)`. 성공률은 과대이므로 −1, 반대성 비율은 과소이므로 +1.
+    # 없으면(=None) 종전과 **비트 동일**하게 동작한다.
+    cadj = a.get("cadj")
+    if cadj and ct:
+        import contam
+        r_car = r_car + float(cadj[1]) * contam.adjust(df, ct, cadj[0])
 
     prior = np.where(np.isfinite(r_car), r_car, a["league"])
     s = float(a["strength"])
@@ -216,7 +233,8 @@ def logit_adjust(df, art):
     for a in ((art.get("asof") or []) if art else []):
         if float(a["beta"]) == 0.0:
             continue
-        v, hit = asof_lookup(df, a, with_hit=True)
+        v, hit = asof_lookup(df, a, with_hit=True,
+                             ct=(art.get("contam") if art else None))
         hits[a["name"]] = float(np.mean(hit))    # ← 진짜 조회 적중률 (v!=0 이 아니다)
         z += float(a["beta"]) * v
 

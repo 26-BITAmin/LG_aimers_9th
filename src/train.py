@@ -212,19 +212,25 @@ def main():
     for line in ctxfit.summary(ctx):
         print(f"보정축 {line}")
     # 시즌 진행분 (§7.55). β=0이면 fit 자체를 건너뛴다 — δ 축과 같은 규약.
-    asof = asofdelta.fit_asof_axes(df, ASOF_AXES, ASOF_STRENGTH)
+    # ⚠️ **오염 보정을 먼저 만들고 asof 축에 넘긴다** (§7.60).
+    #    순서가 뒤바뀌면 축이 원본 컬럼을 보게 되고, 그게 s15~s17의 결함이었다.
+    art = fit_artifacts(df, weights=w, k_pitcher=SMOOTH_K_PITCHER,
+                        k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx,
+                        contam_axes=CONTAM_AXES)
+    asof = asofdelta.fit_asof_axes(df, ASOF_AXES, ASOF_STRENGTH,
+                                   ct=art.get("contam"))
+    art["asof"] = asof
     if asof:
         for _a in asof:
             print(f"시즌진행분 {_a['name']}: 오프셋 {len(_a['keys']):,}개  "
-                  f"mu={_a['mu']:+.5f} sd={_a['sd']:.5f}  β={_a['beta']}")
+                  f"mu={_a['mu']:+.5f} sd={_a['sd']:.5f}  β={_a['beta']}"
+                  f"  오염보정={_a.get('cadj')}")
     # 레퍼토리 균형도 (§7.58). 얼려지는 것이 축당 스칼라 6개뿐이다.
     mix = mixent.fit_mixent(df, MIX_AXES)
     for _a in mix:
         print(f"레퍼토리 {_a['name']}: league={np.round(_a['league'], 3)}  "
               f"mu={_a['mu']:+.5f} sd={_a['sd']:.5f}  β={_a['beta']}")
-    art = fit_artifacts(df, weights=w, k_pitcher=SMOOTH_K_PITCHER,
-                        k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx,
-                        contam_axes=CONTAM_AXES, asof=asof, mix=mix)
+    art["mix"] = mix
     art["use_player_ids"] = USE_PLAYER_IDS
 
     def build_X(d):

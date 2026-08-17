@@ -82,11 +82,14 @@ def main():
     ctx = ctxfit.fit_ctx(tr, TARGET_COL, CTX_AXES, CTX_K)
     # ⚠️ §7.36의 재발 방지 — 배포에 새 보정 축이 생기면 **여기도** 고쳐야 한다.
     #    그때 이 파일을 빠뜨려서 검증이 플래툰 없는 모델을 통과시켰다.
-    asof = asofdelta.fit_asof_axes(tr, ASOF_AXES, ASOF_STRENGTH)
-    mix = mixent.fit_mixent(tr, MIX_AXES)
+    # ⚠️ 오염 보정을 먼저 만들고 asof 축에 넘긴다 (§7.60). train.py와 같은 순서.
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
                         k_batter=SMOOTH_K_BATTER, tm_table=load_table(TRACKMAN_MODE),
-                        ctx=ctx, contam_axes=CONTAM_AXES, asof=asof, mix=mix)
+                        ctx=ctx, contam_axes=CONTAM_AXES)
+    asof = asofdelta.fit_asof_axes(tr, ASOF_AXES, ASOF_STRENGTH,
+                                   ct=art.get("contam"))
+    art["asof"] = asof
+    art["mix"] = mixent.fit_mixent(tr, MIX_AXES)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     Xtr = build_X(tr, art)

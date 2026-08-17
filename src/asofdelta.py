@@ -202,13 +202,29 @@ ASOF_SPEC = {
                         r_col="asof_pitcher_success_rate"),
     "gap_bsuccess": dict(id="batter_id", n_col="asof_batter_n",
                          r_col="asof_batter_success_rate"),
+    # 측정용 (배포 안 함). 오염이 가장 심한 컬럼이라 §7.60에서 다시 물었다.
+    "gap_reverse":  dict(id="pitcher_id", n_col="asof_pitcher_n",
+                         r_col="asof_pitcher_reverse_rate"),
 }
 
 
-def fit_asof_axes(train_df, axes, strength=200.0):
+# pre-2023 F 오염이 어느 컬럼을 어느 방향으로 틀리게 했나 (§7.49 · §7.60).
+#   성공률은 반대성 실패를 성공으로 세었으므로 **과대** → −1
+#   반대성 비율은 그만큼 **과소**                      → +1
+# 여기 없는 축(볼·몰림 등)은 오염과 무관하다고 보고 보정하지 않는다.
+CONTAM_OF = {
+    "gap_success":  ("p", -1.0),
+    "gap_bsuccess": ("b", -1.0),
+    "gap_reverse":  ("p", +1.0),
+}
+
+
+def fit_asof_axes(train_df, axes, strength=200.0, ct=None):
     """배포용 축 리스트를 만든다. **train에서만 호출.**
 
     axes: [(축이름, β), ...].  β=0인 축은 건너뛴다 (δ 축과 같은 규약).
+    ct:   오염 보정 아티팩트(`art["contam"]`). 주면 해당 축에 `cadj`를 달고
+          **mu/sd도 보정된 값에서** 뽑는다. 없으면 종전과 비트 동일하다.
     """
     off_all = fit_offsets(train_df)
     league = float(train_df["control_success"].mean())
@@ -224,7 +240,9 @@ def fit_asof_axes(train_df, axes, strength=200.0):
                  k_off=off["k_off"][spec["r_col"]],
                  mu=0.0, sd=1.0, beta=0.0,   # mu/sd를 먼저 0/1로 두고 원단위를 잰다
                  league=league, strength=float(strength))
-        raw = _f.asof_lookup(train_df, a)
+        if ct is not None and name in CONTAM_OF:
+            a["cadj"] = CONTAM_OF[name]
+        raw = _f.asof_lookup(train_df, a, ct=ct)
         # ⚠️ 표준화 통계는 **학습 행에서만** 뽑는다. 검증/추론 행의 평균을 쓰면
         #    그 자체가 리크다 (tmbfit의 교훈).
         a["mu"] = float(np.mean(raw))
