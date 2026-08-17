@@ -310,9 +310,16 @@ def main():
         old = joblib.load(MODEL_DIR / "artifacts.joblib")
         prev = old.get("feature_hash")
         if prev is None:
-            raise SystemExit(
-                "저장된 아티팩트에 feature_hash가 없다 (--artifacts-only 도입 전에 학습됨).\n"
-                "  → 전체 학습을 한 번 돌려 해시를 심은 뒤에 쓸 수 있다.")
+            # `--assume-features-unchanged` — **일회성 마이그레이션용.**
+            # 해시 도입 전에 학습된 아티팩트에 해시를 처음 심을 때만 쓴다.
+            # 해시 **불일치**는 이 플래그로도 통과하지 않는다 (아래 분기).
+            if "--assume-features-unchanged" not in sys.argv:
+                raise SystemExit(
+                    "저장된 아티팩트에 feature_hash가 없다 (--artifacts-only 도입 전 학습).\n"
+                    "  → 전체 학습을 한 번 돌리거나, 피처가 안 바뀐 것이 확실하면\n"
+                    "     --assume-features-unchanged 를 함께 줘서 해시를 심는다.")
+            print(f"⚠️ feature_hash 없음 → 처음 심는다: {fhash[:16]}")
+            prev = fhash
         if prev != fhash:
             raise SystemExit(
                 "참조 행렬이 달라졌다 → 저장된 모델은 **다른 피처로 학습된 것**이다.\n"
