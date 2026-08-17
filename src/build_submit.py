@@ -222,11 +222,16 @@ def describe(meta):
     ca = meta.get("contam_axes") or ()
     if ca:
         e += "cf" + "".join(ca)
-    # 시즌 진행분 gap β (MODEL.md §7.55). 0이면 생략 — 옛 태그와 호환된다.
-    #   0.02 -> as2  (β는 δ축보다 두 자릿수 작으므로 ×100)
+    # 시즌 진행분 (MODEL.md §7.55 사후가산 · §7.56 컬럼). 둘은 배타적이다.
+    #   사후 가산  0.02 -> as2   (β는 δ축보다 두 자릿수 작으므로 ×100)
+    #   컬럼       gap_success+n_szn -> ac2   (ac + 컬럼 수)
+    # 끄면 생략 — 옛 태그와 호환된다.
     ab = float(meta.get("asof_beta") or 0.0)
+    ac = meta.get("asof_cols") or []
     if ab:
         e += "as" + f"{ab * 100:.0f}"
+    if ac:
+        e += "ac" + str(len(ac))
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
@@ -290,6 +295,8 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
         cfg += "+F오염보정(" + "·".join(CN.get(c, c) for c in meta["contam_axes"]) + ")"
     if meta.get("asof_beta"):
         cfg += f"+시즌진행분 β{meta['asof_beta']}"
+    if meta.get("asof_cols"):
+        cfg += "+시즌진행분 컬럼(" + "·".join(meta["asof_cols"]) + ")"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")

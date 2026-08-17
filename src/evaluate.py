@@ -64,7 +64,19 @@ SEEDS = (42, 7, 2024)
 def run_fold(df, valid_season, *, tm_table=None, tmb_table=None,
              half_life=RECENCY_HALF_LIFE,
              params=FINAL_LGB_PARAMS, drop=DROP_FEATURES, use_ids=USE_PLAYER_IDS,
-             rounds=N_ROUNDS, seeds=SEEDS, k=SMOOTH_K_PITCHER):
+             rounds=N_ROUNDS, seeds=SEEDS, k=SMOOTH_K_PITCHER,
+             extra=None, post=None):
+    """extra / post — **전달 방식을 같은 자리에서 비교**하기 위한 훅 (§7.56).
+
+    같은 정보라도 컬럼으로 넣는 것과 사후 로짓에 더하는 것은 다른 물건이다.
+    컬럼은 상호작용을 쓸 수 있지만 §7.51이 본 '컬럼 추가 비용'을 내고,
+    사후 가산은 선형이지만 공짜다. 둘을 다른 스크립트에서 재면 비교가 안 된다.
+
+      extra(tr) -> f(d) -> {컬럼명: 배열}      학습 시즌으로 fit, 행 단위로 apply
+      post(tr)  -> f(d) -> 로짓에 더할 배열     예측 **후** 가산
+
+    ⚠️ 둘 다 `tr`로만 fit 한다. 검증 행 통계를 쓰면 그 자체가 리크다.
+    """
     tr = df[df.season < valid_season]
     va = df[df.season == valid_season]
     ref = int(tr.season.max())
@@ -73,8 +85,14 @@ def run_fold(df, valid_season, *, tm_table=None, tmb_table=None,
     art = fit_artifacts(tr, weights=w, k_pitcher=k, k_batter=SMOOTH_K_BATTER,
                         tm_table=tm_table, tmb_table=tmb_table)
 
+    ex = extra(tr) if extra is not None else None
+    po = post(tr) if post is not None else None
+
     def X(d):
         x = build_features(d, art)
+        if ex is not None:
+            for c, v in ex(d).items():
+                x[c] = np.asarray(v, dtype=np.float32)
         if use_ids:
             for c in ("pitcher_id", "batter_id"):
                 x[c] = d[c].to_numpy(dtype=np.float32)
@@ -83,13 +101,14 @@ def run_fold(df, valid_season, *, tm_table=None, tmb_table=None,
     Xtr, Xva = X(tr), X(va)
     ytr = tr[TARGET_COL].to_numpy(dtype=np.float64)
     yva = va[TARGET_COL].to_numpy(dtype=np.float64)
+    zadd = po(va) if po is not None else 0.0
 
     vals = []
     for s in seeds:
         p = dict(params, seed=s, bagging_seed=s, feature_fraction_seed=s,
                  data_random_seed=s)
         bst = lgb.train(p, lgb.Dataset(Xtr, ytr, weight=w), num_boost_round=rounds)
-        pr = 1 / (1 + np.exp(-bst.predict(Xva, raw_score=True)))
+        pr = 1 / (1 + np.exp(-(bst.predict(Xva, raw_score=True) + zadd)))
         vals.append(bss(yva, shift_to_prior(pr, yva.mean())))
     return np.array(vals)
 

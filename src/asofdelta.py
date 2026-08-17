@@ -187,7 +187,7 @@ def shrink(hits_szn, n_szn, r_career, league, n_career=None):
     return (hits_szn + strength * prior) / (np.maximum(n_szn, 0.0) + strength)
 
 
-def fit_asof(train_df, beta, strength=200.0):
+def fit_asof(train_df, beta, strength=200.0, cols=()):
     """배포용 아티팩트 하나로 눌러 담는다. **train에서만 호출.**
 
     `features.asof_lookup`이 소비하는 형태와 정확히 맞춰야 한다 — 그쪽은
@@ -204,6 +204,9 @@ def fit_asof(train_df, beta, strength=200.0):
 
     a = {"keys": off["keys"], "n_off": off["n_off"],
          "k_off": off["k_off"]["asof_pitcher_success_rate"],
+         # 컬럼 경로(§7.56)가 쓰는 추가 오프셋. 사후 가산만 쓸 때는 무시된다.
+         # `fit_offsets`가 어차피 전부 계산하므로 비용이 없다.
+         "k_off_middle": off["k_off"]["asof_pitcher_middle_rate"],
          "mu": 0.0, "sd": 1.0, "beta": 0.0,      # mu/sd를 먼저 0/1로 두고 원단위를 잰다
          "league": league, "strength": float(strength)}
 
@@ -212,6 +215,21 @@ def fit_asof(train_df, beta, strength=200.0):
     a["mu"] = float(np.mean(raw))
     a["sd"] = float(np.std(raw)) or 1.0
     a["beta"] = float(beta)
+
+    # ── 컬럼 경로 (§7.56) ────────────────────────────────────────
+    # ⚠️ 사후 가산과 **배타적**이다. 둘 다 켜면 같은 정보를 두 번 넣게 되고
+    #    실측에서 손해였다 (col1_post 778.9 < col1 783.9, fold2024).
+    #    설정 실수로 조용히 겹치지 않도록 여기서 죽인다.
+    if cols:
+        if float(beta) != 0.0:
+            raise ValueError("ASOF_COLS와 ASOF_BETA는 동시에 켤 수 없다 "
+                             "(이중 계산 — MODEL.md §7.56). 하나를 0으로 둘 것.")
+        rawc, _ = _f._asof_raw(train_df, a)
+        miss = [c for c in cols if c not in rawc]
+        if miss:
+            raise KeyError(f"알 수 없는 시즌 진행분 컬럼: {miss}")
+        a["cols"] = {c: (float(np.mean(rawc[c])), float(np.std(rawc[c])) or 1.0)
+                     for c in cols}
     return a
 
 

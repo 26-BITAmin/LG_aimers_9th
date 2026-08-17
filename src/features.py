@@ -116,15 +116,11 @@ def ctx_lookup(df, ax):
 #    오프셋·표준화 상수는 전부 train에서만 만들어져 artifacts에 동결된다.
 
 
-def asof_lookup(df, a, with_hit=False):
-    """시즌 진행분 gap을 행 단위로 조회·계산해 **표준화**해서 돌려준다.
+def _asof_raw(df, a):
+    """시즌 진행분을 **원단위로** 행 단위 계산한다. 사후 가산·컬럼 경로의 공용 코드.
 
     미등록(신인·데뷔 전) 투수는 오프셋 0으로 떨어지고, 그러면
     커리어 = 시즌분이 되어 **정의상 옳다** (2024 검증에서 일치율 1.000000).
-
-    `with_hit=True`면 **오프셋 조회 적중 마스크**를 같이 준다.
-    ⚠️ 이 값을 진단으로 써야 한다 — `v != 0`을 세면 표준화 때문에 항상 100%가 나오고,
-       그러면 §6 버그 2(참조행과 추론행의 적중률 불일치)를 **가린다.**
     """
     kv = (df["pitcher_id"].to_numpy(dtype=np.int64) * 10000
           + df["season"].to_numpy(dtype=np.int64))
@@ -132,17 +128,60 @@ def asof_lookup(df, a, with_hit=False):
     j = np.clip(np.searchsorted(keys, kv), 0, max(len(keys) - 1, 0))
     hit = (len(keys) > 0) & (keys[j] == kv)
 
-    n_now = df["asof_pitcher_n"].to_numpy(dtype=np.float64)
-    r_car = df["asof_pitcher_success_rate"].to_numpy(dtype=np.float64)
-    n_szn = np.maximum(n_now - np.where(hit, a["n_off"][j], 0.0), 0.0)
+    # ⚠️ **float32로 한 번 내린 뒤 float64로 올린다** — `_col64`와 같은 이유다.
+    #    학습은 train.csv를 float32 dtype으로 읽지만 평가 서버의 test.csv는 pandas
+    #    기본 추론으로 float64가 된다. 곧바로 float64로 쓰면 서빙 쪽이 원본 정밀도를
+    #    더 많이 갖고, `k = r × n`이 n~3000에서 1 ULP씩 어긋난다.
+    #    오프셋 `k_off`는 **float32 train에서** 만들어졌으므로 뺄셈의 두 항이
+    #    다른 정밀도 세계에 있게 된다.
+    #    → verify_pipeline이 실제로 잡았다: max|serve − direct| = 4.527e-07 (§7.55 사고).
+    f64 = lambda c: df[c].to_numpy(dtype=np.float32).astype(np.float64)
+    n_now, r_car = f64("asof_pitcher_n"), f64("asof_pitcher_success_rate")
+    n_off = np.where(hit, a["n_off"][j], 0.0)
+    n_szn = np.maximum(n_now - n_off, 0.0)
     k_szn = np.clip(np.nan_to_num(r_car * n_now) - np.where(hit, a["k_off"][j], 0.0),
                     0.0, None)
 
     prior = np.where(np.isfinite(r_car), r_car, a["league"])
     s = float(a["strength"])
-    gap = (k_szn + s * prior) / (n_szn + s) - prior
-    v = np.nan_to_num((gap - float(a["mu"])) / float(a["sd"]))
+    r_szn = (k_szn + s * prior) / (n_szn + s)
+    out = {"gap_success": r_szn - prior, "r_szn_success": r_szn, "n_szn": n_szn}
+
+    # 몰림 축은 컬럼 경로에서만 쓴다. 옛 아티팩트에는 이 오프셋이 없다 (하위 호환).
+    if "k_off_middle" in a:
+        m_car = f64("asof_pitcher_middle_rate")
+        m_szn = np.clip(np.nan_to_num(m_car * n_now)
+                        - np.where(hit, a["k_off_middle"][j], 0.0), 0.0, None)
+        pm = np.where(np.isfinite(m_car), m_car, 0.2)
+        out["gap_middle"] = (m_szn + s * pm) / (n_szn + s) - pm
+    return out, hit
+
+
+def asof_lookup(df, a, with_hit=False):
+    """사후 로짓 가산용 — `gap_success`를 학습 통계로 **표준화**해서 돌려준다.
+
+    `with_hit=True`면 **오프셋 조회 적중 마스크**를 같이 준다.
+    ⚠️ 이 값을 진단으로 써야 한다 — `v != 0`을 세면 표준화 때문에 항상 100%가 나오고,
+       그러면 §6 버그 2(참조행과 추론행의 적중률 불일치)를 **가린다.**
+    """
+    raw, hit = _asof_raw(df, a)
+    v = np.nan_to_num((raw["gap_success"] - float(a["mu"])) / float(a["sd"]))
     return (v, hit) if with_hit else v
+
+
+def asof_columns(df, a):
+    """컬럼 경로(§7.56) — `a["cols"]`에 적힌 것만 각자의 학습 통계로 표준화해 돌려준다.
+
+    `a`에 `cols`가 없으면 빈 딕셔너리 = 완전히 무해하다 (사후 가산만 쓰는 배포와
+    비트 동일). 어느 컬럼을 낼지는 **아티팩트가 정한다** — config가 아니라.
+    그래야 옛 아티팩트로 추론해도 그때의 컬럼 집합이 그대로 재현된다.
+    """
+    spec = (a or {}).get("cols")
+    if not spec:
+        return {}
+    raw, _ = _asof_raw(df, a)
+    return {c: np.nan_to_num((raw[c] - mu) / (sd if sd else 1.0))
+            for c, (mu, sd) in spec.items()}
 
 
 def logit_adjust(df, art):
@@ -405,6 +444,13 @@ def build_features(df, art):
             out[c] = np.where(hit, vals[:, j], np.nan).astype(np.float32)
         out[flag] = hit.astype(np.float32)
 
+    # ── 시즌 진행분 컬럼 (§7.56) ────────────────────────────
+    # 사후 가산(logit_adjust)과 **배타적**이다 — 둘 다 켜면 이중 계산으로 손해다
+    # (실측: col1_post 778.9 < col1 783.9). 어느 쪽을 쓸지는 아티팩트가 정한다.
+    # art["asof"]["cols"]가 없으면 이 블록은 아무것도 안 낸다.
+    for c, v in asof_columns(g, art.get("asof") if art else None).items():
+        out[c] = v.astype(np.float32)
+
     # ── 범주형 → 정수 코드 (미지값 -1) ──────────────────────
     for col in CATEGORICAL_STR:
         codes = g[col].astype("object").astype(str).map(art["cat_maps"][col])
@@ -418,4 +464,4 @@ def build_features(df, art):
 
 
 __all__ = ["fit_artifacts", "build_features", "logit_adjust", "ctx_lookup",
-           "asof_lookup", "CTX_CODERS", "CATEGORICAL_COLS"]
+           "asof_lookup", "asof_columns", "CTX_CODERS", "CATEGORICAL_COLS"]
