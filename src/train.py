@@ -33,7 +33,7 @@ from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PAR
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, ASOF_AXES, ASOF_STRENGTH, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
@@ -208,7 +208,12 @@ def main():
     tm_table = load_table(TRACKMAN_MODE)
     print(f"Trackman 모드={TRACKMAN_MODE}  테이블="
           f"{None if tm_table is None else tm_table.shape}")
-    ctx = ctxfit.fit_ctx(df, TARGET_COL, CTX_AXES, CTX_K)
+    # δ 표는 **모델과 별도의 half-life**를 쓴다 (§7.61). 모델은 0.5, δ는 1.0 —
+    # δ는 셀당 표본이 필요해서 더 완만한 감쇠가 낫다 (스윕이 단봉을 보였다).
+    ctx = ctxfit.fit_ctx(df, TARGET_COL, CTX_AXES, CTX_K,
+                         weights=recency_weight(df["season"].to_numpy(),
+                                                CTX_HALF_LIFE,
+                                                ref_season=int(df.season.max())))
     for line in ctxfit.summary(ctx):
         print(f"보정축 {line}")
     # 시즌 진행분 (§7.55). β=0이면 fit 자체를 건너뛴다 — δ 축과 같은 규약.
@@ -326,6 +331,8 @@ def main():
         "n_features": len(cols), "train_rows": int(len(df)),
         "ctx_axes": {a["name"]: a["beta"] for a in ctx}, "ctx_k": CTX_K,
         "ctx_cells": {a["name"]: int(len(a["keys"])) for a in ctx},
+        # δ 표의 recency half-life (§7.61). **태그에 없으므로 여기가 유일한 기록이다.**
+        "ctx_half_life": CTX_HALF_LIFE,
         # 시즌 진행분 (§7.55). 위 경고와 같은 이유로 반드시 남긴다 —
         # 이게 없으면 s14와 s15의 파일명이 번호만 빼고 똑같아진다.
         "asof_axes": {a["name"]: a["beta"] for a in asof},

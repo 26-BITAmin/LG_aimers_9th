@@ -213,11 +213,20 @@ def describe(meta):
     #   `c10`(count4 β)  s17에서 뺌. s12 이후 5회 불변. 같은 이유·같은 대체 수단이다.
     # ⚠️ MUTE에 넣는 것은 "값이 안 바뀐다"는 뜻이 아니라 "지금까지 안 바뀌었다"는 뜻이다.
     #    이 축을 다시 건드리는 실험을 하면 **여기서 빼야** 태그가 두 제출을 구분한다.
-    ABBR = {"hand": "pl", "count4": "c"}                    # 1.5 -> pl15,  1.0 -> c10
-    MUTE = {"hand", "count4"}
+    # ✅ s20에서 **MUTE를 비웠다.** §7.61이 두 β를 바꿨기 때문이다 (1.5→1.875,
+    #    1.0→1.25). 위 경고가 예고한 상황이 실제로 왔고, 처음 빌드에서 태그가
+    #    s19와 번호만 다르게 나왔다 — 경고를 써놓고 안 지킨 것이다.
+    #    인코딩을 ×10 → **×100**으로 올렸다. 1.875는 ×10이면 "19"로 뭉개진다.
+    #    (옛 태그 pl15·c10과는 자릿수가 달라 헷갈릴 수 있으나, 그건 이미 디스크에
+    #     고정된 파일명이고 describe()는 새 이름만 만든다.)
+    #
+    # CTX_HALF_LIFE는 태그에 없다 — 가중을 바꾸면 δ의 스케일이 바뀌어 **β 재선정이
+    # 필수**이므로(고원이 이동한다) β가 항상 같이 움직인다. 정확한 값은 meta.json의
+    # `ctx_half_life`에 있다.
+    ABBR = {"hand": "h", "count4": "c"}          # 1.875 -> h188,  1.25 -> c125
     for name, beta in (meta.get("ctx_axes") or {}).items():
-        if beta and name not in MUTE:
-            e += ABBR.get(name, name[:2]) + f"{float(beta) * 10:.0f}"
+        if beta:
+            e += ABBR.get(name, name[:2]) + f"{float(beta) * 100:.0f}"
     # 다중 과제 보조 헤드 λ (MODEL.md §7.41). 0이면 생략 — 옛 태그와 호환된다.
     #   `x10`(λ)  s18에서 뺌. s13 이후 5회 불변이고 meta.json에 mlp_aux_lambda로 있다.
     #             ⚠️ 헤드 구성을 다시 실험하면 이 블록을 되살려야 한다 (§7.42).
@@ -231,8 +240,10 @@ def describe(meta):
             e += f"h{nax}"
     # pre-2023 F 오염 보정 축 (MODEL.md §7.49). 끄면 생략 — 옛 태그와 호환된다.
     #   cfp = 투수 축만,  cfpb = 투수+타자
+    #   `cfpb`  s20에서 뺌. s14 이후 6회 불변이고 meta.json에 contam_axes로 있다.
+    #           ctx β 두 개를 되살리느라 8자가 필요해서 자리를 만들었다.
     ca = meta.get("contam_axes") or ()
-    if ca:
+    if ca and set(ca) != {"p", "b"}:
         e += "cf" + "".join(ca)
     # 시즌 진행분 (MODEL.md §7.55 사후가산 · §7.56 컬럼). 둘은 배타적이다.
     #   사후 가산  0.02 -> as2   (β는 δ축보다 두 자릿수 작으므로 ×100)

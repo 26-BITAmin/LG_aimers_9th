@@ -29,19 +29,30 @@ import numpy as np
 from features import CTX_CODERS
 
 
-def fit_ctx(train_df, target_col, axes, k):
+def fit_ctx(train_df, target_col, axes, k, weights=None):
     """axes: [(축이름, β), ...] → [{"name", "beta", "keys", "delta"}, ...]
 
     `keys`는 정렬된 int64 (searchsorted 전제), `delta`는 float64.
     m(코드 개수)은 `features.CTX_CODERS`가 정하므로 여기서 따로 저장하지 않는다 —
     두 곳에 두면 어긋난다.
+
+    `weights`: 행 가중 (없으면 균등 = 종전과 비트 동일). §7.61에서 넣었다 —
+        균등으로 두면 **δ 표의 질량 66%가 2019~2022**에 있고, 그 시즌들은 모델
+        학습에서 가중 6%밖에 안 갖는다. 게다가 pre-2023 F 105,308행(7.1%)은
+        라벨 성공률이 +0.23 편향돼 있다 (2022 F .709 vs R .504 → 2023 F .473).
+        → δ 표가 모델이 무시하는 시즌, 그중 오염 구간까지 균등하게 반영한다.
+
+    수축 분모의 n은 **유효 표본 수** (Σw)²/Σw² 를 쓴다. Σw를 그대로 쓰면
+    가중이 작은 옛 행이 많은 셀에서 수축이 과하게 세진다.
     """
     y = train_df[target_col].to_numpy(dtype=np.float64)
     pid = train_df["pitcher_id"].to_numpy(dtype=np.int64)
+    w = (np.ones(len(y)) if weights is None
+         else np.asarray(weights, dtype=np.float64))
 
     upid, invp = np.unique(pid, return_inverse=True)
-    n_p = np.bincount(invp).astype(np.float64)
-    rate_p = np.bincount(invp, weights=y) / n_p         # 투수 전체 성공률
+    sw_p = np.bincount(invp, weights=w)
+    rate_p = np.bincount(invp, weights=w * y) / np.maximum(sw_p, 1e-12)
 
     out = []
     for name, beta in axes:
@@ -50,10 +61,12 @@ def fit_ctx(train_df, target_col, axes, k):
         code, m = CTX_CODERS[name](train_df)
         key = pid * m + code
         u, inv = np.unique(key, return_inverse=True)     # u는 정렬돼 있다
-        n = np.bincount(inv).astype(np.float64)
-        t = np.bincount(inv, weights=y)
+        sw = np.bincount(inv, weights=w)
+        sw2 = np.bincount(inv, weights=w * w)
+        n_eff = np.where(sw2 > 0, sw * sw / np.maximum(sw2, 1e-12), 0.0)
+        t = np.bincount(inv, weights=w * y)
         rp = rate_p[np.searchsorted(upid, u // m)]       # 각 셀이 속한 투수의 전체 성공률
-        delta = (n / (n + k)) * (t / n - rp)
+        delta = (n_eff / (n_eff + k)) * (t / np.maximum(sw, 1e-12) - rp)
         out.append({"name": name, "beta": float(beta),
                     "keys": u, "delta": delta.astype(np.float64)})
     return out
