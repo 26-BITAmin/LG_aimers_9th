@@ -156,6 +156,48 @@ def asof_lookup(df, a, with_hit=False):
     return (v, hit) if with_hit else v
 
 
+# ── 레퍼토리 균형도 축 (MODEL.md §7.58) ────────────────────────────────────
+#
+# `asof_pitcher_{fastball,breaking,offspeed}_rate`를 **3그룹으로 재정규화**한 뒤
+# 엔트로피를 잰다. 값이 클수록 구종을 고르게 섞는 투수다.
+#
+# 이 축은 앞의 둘과 **얼리는 것의 성격이 다르다.**
+#   δ(ctx)      엔티티×상황 표 — 수천 셀
+#   asof(gap)   오프셋 표 수천 개 + β
+#   mix(r3_ent) **스칼라 6개뿐** — league 3 + mu + sd + β
+# 오프셋 조회조차 없다. 제공 컬럼만의 순수 행 함수라 §7.55의 float32/float64
+# 함정(k = r×n 뺄셈)이 원리상 발생하지 않는다. 그래도 dtype 규약은 맞춘다 —
+# mu/sd가 float32 train에서 나왔기 때문이다.
+#
+# ⚠️ 배포 피처에 `pitchmix_entropy`가 **이미 있는데도** 잔차 t가 +8.72/+5.99 남았다.
+#    §7.56과 같은 그림이다 — 정보가 아니라 **전달 방식**이 문제다.
+
+
+def mixent_lookup(df, a, with_hit=False):
+    """3그룹 재정규화 믹스율의 엔트로피를 행 단위로 계산해 표준화해서 돌려준다.
+
+    cold(믹스 정보 없음)는 **리그 평균 믹스**로 떨어뜨린다. 0으로 두면 엔트로피가
+    0이 되어 "구종 하나만 던지는 투수"와 구별이 안 된다 — 결측을 극단값으로
+    바꾸는 것은 §7.49가 오염 보정에서 본 것과 같은 종류의 사고다.
+    """
+    f64 = lambda c: df[c].to_numpy(dtype=np.float32).astype(np.float64)
+    raw = np.stack([np.nan_to_num(f64(c), nan=0.0) for c in a["cols"]], axis=1)
+    tot = raw.sum(1)
+    n_mix = np.nan_to_num(f64(a["n_col"]), nan=0.0)
+
+    # `tot`는 1이 아니다 — 3그룹에 안 들어가는 구종(other)이 빠져 있다.
+    # 재정규화해야 "그룹 안에서 얼마나 고른가"가 된다 (§7.58에서 `mix3_sum`,
+    # 즉 other 비중 자체는 죽었다 — 재정규화가 아니라 **균형도**가 신호다).
+    ok = (tot > 0) & (n_mix > 0)
+    r3 = np.divide(raw, np.maximum(tot, 1e-9)[:, None])
+    r3 = np.where(ok[:, None], r3, np.asarray(a["league"], dtype=np.float64)[None, :])
+
+    q = np.clip(r3, 1e-12, 1.0)
+    ent = -(q * np.log(q)).sum(1)
+    v = np.nan_to_num((ent - float(a["mu"])) / float(a["sd"]))
+    return (v, ok) if with_hit else v
+
+
 def logit_adjust(df, art):
     """모든 보정 축의 Σ β·δ 와 축별 적중률을 돌려준다.
 
@@ -177,11 +219,20 @@ def logit_adjust(df, art):
         v, hit = asof_lookup(df, a, with_hit=True)
         hits[a["name"]] = float(np.mean(hit))    # ← 진짜 조회 적중률 (v!=0 이 아니다)
         z += float(a["beta"]) * v
+
+    # 레퍼토리 균형도 축 (§7.58). 같은 리스트 구조 — 축을 늘려도 여기는 안 고친다.
+    for a in ((art.get("mix") or []) if art else []):
+        if float(a["beta"]) == 0.0:
+            continue
+        v, ok = mixent_lookup(df, a, with_hit=True)
+        hits[a["name"]] = float(np.mean(ok))     # cold가 아닌 행의 비율
+        z += float(a["beta"]) * v
     return z, hits
 
 
 def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None,
-                  clip=None, ctx=None, contam_axes=None, tmb_table=None, asof=None):
+                  clip=None, ctx=None, contam_axes=None, tmb_table=None, asof=None,
+                  mix=None):
     """train에서만 호출. 추론 시 필요한 상수들을 계산해 딕셔너리로 반환.
 
     tm_table: (pitcher_id, season) → Trackman 요약 피처 DataFrame.
@@ -195,6 +246,7 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
     art = {"priors": {}, "cat_maps": {}, "clip": dict(clip or {}),
            "ctx": list(ctx or []),      # src/ctxfit.fit_ctx 이 만든다 (사후 로짓 보정 축)
            "asof": list(asof or []),    # src/asofdelta.fit_asof_axes (시즌 진행분 축들)
+           "mix": list(mix or []),      # src/mixent.fit_mixent (레퍼토리 균형도 §7.58)
            "smooth_k": {col: (k_pitcher if ncol in _PITCHER_N_COLS else k_batter)
                         for col, ncol in SMOOTH_SPEC}}
 

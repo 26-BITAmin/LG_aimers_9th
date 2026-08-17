@@ -192,8 +192,14 @@ def describe(meta):
     #   `f80`(피처 수)   s11에서 뺌. s05 이후 불변
     #   `h5`(recency)    s12에서 뺌. s04 이후 불변이고 §7.23에서 재검증·기각됐다
     #   `m8`(MLP 멤버 수) s17에서 뺌. s09 이후 8회 불변이고 `a40`이 MLP 사용을 이미 알린다
+    #   `e20`(LGBM 멤버)  s18에서 뺌. s13 이후 5회 불변이고 meta.json에 n_members로 있다
     # 30자 제한에 걸리면 **이번에 바뀐 축이 아니라 안 바뀐 축을 뺀다.**
-    e = "e" + str(meta.get("n_members", len(meta.get("seeds", []))))
+    #
+    # ⚠️ 축이 8개가 되면서 26자 예산이 구조적으로 부족해졌다. 지금은 뺄 수 있는
+    #    불변 축이 남아 있지만 **다음 축에서는 이 방식이 한계에 닿는다.**
+    #    그때는 태그를 늘리지 말고 `sNN` + meta.json 해시 4자리 같은 방식으로 바꾼다
+    #    — 파일명은 서로 구분만 되면 되고, 설정 전문은 SUBMISSIONS.md와 meta.json에 있다.
+    e = ""
     if meta.get("use_mlp"):
         e += "a" + f"{float(meta.get('mlp_alpha', 0)):.2f}".split(".")[1]  # 0.40 -> a40
         # noid 비중 (MODEL.md §7.27). 균등(.375)이면 생략 — 옛 태그와 호환된다.
@@ -213,7 +219,9 @@ def describe(meta):
         if beta and name not in MUTE:
             e += ABBR.get(name, name[:2]) + f"{float(beta) * 10:.0f}"
     # 다중 과제 보조 헤드 λ (MODEL.md §7.41). 0이면 생략 — 옛 태그와 호환된다.
-    ax = float(meta.get("mlp_aux_lambda") or 0.0)
+    #   `x10`(λ)  s18에서 뺌. s13 이후 5회 불변이고 meta.json에 mlp_aux_lambda로 있다.
+    #             ⚠️ 헤드 구성을 다시 실험하면 이 블록을 되살려야 한다 (§7.42).
+    ax = 0.0 if meta.get("mlp_aux_lambda") == 1.0 else float(meta.get("mlp_aux_lambda") or 0.0)
     if ax:
         e += "x" + f"{ax * 10:.0f}"
         # 축 개수는 **2가 아닐 때만** 붙인다 → s13의 `x10`이 그대로 유지된다.
@@ -234,6 +242,11 @@ def describe(meta):
     for name, beta in (meta.get("asof_axes") or {}).items():
         if beta:
             e += AB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
+    # 레퍼토리 균형도 (MODEL.md §7.58).  r3_ent 0.02 -> me20  (asof와 같은 ×1000)
+    MB = {"r3_ent": "me"}
+    for name, beta in (meta.get("mix_axes") or {}).items():
+        if beta:
+            e += MB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
     parts.append(e)
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
@@ -299,6 +312,10 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
     for name, beta in (meta.get("asof_axes") or {}).items():
         if beta:
             cfg += f"+시즌진행분 {NA.get(name, name)} β{beta}"
+    MN = {"r3_ent": "레퍼토리 균형도"}
+    for name, beta in (meta.get("mix_axes") or {}).items():
+        if beta:
+            cfg += f"+{MN.get(name, name)} β{beta}"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")

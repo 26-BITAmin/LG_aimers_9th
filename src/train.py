@@ -33,10 +33,11 @@ from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PAR
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, ASOF_AXES, ASOF_STRENGTH, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, ASOF_AXES, ASOF_STRENGTH, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
+import mixent
 import ctxfit
 import modelabel
 from features import build_features, fit_artifacts, logit_adjust
@@ -216,9 +217,14 @@ def main():
         for _a in asof:
             print(f"시즌진행분 {_a['name']}: 오프셋 {len(_a['keys']):,}개  "
                   f"mu={_a['mu']:+.5f} sd={_a['sd']:.5f}  β={_a['beta']}")
+    # 레퍼토리 균형도 (§7.58). 얼려지는 것이 축당 스칼라 6개뿐이다.
+    mix = mixent.fit_mixent(df, MIX_AXES)
+    for _a in mix:
+        print(f"레퍼토리 {_a['name']}: league={np.round(_a['league'], 3)}  "
+              f"mu={_a['mu']:+.5f} sd={_a['sd']:.5f}  β={_a['beta']}")
     art = fit_artifacts(df, weights=w, k_pitcher=SMOOTH_K_PITCHER,
                         k_batter=SMOOTH_K_BATTER, tm_table=tm_table, ctx=ctx,
-                        contam_axes=CONTAM_AXES, asof=asof)
+                        contam_axes=CONTAM_AXES, asof=asof, mix=mix)
     art["use_player_ids"] = USE_PLAYER_IDS
 
     def build_X(d):
@@ -319,6 +325,8 @@ def main():
         "asof_axes": {a["name"]: a["beta"] for a in asof},
         "asof_strength": ASOF_STRENGTH,
         "asof_cells": {a["name"]: int(len(a["keys"])) for a in asof},
+        # 레퍼토리 균형도 (§7.58). 같은 이유 — 태그가 두 제출을 구분하려면 여기 있어야 한다.
+        "mix_axes": {a["name"]: a["beta"] for a in mix},
         "lgb_params": FINAL_LGB_PARAMS, "lightgbm_version": lgb.__version__,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 
