@@ -253,6 +253,13 @@ def describe(meta):
     for name, beta in (meta.get("asof_axes") or {}).items():
         if beta:
             e += AB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
+    # EB 수축 강도 (MODEL.md §7.63). 200은 한 번도 스윕 안 된 채 배포돼 있었다.
+    # ⚠️ **배포 하이퍼파라미터인데 태그에 없었다.** s21에서 `next_zip_path`의 새 assert가
+    #    잡았다 — 이번엔 β_b도 같이 바뀌어 우연히 구분됐지만, strength만 바꿨으면
+    #    태그가 직전과 같았을 것이다. 기본값(200)일 때만 생략해 옛 태그와 호환한다.
+    st = float(meta.get("asof_strength") or 0.0)
+    if (meta.get("asof_axes") or {}) and st and st != 200.0:
+        e += f"k{st:.0f}"
     # 레퍼토리 균형도 (MODEL.md §7.58).  r3_ent 0.02 -> me20  (asof와 같은 ×1000)
     MB = {"r3_ent": "me"}
     for name, beta in (meta.get("mix_axes") or {}).items():
@@ -268,12 +275,28 @@ def describe(meta):
 def next_zip_path(meta, suffix=""):
     """이미 쓴 번호의 **최댓값 + 1**. 개수로 세면 파일을 지우거나 이름을 바꿨을 때
     같은 번호가 다시 나와 기존 제출물을 덮어쓴다."""
-    used = [0]
+    used, prev = [0], {}
     for p in ROOT.glob("s[0-9][0-9]_*.zip"):
         head = p.stem.split("_")[0][1:]
         if head.isdigit():
             used.append(int(head))
-    name = f"s{max(used)+1:02d}_{describe(meta)}{suffix}.zip"
+            prev[int(head)] = p.stem.split("_", 1)[1] if "_" in p.stem else ""
+    tag = describe(meta)
+    name = f"s{max(used)+1:02d}_{tag}{suffix}.zip"
+
+    # ⚠️ **번호를 뺀 태그가 직전 제출과 같으면 멈춘다.**
+    #    s20에서 실제로 났다 — §7.61이 δ의 β를 바꿨는데 그 축이 `MUTE`에 있어서
+    #    태그가 s19와 문자 단위로 같게 나왔다. `MUTE`에 "다시 건드리면 여기서 빼라"는
+    #    경고 주석을 직접 달아놓고도 지나쳤고, 눈으로 파일명을 읽어서 잡았다.
+    #    **주석은 사람이 읽어야 작동하고 assert는 안 읽어도 작동한다.**
+    #    (같은 설정을 의도적으로 재현할 때는 suffix로 구분한다 — s04가 s01을
+    #     재현했던 경우처럼.)
+    last = prev.get(max(used))
+    if last is not None and not suffix and last == tag:
+        raise SystemExit(
+            f"태그가 직전 제출(s{max(used):02d})과 같다: `{tag}`\n"
+            f"  → 이번에 바꾼 축이 describe()에 안 들어가 있다. MUTE를 확인할 것.\n"
+            f"  → 같은 설정을 의도적으로 다시 내는 것이면 suffix= 를 줄 것.")
     # ⚠️ 예전에는 넘치면 **뒤를 잘랐다.** 그런데 태그는 뒤로 갈수록 최근에 추가된
     #    설정이라(alpha, noid 비중 …) 자르면 정확히 이번에 바뀐 것이 사라진다 —
     #    s08(a=.30)과 s09(a=.40)의 이름이 같아졌던 사고의 재발 경로다.

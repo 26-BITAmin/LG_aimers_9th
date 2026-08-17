@@ -47,6 +47,46 @@ from validation import _logit, _sigmoid
 REF_SEASON = 2024          # prior shift delta를 푸는 참조 행 (= test와 가장 가까운 시즌)
 TEST_SEASON = 2025         # 평가 데이터의 시즌. Trackman 조회 키에 들어간다.
 
+# ── `--artifacts-only` (§7.66) ────────────────────────────────────────────
+# 사후 로짓 보정축(ctx / asof / mix)만 바꿨을 때는 **모델을 다시 만들 필요가 없다.**
+# s17→s18→s19에서 해시로 세 번 확인했다 — 모델 파일 30개가 바이트 단위로 동일했고
+# `artifacts.joblib`과 `meta.json`만 달랐다. 그런데 매번 26분을 냈다.
+#
+# 그래도 재학습이 필요했던 이유는 `logit_delta`(prior shift)가 보정축에 의존해서
+# **참조행 예측을 다시 해야** 하기 때문이다. 모델은 디스크에 있으니 로드해서 쓰면 된다.
+#
+# ⚠️ **잘못 쓰면 조용히 틀린다.** `priors`·`clip`·`cat_maps`·`contam` 같은
+#    `build_features` 입력이 바뀌면 저장된 모델은 **다른 피처로 학습된 것**이다.
+#    그래서 참조 행렬의 바이트 해시를 아티팩트에 남기고, 여기서 대조해 다르면 죽는다.
+#    (보정축은 `logit_adjust`만 타므로 피처를 안 바꾼다 → 해시가 같다.)
+ARTIFACTS_ONLY = "--artifacts-only" in sys.argv
+
+
+def _feature_hash(X_ref):
+    """참조 행렬의 내용 해시. 피처가 바뀌면 저장된 모델을 쓸 수 없다는 판정 기준."""
+    import hashlib
+    a = np.ascontiguousarray(X_ref.to_numpy(dtype=np.float64))
+    h = hashlib.sha256(a.tobytes())
+    h.update(("|".join(map(str, X_ref.columns))).encode())
+    return h.hexdigest()
+
+
+def load_members(model_dir, bundle, X_ref, art):
+    """저장된 LGBM·MLP로 참조행 로짓을 다시 계산한다. **학습은 없다.**"""
+    from mlp_infer import MLPPredictor
+
+    raw = np.zeros(len(X_ref))
+    for tag in bundle["members"]:
+        txt = (model_dir / f"lgbm_{tag}.txt").read_text(encoding="utf-8")
+        raw += lgb.Booster(model_str=txt).predict(X_ref, raw_score=True)
+    raw /= len(bundle["members"])
+
+    z_mlp = np.zeros(len(X_ref))
+    for tag, wm in zip(bundle["mlp_members"], bundle["mlp_weights"]):
+        W = dict(np.load(model_dir / f"mlp_{tag}.npz"))
+        z_mlp += wm * MLPPredictor(W, bundle["mlp_enc"]).logit(X_ref)
+    return raw, z_mlp
+
 
 def reference_matrix(df, art, build_X, ref_season=None, test_season=None):
     """delta를 풀 참조 피처 행렬.
@@ -264,6 +304,32 @@ def main():
     # ── 앙상블 학습 ──────────────────────────────────────────
     # 참조 행렬은 **추론 시점의 피처 분포**를 재현한 것이다 (reference_matrix 참조).
     X_ref = reference_matrix(df, art, build_X)[cols]
+    fhash = _feature_hash(X_ref)
+
+    if ARTIFACTS_ONLY:
+        old = joblib.load(MODEL_DIR / "artifacts.joblib")
+        prev = old.get("feature_hash")
+        if prev is None:
+            raise SystemExit(
+                "저장된 아티팩트에 feature_hash가 없다 (--artifacts-only 도입 전에 학습됨).\n"
+                "  → 전체 학습을 한 번 돌려 해시를 심은 뒤에 쓸 수 있다.")
+        if prev != fhash:
+            raise SystemExit(
+                "참조 행렬이 달라졌다 → 저장된 모델은 **다른 피처로 학습된 것**이다.\n"
+                f"  저장 {prev[:16]}  현재 {fhash[:16]}\n"
+                "  build_features 입력(priors/clip/cat_maps/contam/tm)이 바뀌면\n"
+                "  --artifacts-only 를 쓸 수 없다. 전체 학습을 돌릴 것.")
+        print("--artifacts-only: 참조 행렬 해시 일치 → 저장된 모델 재사용")
+        members, mlp_tags = old["members"], old["mlp_members"]
+        mlp_wts, mlp_enc = old["mlp_weights"], old["mlp_enc"]
+        raw_ref, z_mlp_ref = load_members(MODEL_DIR, old, X_ref, art)
+        if USE_MLP:
+            print(f"  블렌드: (1-{MLP_ALPHA})·lgbm + {MLP_ALPHA}·mlp   "
+                  f"(로짓 상관 {np.corrcoef(raw_ref, z_mlp_ref)[0,1]:.3f})")
+            raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref
+        return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
+                       mlp_tags, mlp_wts, mlp_enc, fhash, t0)
+
     members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
 
     # ── MLP 멤버 (로짓 블렌드) ───────────────────────────────
@@ -286,6 +352,17 @@ def main():
     #    구조다. 다만 δ는 투수 자기 평균으로부터의 편차라 **평균이 0에 붙어 있고**
     #    (실측 hand −0.0001 / count4 +0.0007) 미적중은 0으로 떨어지므로 레벨 영향이
     #    사실상 없다. 조회 키에 season이 안 들어가는 것이 Trackman과의 결정적 차이다.
+    return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
+                   mlp_tags, mlp_wts, mlp_enc, fhash, t0)
+
+
+def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
+            mlp_tags, mlp_wts, mlp_enc, fhash, t0):
+    """블렌드 이후 — 보정 가산 → prior shift → 저장.
+
+    전체 학습과 `--artifacts-only`가 **이 함수 하나를 공유한다.** 두 경로가
+    각자 delta를 풀거나 각자 meta를 쓰면 조용히 어긋난다 (§5·§7.36의 반복 패턴).
+    """
     z_adj, hits = logit_adjust(df[df.season == REF_SEASON], art)
     if len(art["ctx"]):
         print(f"보정축 참조행 적중 " + "  ".join(f"{k} {v:.1%}" for k, v in hits.items())
@@ -306,7 +383,10 @@ def main():
     joblib.dump({"artifacts": art, "feature_cols": cols, "logit_delta": logit_delta,
                  "members": members, "mlp_members": mlp_tags, "mlp_enc": mlp_enc,
                  "mlp_weights": mlp_wts,
-                 "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0},
+                 "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0,
+                 # ⚠️ --artifacts-only 의 안전장치 (§7.66). 이게 있어야
+                 #    "저장된 모델이 이 피처로 학습된 것인가"를 판정할 수 있다.
+                 "feature_hash": fhash},
                 MODEL_DIR / "artifacts.joblib", compress=3)
     (MODEL_DIR / "meta.json").write_text(json.dumps({
         "seeds": list(SEED_ENSEMBLE), "variants": list(ENSEMBLE_VARIANTS),
