@@ -38,5 +38,20 @@
   },
   "fingerprint": "6942",
   "full_tag": "a40h188c125as30bs30k35"
+ },
+ {
+  "n": 22,
+  "file": "s22_gf362822.zip",
+  "tokens": {
+   "alpha": "a40",
+   "ctx:hand": "h188",
+   "ctx:count4": "c125",
+   "asof:gap_success": "as30",
+   "asof:gap_bsuccess": "bs30",
+   "k": "k35",
+   "gt": "gf36"
+  },
+  "fingerprint": "2822",
+  "full_tag": "a40h188c125as30bs30k35gf36"
  }
 ]

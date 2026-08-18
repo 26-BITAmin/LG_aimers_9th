@@ -245,6 +245,15 @@ def logit_adjust(df, art):
         v, ok = mixent_lookup(df, a, with_hit=True)
         hits[a["name"]] = float(np.mean(ok))     # cold가 아닌 행의 비율
         z += float(a["beta"]) * v
+
+    # 행 단위 game_type=F 레벨 δ_F (§7.69). game_type은 피처에서 드랍돼 있어
+    # 모델이 F 행 레벨을 표현할 수 없다 — 그 몫을 사후 로짓으로 더한다.
+    # 행 자신의 컬럼 하나만 보는 조회라 test 행 간 독립성에 영향이 없다.
+    gt = (art.get("gt") if art else None)
+    if gt and float(gt["delta"]) != 0.0:
+        isf = (df["game_type"].astype("object").to_numpy() == "F")
+        hits["gt_F"] = float(isf.mean())         # = F 행 비율
+        z += float(gt["delta"]) * isf
     return z, hits
 
 

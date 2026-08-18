@@ -33,7 +33,7 @@ from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PAR
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
@@ -277,6 +277,10 @@ def main():
               f"mu={_a['mu']:+.5f} sd={_a['sd']:.5f}  β={_a['beta']}")
     art["mix"] = mix
     art["use_player_ids"] = USE_PLAYER_IDS
+    # 행 단위 F 레벨 δ_F (§7.69). fit이 없는 동결 상수 — β·δ 곱만 아티팩트에 싣는다.
+    art["gt"] = {"delta": GT_F_BETA * GT_F_DELTA}
+    if art["gt"]["delta"]:
+        print(f"F레벨 δ_F: {GT_F_DELTA} x β {GT_F_BETA} = {art['gt']['delta']:+.5f}")
 
     def build_X(d):
         x = build_features(d, art)
@@ -371,7 +375,7 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
     각자 delta를 풀거나 각자 meta를 쓰면 조용히 어긋난다 (§5·§7.36의 반복 패턴).
     """
     z_adj, hits = logit_adjust(df[df.season == REF_SEASON], art)
-    if len(art["ctx"]):
+    if len(art["ctx"]) or (art.get("gt") or {}).get("delta"):
         print(f"보정축 참조행 적중 " + "  ".join(f"{k} {v:.1%}" for k, v in hits.items())
               + f"   로짓 기여 평균 {z_adj.mean():+.5f}")
         raw_ref = raw_ref + z_adj
@@ -427,6 +431,8 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
         "asof_cells": {a["name"]: int(len(a["keys"])) for a in asof},
         # 레퍼토리 균형도 (§7.58). 같은 이유 — 태그가 두 제출을 구분하려면 여기 있어야 한다.
         "mix_axes": {a["name"]: a["beta"] for a in mix},
+        # 행 단위 F 레벨 δ_F (§7.69). 같은 이유.
+        "gt_f_delta": GT_F_DELTA, "gt_f_beta": GT_F_BETA,
         "lgb_params": FINAL_LGB_PARAMS, "lightgbm_version": lgb.__version__,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 

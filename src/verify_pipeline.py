@@ -38,7 +38,7 @@ import pandas as pd
 
 from config import (CONTAM_AXES, DROP_FEATURES, FINAL_LGB_PARAMS, MLP_ALPHA, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
                     TRAIN_CSV, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
@@ -94,6 +94,10 @@ def main():
     art["asof"] = asof
     art["mix"] = mixent.fit_mixent(tr, MIX_AXES)
     art["use_player_ids"] = USE_PLAYER_IDS
+    # 행 단위 F 레벨 δ_F (§7.69). train.py와 같은 조립.
+    # ⚠️ δ_F는 이 검증 fold(2024) 잔차에서 fit한 상수다 — 여기서 보이는 이득은
+    #    in-fold이므로 상한으로만 읽는다. 진짜 검정은 LB다.
+    art["gt"] = {"delta": GT_F_BETA * GT_F_DELTA}
 
     Xtr = build_X(tr, art)
     ytr = tr[TARGET_COL].to_numpy(dtype=np.float64)

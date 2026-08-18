@@ -267,6 +267,11 @@ def describe_tokens(meta):
     for name, beta in (meta.get("mix_axes") or {}).items():
         if beta:
             tok["mix:" + name] = MB.get(name, name[:2]) + f"{float(beta) * 1000:.0f}"
+    # 행 단위 F 레벨 δ_F (MODEL.md §7.69).  −0.0711×0.5 → gf36 (×1000, 부호는
+    # 항상 음수라 생략 — 부호까지 구분은 지문이 한다). 끄면 생략.
+    gtd = float(meta.get("gt_f_delta") or 0.0) * float(meta.get("gt_f_beta") or 0.0)
+    if gtd:
+        tok["gt"] = f"gf{abs(gtd) * 1000:.0f}"
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
         tok["tm"] = {"release": "tmR", "release_ext": "tmE"}.get(tm, "tmA")
@@ -433,6 +438,9 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
     for name, beta in (meta.get("mix_axes") or {}).items():
         if beta:
             cfg += f"+{MN.get(name, name)} β{beta}"
+    # 행 단위 F 레벨 δ_F (§7.69)
+    if float(meta.get("gt_f_delta") or 0.0) * float(meta.get("gt_f_beta") or 0.0):
+        cfg += f"+F레벨 δ{meta['gt_f_delta']} β{meta['gt_f_beta']}"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")
