@@ -63,12 +63,50 @@ TEST_SEASON = 2025         # 평가 데이터의 시즌. Trackman 조회 키에 
 ARTIFACTS_ONLY = "--artifacts-only" in sys.argv
 
 
-def _feature_hash(X_ref):
-    """참조 행렬의 내용 해시. 피처가 바뀌면 저장된 모델을 쓸 수 없다는 판정 기준."""
+# 저장된 모델을 **결정하는** 설정 전부. 하나라도 바뀌면 모델이 달라지므로
+# `--artifacts-only`가 낡은 모델을 재사용하면 안 된다.
+#
+# ⚠️ 배열(X_ref/w/y)만으로는 부족하다. `SOFT_LABEL_F`가 그 증거다 —
+#    `soften()`은 **해시 계산보다 뒤에서** 타깃을 바꾸므로, 배열만 해시하면
+#    soft label을 켜고 꺼도 해시가 같다. s23이 정확히 그 변경이었다.
+#    "배열을 넣었으니 됐다"가 아니라 **모델을 정하는 것을 다 넣었나**로 물어야 한다.
+_TRAIN_SHAPING = {
+    "soft_label_f": SOFT_LABEL_F,
+    "recency_half_life": RECENCY_HALF_LIFE,
+    "use_init_score": USE_INIT_SCORE,
+    "n_rounds": N_ROUNDS,
+    "seeds": list(SEED_ENSEMBLE),
+    "variants": {k: dict(v) for k, v in ENSEMBLE_VARIANTS.items()},
+    "lgb": dict(FINAL_LGB_PARAMS),
+    "use_mlp": USE_MLP,
+    "mlp_variants": {k: (dict(c), n) for k, (c, n) in MLP_VARIANTS.items()},
+    "mlp_seeds": list(MLP_SEEDS),
+    "mlp_aux_lambda": MLP_AUX_LAMBDA,
+    "mlp_aux_modes": list(MLP_AUX_MODES),
+    "use_player_ids": USE_PLAYER_IDS,
+    "drop_features": list(DROP_FEATURES),
+}
+
+
+def _feature_hash(X_ref, w=None, y=None):
+    """저장된 모델을 재사용해도 되는지 판정하는 해시.
+
+    ⚠️ **참조 행렬만 넣으면 구멍이 난다.** 학습 행 가중(`RECENCY_HALF_LIFE`,
+       오염 구간 제외 등)이나 타깃을 바꾸는 변경은 **피처를 안 바꾼다** →
+       해시가 같아지고 → 가드가 낡은 모델을 통과시킨다.
+       모델을 결정하는 것은 (피처, 가중, 타깃) 셋이므로 셋 다 해시에 넣는다.
+       (§7.66에서 처음엔 피처만 넣었고, §7.69 후보를 검토하다 발견했다.)
+    """
     import hashlib
-    a = np.ascontiguousarray(X_ref.to_numpy(dtype=np.float64))
-    h = hashlib.sha256(a.tobytes())
+    h = hashlib.sha256(np.ascontiguousarray(
+        X_ref.to_numpy(dtype=np.float64)).tobytes())
     h.update(("|".join(map(str, X_ref.columns))).encode())
+    for arr in (w, y):
+        if arr is not None:
+            h.update(np.ascontiguousarray(
+                np.asarray(arr, dtype=np.float64)).tobytes())
+    h.update(json.dumps(_TRAIN_SHAPING, sort_keys=True,
+                        default=str).encode("utf-8"))
     return h.hexdigest()
 
 
@@ -309,7 +347,7 @@ def main():
     # ── 앙상블 학습 ──────────────────────────────────────────
     # 참조 행렬은 **추론 시점의 피처 분포**를 재현한 것이다 (reference_matrix 참조).
     X_ref = reference_matrix(df, art, build_X)[cols]
-    fhash = _feature_hash(X_ref)
+    fhash = _feature_hash(X_ref, w, y)
 
     if ARTIFACTS_ONLY:
         old = joblib.load(MODEL_DIR / "artifacts.joblib")
