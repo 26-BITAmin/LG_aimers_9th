@@ -51,7 +51,7 @@ from data import load_csv, recency_weight
 from validation import bss, shift_to_prior
 
 FOLDS = [2023, 2024]
-STRENGTHS = [18.0, 25.0, 35.0, 50.0, 70.0, 200.0]
+STRENGTHS = [12.0, 18.0, 25.0, 35.0, 50.0, 70.0, 100.0, 200.0]
 BETAS = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.14]
 IBETAS = [-0.04, -0.02, -0.01, -0.005, 0.005, 0.01, 0.02, 0.04]
 NAMES = ["gap_success", "gap_bsuccess"]
