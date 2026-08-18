@@ -272,6 +272,10 @@ def describe_tokens(meta):
     gtd = float(meta.get("gt_f_delta") or 0.0) * float(meta.get("gt_f_beta") or 0.0)
     if gtd:
         tok["gt"] = f"gf{abs(gtd) * 1000:.0f}"
+    # 2019–22 F 오염 라벨 soft label (MODEL.md §7.70). 끄면 생략 — 옛 태그와 호환.
+    # h_s는 학습 데이터에서 유도되는 값(자유 파라미터 아님)이라 on/off만 표기한다.
+    if meta.get("soft_label_f"):
+        tok["soft"] = "sl"
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
         tok["tm"] = {"release": "tmR", "release_ext": "tmE"}.get(tm, "tmA")

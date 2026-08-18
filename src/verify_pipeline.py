@@ -38,13 +38,14 @@ import pandas as pd
 
 from config import (CONTAM_AXES, DROP_FEATURES, FINAL_LGB_PARAMS, MLP_ALPHA, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, SOFT_LABEL_F, TARGET_COL, TARGET_PRIOR_2025, TRACKMAN_MODE,
                     TRAIN_CSV, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
 import mixent
 import ctxfit
 import modelabel
+import soften
 from features import build_features, fit_artifacts, logit_adjust
 from predict import Predictor
 from trackman_features import load_table
@@ -114,6 +115,20 @@ def main():
     print(f"학습: 앙상블 (train.train_ensemble — 배포와 동일한 루프) ...")
     X_ref = reference_matrix(tr, art, lambda d: build_X(d, art),
                              ref_season=ref_season, test_season=VALID_SEASON)[Xtr.columns]
+
+    # ── soft label (§7.70) — train.py와 같은 조립: aux 복원 → soften 한 번 ──
+    aux = None
+    if USE_MLP:
+        # 보조 라벨은 **학습 부분집합에서** 복원한다 (Xtr과 행이 정렬돼야 한다).
+        aux, aux_cov = modelabel.aux_labels(tr)
+        print(f"보조 라벨 복원 {aux_cov:.1%}")
+    if SOFT_LABEL_F:
+        assert init_tr is None, "soften은 init_score와 동시 사용 불가 (§7.70)"
+        n0 = len(ytr)
+        Xtr, ytr, w, aux, soft_h = soften.soften(tr, Xtr, ytr, w, aux)
+        print(f"soft label(§7.70): +{len(ytr)-n0:,}행 복제  h = "
+              + "  ".join(f"{k}:{v:.3f}" for k, v in sorted(soft_h.items())))
+
     members, raw_ref = train_ensemble(Xtr, ytr, w, init_tr, X_ref, model_dir)
 
     # ⚠️ 여기는 **배포와 같은 함수**를 호출해야 한다. 예전에 학습 루프가 train.py와
@@ -121,9 +136,6 @@ def main():
     #    (MODEL.md §5). 반환값이 늘면 여기도 같이 고친다.
     mlp_tags, mlp_wts, mlp_enc = [], [], None
     if USE_MLP:
-        # 보조 라벨은 **학습 부분집합에서** 복원한다 (Xtr과 행이 정렬돼야 한다).
-        aux, aux_cov = modelabel.aux_labels(tr)
-        print(f"보조 라벨 복원 {aux_cov:.1%}")
         mlp_tags, mlp_wts, mlp_enc, z_mlp_ref = train_mlp_members(
             Xtr, ytr, w, X_ref, art, model_dir, y_aux=aux)
         raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref

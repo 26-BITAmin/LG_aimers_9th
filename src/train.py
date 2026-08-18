@@ -33,13 +33,14 @@ from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PAR
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
-                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
+                    SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, SOFT_LABEL_F, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 import asofdelta
 import mixent
 import ctxfit
 import modelabel
+import soften
 from features import build_features, fit_artifacts, logit_adjust
 from trackman_features import load_table
 from validation import _logit, _sigmoid
@@ -330,6 +331,12 @@ def main():
                 f"  저장 {prev[:16]}  현재 {fhash[:16]}\n"
                 "  build_features 입력(priors/clip/cat_maps/contam/tm)이 바뀌면\n"
                 "  --artifacts-only 를 쓸 수 없다. 전체 학습을 돌릴 것.")
+        # ⚠️ soft label(§7.70)은 **라벨**만 바꾸므로 피처 해시로 잡히지 않는다.
+        #    플래그가 다르면 저장된 모델은 다른 타깃으로 학습된 것이다 — 따로 막는다.
+        if bool(old.get("soft_label_f", False)) != bool(SOFT_LABEL_F):
+            raise SystemExit(
+                "SOFT_LABEL_F가 저장된 모델과 다르다 — 라벨 변경은 피처 해시에\n"
+                "  안 잡히므로 --artifacts-only 를 쓸 수 없다. 전체 학습을 돌릴 것.")
         print("--artifacts-only: 참조 행렬 해시 일치 → 저장된 모델 재사용")
         members, mlp_tags = old["members"], old["mlp_members"]
         mlp_wts, mlp_enc = old["mlp_weights"], old["mlp_enc"]
@@ -339,17 +346,30 @@ def main():
                   f"(로짓 상관 {np.corrcoef(raw_ref, z_mlp_ref)[0,1]:.3f})")
             raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref
         return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
-                       mlp_tags, mlp_wts, mlp_enc, fhash, t0)
+                       mlp_tags, mlp_wts, mlp_enc, fhash, t0,
+                       soft_h=old.get("soft_h", {}))
+
+    # ── soft label (§7.70) — LGBM과 MLP가 **같은** (X, y, w, aux)를 봐야
+    #    하므로 보조 라벨을 먼저 복원하고 soften을 한 번만 적용한다.
+    aux = None
+    if USE_MLP:
+        # 보조 라벨 — asof 누적의 증분에서 복원한다. **학습 타깃 전용**이다.
+        aux, aux_cov = modelabel.aux_labels(df)
+        print(f"  보조 라벨 복원 {aux_cov:.1%}  λ={MLP_AUX_LAMBDA}  "
+              f"축 {list(MLP_AUX_MODES)} ({aux.shape[1]}개)")
+    soft_h = {}
+    if SOFT_LABEL_F:
+        assert init_tr is None, "soften은 init_score와 동시 사용 불가 (§7.70)"
+        n0 = len(y)
+        X, y, w, aux, soft_h = soften.soften(df, X, y, w, aux)
+        print(f"soft label(§7.70): +{len(y)-n0:,}행 복제  h = "
+              + "  ".join(f"{k}:{v:.3f}" for k, v in sorted(soft_h.items())))
 
     members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
 
     # ── MLP 멤버 (로짓 블렌드) ───────────────────────────────
     mlp_tags, mlp_wts, mlp_enc = [], [], None
     if USE_MLP:
-        # 보조 라벨 — asof 누적의 증분에서 복원한다. **학습 타깃 전용**이다.
-        aux, aux_cov = modelabel.aux_labels(df)
-        print(f"  보조 라벨 복원 {aux_cov:.1%}  λ={MLP_AUX_LAMBDA}  "
-              f"축 {list(MLP_AUX_MODES)} ({aux.shape[1]}개)")
         mlp_tags, mlp_wts, mlp_enc, z_mlp_ref = train_mlp_members(
             X, y, w, X_ref, art, MODEL_DIR, t0, y_aux=aux)
         print(f"  블렌드: (1-{MLP_ALPHA})·lgbm + {MLP_ALPHA}·mlp   "
@@ -364,11 +384,11 @@ def main():
     #    (실측 hand −0.0001 / count4 +0.0007) 미적중은 0으로 떨어지므로 레벨 영향이
     #    사실상 없다. 조회 키에 season이 안 들어가는 것이 Trackman과의 결정적 차이다.
     return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
-                   mlp_tags, mlp_wts, mlp_enc, fhash, t0)
+                   mlp_tags, mlp_wts, mlp_enc, fhash, t0, soft_h=soft_h)
 
 
 def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
-            mlp_tags, mlp_wts, mlp_enc, fhash, t0):
+            mlp_tags, mlp_wts, mlp_enc, fhash, t0, *, soft_h=None):
     """블렌드 이후 — 보정 가산 → prior shift → 저장.
 
     전체 학습과 `--artifacts-only`가 **이 함수 하나를 공유한다.** 두 경로가
@@ -397,7 +417,9 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
                  "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0,
                  # ⚠️ --artifacts-only 의 안전장치 (§7.66). 이게 있어야
                  #    "저장된 모델이 이 피처로 학습된 것인가"를 판정할 수 있다.
-                 "feature_hash": fhash},
+                 "feature_hash": fhash,
+                 # ⚠️ soft label(§7.70)은 피처 해시에 안 잡힌다 — 따로 기록해 막는다.
+                 "soft_label_f": SOFT_LABEL_F, "soft_h": dict(soft_h or {})},
                 MODEL_DIR / "artifacts.joblib", compress=3)
     (MODEL_DIR / "meta.json").write_text(json.dumps({
         "seeds": list(SEED_ENSEMBLE), "variants": list(ENSEMBLE_VARIANTS),
@@ -411,6 +433,8 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
         # 오염 보정 축 (§7.49). 위 경고와 같은 이유로 반드시 남긴다 —
         # 이게 없으면 s13과 s14의 파일명이 번호만 빼고 똑같아진다.
         "contam_axes": list(CONTAM_AXES or []),
+        # soft label (§7.70). 같은 이유 — 이게 없으면 s22와 s23이 구분 안 된다.
+        "soft_label_f": SOFT_LABEL_F, "soft_h": dict(soft_h or {}),
         "mlp_seeds": list(MLP_SEEDS) if USE_MLP else [],
         "mlp_members": mlp_tags, "mlp_variants": MLP_VARIANTS,
         "mlp_variant_weight": MLP_VARIANT_WEIGHT, "mlp_weights": mlp_wts,
