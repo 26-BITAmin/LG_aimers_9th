@@ -28,10 +28,13 @@ import lightgbm as lgb
 import numpy as np
 
 import mlp
+import modelabel
+import soften
 from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
-                    MLP_SEEDS, MLP_VARIANTS, N_ROUNDS, RECENCY_HALF_LIFE,
-                    SEED_ENSEMBLE, SMOOTH_K_BATTER, SMOOTH_K_PITCHER,
-                    TARGET_COL, TRAIN_CSV, USE_PLAYER_IDS)
+                    MLP_AUX_LAMBDA, MLP_AUX_MODES, MLP_SEEDS, MLP_VARIANTS,
+                    N_ROUNDS, RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
+                    SMOOTH_K_PITCHER, SOFT_LABEL_F, TARGET_COL, TRAIN_CSV,
+                    USE_PLAYER_IDS)
 from data import load_csv, recency_weight
 from features import build_features, fit_artifacts
 
@@ -41,12 +44,15 @@ LGB_SEEDS = SEED_ENSEMBLE[:3]        # fold 실험은 3시드 (배포는 5시드
 
 def _key():
     """설정 지문. 하나라도 바뀌면 캐시가 무효가 된다."""
+    # ⚠️ **타깃을 바꾸는 설정도 여기 있어야 한다.** `SOFT_LABEL_F`가 빠져 있어서
+    #    s23(soft label, LB 1067.15) 이후에도 낡은 z가 같은 키로 재사용됐다.
+    #    보조 헤드(λ·축)도 MLP를 바꾸므로 같이 넣는다.
     s = repr([sorted(FINAL_LGB_PARAMS.items()), N_ROUNDS, RECENCY_HALF_LIFE,
               sorted(DROP_FEATURES), USE_PLAYER_IDS, LGB_SEEDS,
               sorted((k, sorted(v.items())) for k, v in ENSEMBLE_VARIANTS.items()),
               sorted((k, sorted(c.items()), n) for k, (c, n) in MLP_VARIANTS.items()),
               MLP_SEEDS, SMOOTH_K_PITCHER, SMOOTH_K_BATTER,
-              CONTAM_AXES])
+              CONTAM_AXES, SOFT_LABEL_F, MLP_AUX_LAMBDA, tuple(MLP_AUX_MODES)])
     return hashlib.sha1(s.encode()).hexdigest()[:10]
 
 
@@ -86,7 +92,7 @@ def fold_data(df, fold):
         return x.drop(columns=[c for c in DROP_FEATURES if c in x.columns])
 
     return (X(tr), tr[TARGET_COL].to_numpy(dtype=np.float64), w,
-            X(va), va[TARGET_COL].to_numpy(dtype=np.float64), art)
+            X(va), va[TARGET_COL].to_numpy(dtype=np.float64), art, tr)
 
 
 def part(f, kind, tag):
@@ -94,7 +100,17 @@ def part(f, kind, tag):
 
 
 def compute(f, df, t0):
-    Xtr, ytr, w, Xva, yva, art = fold_data(df, f)
+    Xtr, ytr, w, Xva, yva, art, tr = fold_data(df, f)
+
+    # ⚠️ **배포(train.py)와 같은 순서여야 한다** — 보조 라벨을 원본 행에서 먼저
+    #    복원하고, 그 다음 soften이 (X, y, w, aux)를 함께 늘린다. 순서가 바뀌면
+    #    복제 행의 보조 타깃이 비고, 그러면 캐시가 배포 모델이 아니게 된다.
+    aux, cov = modelabel.aux_labels(tr)
+    if SOFT_LABEL_F:
+        n0 = len(Xtr)
+        Xtr, ytr, w, aux, soft_h = soften.soften(tr, Xtr, ytr, w, aux)
+        print(f"  soft label: {n0:,} → {len(Xtr):,}행  h={soft_h}")
+    print(f"  보조 라벨 복원 {cov:.1%}  λ={MLP_AUX_LAMBDA}  축 {list(MLP_AUX_MODES)}")
 
     pl = part(f, "lgb", "all")
     if pl.exists():
@@ -130,7 +146,8 @@ def compute(f, df, t0):
                 print(f"  mlp {vname}_{s} 재사용  ({time.time()-t0:.0f}s)")
                 continue
             _, curve = mlp.train_mlp(A, C, ytr, w, B, Cv, sizes, seed=s,
-                                     verbose=False, **cfg)
+                                     verbose=False, y_aux=aux,
+                                     **dict(cfg, aux=MLP_AUX_LAMBDA))
             zs.append(curve[-1])
             np.savez_compressed(pm, z=zs[-1])
             print(f"  mlp {vname}_{s} 완료  단독 {mlp.score(zs[-1], yva):.1f}"
