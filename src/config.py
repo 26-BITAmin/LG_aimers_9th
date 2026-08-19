@@ -57,7 +57,11 @@ RECENCY_HALF_LIFE = 0.5
 # ── 피처에서 제외하는 컬럼 ───────────────────────────────────────
 #
 # game_type — 2022→2023에 정의가 바뀐 컬럼 (MODEL.md §4). 단독 +172, LB에서도 전이됨.
-DROP_FEATURES = ["game_type"]
+# game_month / game_dayofweek — 달력 축 (MODEL.md §7.78). 월 잔차가 해별로 부호
+#   반전(= 학습된 월 패턴이 시즌 간 전이 안 됨), 요일은 §7.33의 무의미 버킷 대조군.
+#   현행 구성 쌍체: 블렌드 f2023 +32.09±5.12 / f2024 +9.36±2.74 (t +6.3/+3.4).
+#   사전 예측 LB Δ ∈ [+2, +12], −3 이하면 되돌린다.
+DROP_FEATURES = ["game_type", "game_month", "game_dayofweek"]
 
 # ── 행 단위 game_type=F 로짓 오프셋 δ_F (MODEL.md §7.69) ─────────
 #

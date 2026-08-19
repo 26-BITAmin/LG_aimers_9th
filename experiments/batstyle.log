@@ -1,0 +1,17 @@
+[label] 역산 검증 OK (1,474,300행 100% 일치)
+
+fold 2023  기준 BSS 778.2  행 245,525
+  피처                 행 t     클러스터 t     셔플 t     커버리지         배포피처 최대상관
+  ppa               0.69       0.47    -1.20   86.6%      0.169 asof_batter_n   
+  two_strike       -1.97      -1.19    -0.53   86.6%      0.158 asof_batter_n   
+  three_ball        2.95       1.87    -0.36   86.6%      0.266 asof_batter_n   
+  ball_rate         3.46       2.01    -0.51   86.6%      0.258 asof_batter_n     ✓
+  reverse_rate      6.22       3.74     0.25   81.5%      0.481 asof_batter_succ  ✓
+
+fold 2024  기준 BSS 915.7  행 253,507
+  피처                 행 t     클러스터 t     셔플 t     커버리지         배포피처 최대상관
+  ppa              -0.75      -0.69    -0.95   87.5%      0.245 asof_batter_n   
+  two_strike       -0.11      -0.10     0.53   87.5%      0.165 batter_hand     
+  three_ball        0.07       0.07    -0.99   87.5%      0.280 asof_batter_n   
+  ball_rate         0.60       0.51    -1.25   87.5%      0.298 asof_batter_n   
+  reverse_rate      0.04       0.03    -0.32   85.5%      0.463 asof_batter_succ

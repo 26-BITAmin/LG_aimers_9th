@@ -68,5 +68,21 @@
   },
   "fingerprint": "65d0",
   "full_tag": "a40h188c125as30bs30k35sl"
+ },
+ {
+  "n": 24,
+  "file": "s24_nocal62a8.zip",
+  "tokens": {
+   "alpha": "a40",
+   "ctx:hand": "h188",
+   "ctx:count4": "c125",
+   "dropx": "nocal",
+   "asof:gap_success": "as30",
+   "asof:gap_bsuccess": "bs30",
+   "k": "k35",
+   "soft": "sl"
+  },
+  "fingerprint": "62a8",
+  "full_tag": "a40h188c125nocalas30bs30k35sl"
  }
 ]

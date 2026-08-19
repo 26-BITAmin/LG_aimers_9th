@@ -240,6 +240,13 @@ def describe_tokens(meta):
         if nax and nax != 2:
             t += f"h{nax}"
         tok["aux"] = t
+    # game_type 외 추가 드랍 피처 (MODEL.md §7.78 달력 제거). 기본(없음)이면 생략.
+    #   game_month+game_dayofweek -> nocal.  다른 조합이 오면 개수로 구분한다.
+    extra_drop = sorted(c for c in (meta.get("drop_features") or [])
+                        if c != "game_type")
+    if extra_drop:
+        tok["dropx"] = ("nocal" if extra_drop == ["game_dayofweek", "game_month"]
+                        else f"dx{len(extra_drop)}")
     # pre-2023 F 오염 보정 축 (MODEL.md §7.49). 끄면 생략 — 옛 태그와 호환된다.
     #   cfp = 투수 축만,  cfpb = 투수+타자
     #   `cfpb`  s20에서 뺌. s14 이후 6회 불변이고 meta.json에 contam_axes로 있다.

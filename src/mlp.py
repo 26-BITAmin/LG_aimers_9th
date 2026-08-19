@@ -96,7 +96,8 @@ def _device():
 #    단위의 group lasso**가 된다. 배포 wd가 1e-2로 세므로 이 전환이 실제로 작동한다.
 DEFAULT = dict(hid=256, epochs=25, lr=2e-3, dropout=0.10, wd=1e-4,
                emb_dim=EMB_DIM, use_id_emb=True, drop_emb=(), loss="bce",
-               depth=2, resid=False, numemb=None, scale=None, aux=None)
+               depth=2, resid=False, numemb=None, scale=None, aux=None,
+               act="gelu")
 
 
 def fold_data(df, valid_season):
@@ -223,8 +224,12 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
             #   [Linear, BN, GELU, Dropout, Linear, BN, GELU, Dropout, Linear]  (인덱스 0..8)
             # export_weights가 그 인덱스를 하드코딩하고 있으므로 기본 경로를 깨면 안 된다.
             def block(i):
+                # act 모듈 생성은 RNG를 소비하지 않으므로 기본(gelu) 경로는
+                # 비트 단위로 예전과 같다. relu는 §7.25 후속 activation 실험용.
+                a = (nn.ReLU() if c["act"] == "relu"
+                     else nn.GELU(approximate="tanh"))
                 return [nn.Linear(h if i else d, h), nn.BatchNorm1d(h),
-                        nn.GELU(approximate="tanh"), nn.Dropout(p)]
+                        a, nn.Dropout(p)]
 
             layers = block(0)
             for i in range(1, c["depth"]):

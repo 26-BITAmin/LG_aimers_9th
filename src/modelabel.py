@@ -96,11 +96,16 @@ def aux_labels(df, modes=None):
     """
     from config import MLP_AUX_MODES
     modes = tuple(MLP_AUX_MODES if modes is None else modes)
-    known = {m for m, _ in MODES}
+    # `off` = 세 번째 실패 모드 「크게 벗어남」. 직접 컬럼이 없어 유도한다:
+    # off = (1-suc)(1-mid)(1-rev). mid·rev 공존 행(3.4%)에서도 {0,1}에 떨어진다.
+    known = {m for m, _ in MODES} | {"off"}
     bad = [m for m in modes if m not in known]
     assert not bad, f"모르는 보조 축 {bad} (가능: {sorted(known)})"
 
     lab, _, _ = recover(df)
+    if "off" in modes:
+        suc, mid, rev = (np.round(lab[k]) for k in ("success", "middle", "reverse"))
+        lab["off"] = (1 - suc) * (1 - mid) * (1 - rev)
     cols = [np.round(lab[m]) for m in modes]
     # `success`는 축이 아니라 **복원 유효성 검사**다 (§③에서 100% 일치를 확인했다).
     ok = ~np.any([np.isnan(c) for c in cols] + [np.isnan(np.round(lab["success"]))],
