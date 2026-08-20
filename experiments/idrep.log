@@ -1,0 +1,9 @@
+  임베딩 학습 완료  투수 (712, 4)  타자 (743, 4)  (118s)
+
+  학습기       ID 표현       열    subBSS   Δ vs LGBM raw      SE      소요
+  LGBM      raw        78     426.8            (기준)              2s
+  LGBM      drop       76     438.3           +11.4    28.7      2s
+  LGBM      emb        84     429.5            +2.7    36.3      2s
+  TabPFN    raw        78     196.0          -230.8   110.1     20s
+  TabPFN    drop       76     415.6           -11.3    89.5     17s
+  TabPFN    emb        84     245.2          -181.6   108.9     19s

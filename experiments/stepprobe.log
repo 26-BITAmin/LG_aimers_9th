@@ -1,0 +1,43 @@
+  캐시 적중: fold2023_faa19e0e95.npz
+  캐시 적중: fold2024_faa19e0e95.npz
+
+fold 2023: 검증 245,525행  피처 준비 (8s)
+
+fold 2024: 검증 253,507행  피처 준비 (14s)
+
+셔플 널 교정: median -0.14  p95 +2.00  max +3.22  (컬럼 46개 × fold 2)
+
+초과구조 z점수 — min(fold) 내림차순, 상위 25
+컬럼                                   mlp23   mlp24   lgb23   lgb24     Δ23     Δ24
+asof_pitcher_breaking_rate_sm          7.5     7.1     8.0     5.8    -0.5     1.3
+score_diff_home                        7.7     6.1     8.9     6.0    -1.2     0.1
+asof_pitcher_fastball_rate             5.9     5.7     7.7     6.1    -1.8    -0.4
+asof_pitcher_breaking_rate            10.9     5.0    10.3     4.8     0.6     0.2
+asof_pitcher_strike_rate               8.8     4.6     9.8     4.7    -1.0    -0.1
+asof_pitcher_fastball_rate_sm          9.8     4.3    11.0     4.6    -1.2    -0.3
+pitchmix_nonfastball                   9.9     4.3    11.0     4.6    -1.2    -0.3
+form_p3_minus_p5                      11.5     4.2    11.2     3.7     0.3     0.5
+asof_pitcher_ball_rate                 7.6     4.0    10.3     2.4    -2.8     1.7
+asof_pitcher_offspeed_rate_sm         11.2     2.8    10.9     3.9     0.3    -1.1
+asof_pitcher_ball_rate_sm              9.1     2.8    11.0     1.3    -1.9     1.5
+pitcher_ball_minus_strike             10.8     2.6    13.4     2.0    -2.7     0.7
+asof_pitcher_middle_rate               3.5     2.3     3.0     2.7     0.5    -0.4
+form_p3_minus_career                   3.5     2.3     3.8     2.4    -0.3    -0.1
+fail_middle_share                      6.1     2.2     6.5     2.3    -0.4    -0.1
+asof_pitcher_prev5_game_middle_rate     2.8     2.2     2.8     2.5     0.0    -0.3
+asof_pitcher_prev3_game_success_rate     4.0     2.1     3.9     2.1     0.1    -0.0
+pitchmix_entropy                       9.2     2.1     9.2     1.8    -0.0     0.3
+asof_pitcher_prev5_game_success_rate     3.1     2.1     3.1     1.6     0.0     0.5
+asof_pitcher_prev1_game_middle_rate     3.2     2.1     3.2     1.8     0.0     0.3
+asof_pitcher_success_rate_sm           3.1     1.9     3.1     1.0     0.0     0.9
+asof_pitcher_prev1_game_success_rate     4.3     1.6     4.3     1.2     0.0     0.4
+asof_pitcher_reverse_rate              6.8     1.6     6.1     1.0     0.8     0.6
+form_p1_minus_p5                       3.9     1.5     4.0     1.3    -0.1     0.1
+asof_pitcher_success_rate              1.9     1.3     1.9     0.9     0.1     0.4
+
+판독 기준:
+  · 후보 = mlp 양 fold 큼(≥5) && lgb 양 fold 그보다 뚜렷이 작음
+  · mlp ≈ lgb 로 같이 크면: 아무도 못 배운 구조 (PLE 무관)
+  · 널 p95가 ~2 안이면 통계 교정 정상
+
+총 17s

@@ -1,0 +1,28 @@
+# 로컬 학습 환경. 제출 requirements.txt와 버전을 일치시킨다.
+# (pickle/직렬화는 마이너 버전만 달라도 깨진다 — CLAUDE.md §4)
+#
+#   python -m venv .venv
+#   .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+#
+# 재현 절차 전체는 REPRODUCE.md 를 볼 것.
+
+# ── 추론에도 쓰인다 (submit/requirements.txt와 동일해야 한다) ──────────
+lightgbm==4.6.0
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.2
+joblib==1.4.2
+scikit-learn==1.6.1
+
+# ── 학습 전용 ────────────────────────────────────────────────────────
+pyarrow==19.0.1
+
+# MLP 멤버 8개(배포 블렌드의 40%)를 학습하는 데 **필수**다 — src/mlp.py.
+# 추론에는 안 쓴다: 학습이 끝나면 가중치를 npz로 내보내고 순전파는 numpy가 한다
+# (src/mlp_infer.py). 그래서 제출 zip에는 torch가 들어가지 않는다.
+#
+# ⚠️ CPU 빌드로 고정한다. CUDA 빌드는 부동소수점·RNG가 달라 같은 시드로도
+#    다른 가중치가 나오고, 그러면 기록된 LB 점수를 재현할 수 없다.
+#    설치: pip install torch==2.13.0+cpu --index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0+cpu

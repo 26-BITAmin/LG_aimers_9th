@@ -1,0 +1,69 @@
+valid=2024  수치 73개  (14s)
+기준 lgbm  BSS = 741.9   (49s)
+
+--- 1차 설정 (참고) ---
+    ep 1  loss=0.69581  (27s)  validBSS=   153.3
+    ep 2  loss=0.68963  (53s)  validBSS=   267.4
+    ep 3  loss=0.68705  (80s)  validBSS=   380.2
+    ep 4  loss=0.68575  (114s)  validBSS=   338.3
+    ep 5  loss=0.68417  (144s)  validBSS=   180.9
+    ep 6  loss=0.68204  (174s)  validBSS=    67.3
+    ep 7  loss=0.67964  (206s)  validBSS=  -165.9
+    ep 8  loss=0.67646  (236s)  validBSS=  -518.2
+    ep 9  loss=0.67316  (266s)  validBSS=  -675.8
+    ep10  loss=0.67115  (293s)  validBSS=  -701.1
+  최적 ep3  단독 380.2 (핸디캡 -361.7)  최적블렌드 a=0.1 → 748.9 (+7.0)  보너스 +43.2  corr 0.791   (349s)
+
+--- ID임베딩 제거 ---
+    ep 1  loss=0.69682  (26s)  validBSS=   215.8
+    ep 2  loss=0.69010  (55s)  validBSS=   276.2
+    ep 3  loss=0.68762  (85s)  validBSS=   519.1
+    ep 4  loss=0.68677  (113s)  validBSS=   495.9
+    ep 5  loss=0.68589  (139s)  validBSS=   396.6
+    ep 6  loss=0.68496  (166s)  validBSS=   357.1
+    ep 7  loss=0.68360  (195s)  validBSS=   214.2
+    ep 8  loss=0.68194  (226s)  validBSS=    92.7
+    ep 9  loss=0.68025  (248s)  validBSS=    21.6
+    ep10  loss=0.67899  (272s)  validBSS=     2.4
+  최적 ep3  단독 519.1 (핸디캡 -222.8)  최적블렌드 a=0.2 → 756.5 (+14.6)  보너스 +59.2  corr 0.831   (623s)
+
+--- ID임베딩 4차원+wd ---
+    ep 1  loss=0.70174  (13s)  validBSS=   460.8
+    ep 2  loss=0.69181  (26s)  validBSS=   577.0
+    ep 3  loss=0.68911  (42s)  validBSS=   644.0
+    ep 4  loss=0.68839  (55s)  validBSS=   665.0
+    ep 5  loss=0.68806  (70s)  validBSS=   647.4
+    ep 6  loss=0.68752  (82s)  validBSS=   620.2
+    ep 7  loss=0.68710  (96s)  validBSS=   686.9
+    ep 8  loss=0.68677  (109s)  validBSS=   659.2
+    ep 9  loss=0.68637  (123s)  validBSS=   660.3
+    ep10  loss=0.68617  (135s)  validBSS=   656.8
+  최적 ep7  단독 686.9 (핸디캡 -55.0)  최적블렌드 a=0.4 → 765.2 (+23.3)  보너스 +45.3  corr 0.882   (759s)
+
+--- 소형+강한 정규화 ---
+    ep 1  loss=0.70447  (6s)  validBSS=   380.1
+    ep 2  loss=0.69286  (13s)  validBSS=   562.0
+    ep 3  loss=0.68952  (19s)  validBSS=   632.8
+    ep 4  loss=0.68904  (25s)  validBSS=   667.6
+    ep 5  loss=0.68863  (32s)  validBSS=   659.1
+    ep 6  loss=0.68837  (39s)  validBSS=   677.4
+    ep 7  loss=0.68835  (47s)  validBSS=   684.9
+    ep 8  loss=0.68812  (53s)  validBSS=   684.7
+    ep 9  loss=0.68796  (60s)  validBSS=   695.1
+    ep10  loss=0.68789  (66s)  validBSS=   695.4
+  최적 ep10  단독 695.4 (핸디캡 -46.5)  최적블렌드 a=0.3 → 753.9 (+12.0)  보너스 +26.0  corr 0.912   (827s)
+
+변형                  ep       단독      핸디캡    a      블렌드      대비     보너스   corr
+----------------------------------------------------------------------------
+lgbm (기준)                 741.9
+ID임베딩 4차원+wd         7    686.9    -55.0  0.4    765.2   +23.3   +45.3  0.882
+ID임베딩 제거             3    519.1   -222.8  0.2    756.5   +14.6   +59.2  0.831
+소형+강한 정규화           10    695.4    -46.5  0.3    753.9   +12.0   +26.0  0.912
+1차 설정 (참고)           3    380.2   -361.7  0.1    748.9    +7.0   +43.2  0.791
+
+판정:
+  · '대비'가 양수인 변형이 하나도 없으면 → MLP 기각. 피처 작업에 자원을 돌린다.
+  · 양수가 있으면 → 정직한 조기중단 규칙을 세워 2 fold x 3시드로 재판정.
+    (여기서 고른 에폭은 valid를 보고 고른 것이라 그대로 쓸 수 없다.)
+
+total 827s

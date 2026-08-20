@@ -1,0 +1,22 @@
+=== 1단계: 용량 스윕  (hl=0.5, -game_type, +ids, 단일 시드) ===
+  63/1000/l2=10 (base)     iter= 124  BSS oracle=  732.7   (35s)
+  31/2000/l2=30 (lean)     iter= 139  BSS oracle=  744.4   (69s)
+  15/4000/l2=50            iter= 174  BSS oracle=  731.3   (97s)
+  15/8000/l2=100           iter= 218  BSS oracle=  736.9   (130s)
+  31/2000/l2=200           iter= 137  BSS oracle=  727.2   (161s)
+  31/2000 lr=0.015         iter= 292  BSS oracle=  755.3   (202s)
+  31/2000 ff=0.6           iter= 138  BSS oracle=  744.1   (233s)
+  → 최고: 31/2000 lr=0.015
+
+=== 2단계: init_score(season x game_type) 조합 ===
+  init + hl=0.5 +ids         iter= 121  BSS oracle=  729.3   (271s)
+  init + hl=0.5 +ids lean    iter= 137  BSS oracle=  746.9   (308s)
+  init + hl=0.7 +ids         iter= 114  BSS oracle=  728.8   (345s)
+  init + hl=0.5 +ids -gt     iter= 118  BSS oracle=  739.9   (383s)
+
+=== 3단계: 최종 후보 3시드 평균 (이 숫자로만 채택 결정) ===
+  A) -gt, hl=0.5, +ids, best_cap   [741.3 742.1 741.6]  mean=  741.7  std=  0.4   (504s)
+  B) init, hl=0.5, +ids            [720.3 717.5 725. ]  mean=  720.9  std=  3.8   (618s)
+  C) init, hl=0.5, +ids, lean      [743.5 750.4 744.2]  mean=  746.0  std=  3.8   (730s)
+
+total 730s

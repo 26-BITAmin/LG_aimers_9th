@@ -1,0 +1,101 @@
+타자 테이블 (3203, 28)   컬럼 26개
+
+============================================================================================
+fold 2023   기준 BSS(배포상태) 130.2   타자 테이블 조회 적중 90.6%
+============================================================================================
+  컬럼                              결측      잔차 t  |t|>2
+  tmb_n                        9.4%     11.61      ✓
+  tmb_velo_mean                9.4%     14.24      ✓
+  tmb_velo_std                 9.4%      6.81      ✓
+  tmb_spin_mean                9.4%      7.19      ✓
+  tmb_spin_std                 9.4%     14.00      ✓
+  tmb_ivb_mean                 9.4%     -6.96      ✓
+  tmb_ivb_std                  9.4%      5.45      ✓
+  tmb_hb_mean                  9.4%      6.27      ✓
+  tmb_hb_std                   9.4%      6.99      ✓
+  tmb_zvelo_mean               9.4%     14.87      ✓
+  tmb_zvelo_std                9.4%      6.97      ✓
+  tmb_share_fastball           9.4%      3.91      ✓
+  tmb_share_breaking           9.4%     -3.23      ✓
+  tmb_share_offspeed           9.4%     -2.76      ✓
+  tmb_share_other              9.4%      9.72      ✓
+  tmb_n_types                  9.4%     10.80      ✓
+  tmb_zone_drop                9.4%     -8.00      ✓
+  tmb_share_fastball_dev       9.4%      3.91      ✓
+  tmb_share_breaking_dev       9.4%     -3.23      ✓
+  tmb_share_offspeed_dev       9.4%     -2.76      ✓
+  tmb_share_other_dev          9.4%      9.72      ✓
+  tmb_velo_mean_dev            9.4%     14.24      ✓
+  tmb_spin_mean_dev            9.4%      7.19      ✓
+  tmb_ivb_mean_dev             9.4%     -6.96      ✓
+  tmb_hb_mean_dev              9.4%      6.27      ✓
+  tmb_zone_drop_dev            9.4%     -8.00      ✓
+============================================================================================
+fold 2024   기준 BSS(배포상태) 826.0   타자 테이블 조회 적중 90.6%
+============================================================================================
+  컬럼                              결측      잔차 t  |t|>2
+  tmb_n                        9.4%      2.90      ✓
+  tmb_velo_mean                9.4%      2.63      ✓
+  tmb_velo_std                 9.4%     -0.05       
+  tmb_spin_mean                9.4%      2.14      ✓
+  tmb_spin_std                 9.4%      1.59       
+  tmb_ivb_mean                 9.4%     -0.70       
+  tmb_ivb_std                  9.4%      0.06       
+  tmb_hb_mean                  9.4%      0.29       
+  tmb_hb_std                   9.4%      2.04      ✓
+  tmb_zvelo_mean               9.4%      2.60      ✓
+  tmb_zvelo_std                9.4%     -0.17       
+  tmb_share_fastball           9.4%     -0.23       
+  tmb_share_breaking           9.4%      0.03       
+  tmb_share_offspeed           9.4%      0.38       
+  tmb_share_other              9.4%     -0.33       
+  tmb_n_types                  9.4%      1.34       
+  tmb_zone_drop                9.4%      0.07       
+  tmb_share_fastball_dev       9.4%     -0.23       
+  tmb_share_breaking_dev       9.4%      0.03       
+  tmb_share_offspeed_dev       9.4%      0.38       
+  tmb_share_other_dev          9.4%     -0.33       
+  tmb_velo_mean_dev            9.4%      2.63      ✓
+  tmb_spin_mean_dev            9.4%      2.14      ✓
+  tmb_ivb_mean_dev             9.4%     -0.70       
+  tmb_hb_mean_dev              9.4%      0.29       
+  tmb_zone_drop_dev            9.4%      0.07       
+
+============================================================================================
+부호 일치 판정 — §7.39가 투수 Trackman을 죽인 바로 그 검사
+============================================================================================
+  컬럼                           f2023 t   f2024 t   판정
+  tmb_n                         +11.61     +2.90   일치 (둘 다 유의)
+  tmb_velo_mean                 +14.24     +2.63   일치 (둘 다 유의)
+  tmb_velo_std                   +6.81     -0.05   ★ 반전
+  tmb_spin_mean                  +7.19     +2.14   일치 (둘 다 유의)
+  tmb_spin_std                  +14.00     +1.59   일치 (약함)
+  tmb_ivb_mean                   -6.96     -0.70   일치 (약함)
+  tmb_ivb_std                    +5.45     +0.06   일치 (약함)
+  tmb_hb_mean                    +6.27     +0.29   일치 (약함)
+  tmb_hb_std                     +6.99     +2.04   일치 (둘 다 유의)
+  tmb_zvelo_mean                +14.87     +2.60   일치 (둘 다 유의)
+  tmb_zvelo_std                  +6.97     -0.17   ★ 반전
+  tmb_share_fastball             +3.91     -0.23   ★ 반전
+  tmb_share_breaking             -3.23     +0.03   ★ 반전
+  tmb_share_offspeed             -2.76     +0.38   ★ 반전
+  tmb_share_other                +9.72     -0.33   ★ 반전
+  tmb_n_types                   +10.80     +1.34   일치 (약함)
+  tmb_zone_drop                  -8.00     +0.07   ★ 반전
+  tmb_share_fastball_dev         +3.91     -0.23   ★ 반전
+  tmb_share_breaking_dev         -3.23     +0.03   ★ 반전
+  tmb_share_offspeed_dev         -2.76     +0.38   ★ 반전
+  tmb_share_other_dev            +9.72     -0.33   ★ 반전
+  tmb_velo_mean_dev             +14.24     +2.63   일치 (둘 다 유의)
+  tmb_spin_mean_dev              +7.19     +2.14   일치 (둘 다 유의)
+  tmb_ivb_mean_dev               -6.96     -0.70   일치 (약함)
+  tmb_hb_mean_dev                +6.27     +0.29   일치 (약함)
+  tmb_zone_drop_dev              -8.00     +0.07   ★ 반전
+
+  부호 일치 14개 / 반전 12개
+  반전: ['tmb_velo_std', 'tmb_zvelo_std', 'tmb_share_fastball', 'tmb_share_breaking', 'tmb_share_offspeed', 'tmb_share_other', 'tmb_zone_drop', 'tmb_share_fastball_dev', 'tmb_share_breaking_dev', 'tmb_share_offspeed_dev', 'tmb_share_other_dev', 'tmb_zone_drop_dev']
+  **양 fold |t|>2 이면서 부호 일치: 7개**
+    ['tmb_n', 'tmb_velo_mean', 'tmb_spin_mean', 'tmb_hb_std', 'tmb_zvelo_mean', 'tmb_velo_mean_dev', 'tmb_spin_mean_dev']
+
+  → 이 컬럼들만 사후 로짓 가산(β 스윕)으로 재볼 근거가 있다.
+     컬럼 추가가 아니라 가산이므로 ablate42가 본 '컬럼 비용'을 안 낸다.

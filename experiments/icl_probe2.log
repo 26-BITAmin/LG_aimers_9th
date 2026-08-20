@@ -1,0 +1,10 @@
+컨텍스트 (25686, 78) → 정제 후 76열   평가 8,000행
+  [기준] LGBM F전문가 (원본 피처)  subBSS    426.8  (2s)
+
+  설정                             subBSS   Δ vs LGBM     쌍체SE      t      소요
+  TabICL ctx전체 est4 · 원본         -551.4      -978.2    227.5  -4.30     18s
+  TabICL ctx전체 est4 · 정제         -503.3      -930.1    241.5  -3.85     16s
+  TabICL ctx10k  est1 · 정제       -250.8      -677.6    200.7  -3.38      2s
+  TabPFN ctx10k  est1 · 원본        363.3       -63.5     91.7  -0.69     20s
+  TabPFN ctx10k  est1 · 정제        415.6       -11.3     89.5  -0.13     17s
+  TabPFN ctx전체 est1 · 원본          409.5       -17.3     85.8  -0.20     72s

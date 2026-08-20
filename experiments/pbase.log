@@ -1,0 +1,15 @@
+foldcache 지문: 5488ef1b18
+
+투수 전용 38개 / 제외 40개
+  제외: inning, balls_before, strikes_before, outs_before, run_top_before, run_bot_before, run_total_before, score_diff_home, score_diff_pitcher_team, runner_on_1b, runner_on_2b, runner_on_3b, num_runners_on, home_win_expectancy, li, batter_hand, count_state, count_diff, is_two_strikes, is_three_balls, is_full_count, is_first_pitch, hand_same, hand_matchup, we_margin, is_pitcher_home, abs_score_diff, is_late_close, asof_batter_n, miss_batter_asof, asof_batter_success_rate, asof_batter_success_rate_sm, asof_batter_middle_rate, asof_batter_middle_rate_sm, matchup_success_edge, matchup_middle_edge, base_state, top_bottom, batter_team_id, batter_id
+  M_p 단독 BSS 525.4   (48s)
+  대체물 상관:  L_j~z̄_j 0.834   M_p~z̄_b 0.923   미지 투수 행 13.8%
+  fold 2023 기준 805.5   최적 b=1.0 a=1.2 s=1.0  Δ +1.5
+  M_p 단독 BSS 593.2   (110s)
+  대체물 상관:  L_j~z̄_j 0.741   M_p~z̄_b 0.929   미지 투수 행 19.9%
+  fold 2024 기준 921.1   최적 b=1.0 a=1.0 s=1.0  Δ +0.0
+
+==================================================================
+두 fold 최소값 최대화: b=1.0 a=1.0 s=1.0   fold2023 +0.0   fold2024 +0.0   (크기비 0.00)
+  교차: fold2023 최적 (b=1.0 a=1.2 s=1.0) → fold2024 -2.9  (자체 +1.5)
+  교차: fold2024 최적 (b=1.0 a=1.0 s=1.0) → fold2023 +0.0  (자체 +0.0)

@@ -1,0 +1,62 @@
+﻿Loading train.csv ...
+  (1475092, 49)  (5.7s)
+
+시즌별 양성률: {2019: 0.5647, 2020: 0.5327, 2021: 0.5328, 2022: 0.5289, 2023: 0.5, 2024: 0.4861}
+
+====================================================================================================
+### uniform-weight
+====================================================================================================
+
+[fold] train 2019-2022 → valid 2023   best_iter=15  (16s)
+  const = oracle(valid mean)         Brier=0.250000  BSS=    -0.0  AUC=0.5073  pred_mean=0.5000 (true 0.5000, level_loss=0.000000) 
+  const = last train season          Brier=0.250839  BSS=  -335.5  AUC=0.5073  pred_mean=0.5289 (true 0.5000, level_loss=0.000839) 
+  LGBM raw                           Brier=0.250894  BSS=  -357.4  AUC=0.5253  pred_mean=0.5320 (true 0.5000, level_loss=0.001025) 
+  LGBM + shift→oracle                Brier=0.249875  BSS=    50.1  AUC=0.5253  pred_mean=0.5000 (true 0.5000, level_loss=0.000000) 
+  LGBM + shift→R1_last               Brier=0.250708  BSS=  -283.2  AUC=0.5253  pred_mean=0.5289 (true 0.5000, level_loss=0.000839) [est=0.5289]
+  LGBM + shift→R2_last+delta         Brier=0.250501  BSS=  -200.5  AUC=0.5253  pred_mean=0.5251 (true 0.5000, level_loss=0.000631) [est=0.5251]
+  LGBM + shift→R3_last+half_delta    Brier=0.250601  BSS=  -240.4  AUC=0.5253  pred_mean=0.5270 (true 0.5000, level_loss=0.000731) [est=0.5270]
+  LGBM + shift→R4_last+mean_delta    Brier=0.250162  BSS=   -64.9  AUC=0.5253  pred_mean=0.5170 (true 0.5000, level_loss=0.000291) [est=0.5170]
+  LGBM + shift→R5_last+half_mean_delta Brier=0.250400  BSS=  -159.9  AUC=0.5253  pred_mean=0.5230 (true 0.5000, level_loss=0.000529) [est=0.5230]
+  top15 gain: game_type=60442, asof_pitcher_success_rate=21484, asof_pitcher_success_rate_sm=19800, asof_batter_success_rate=6273, asof_pitcher_reverse_rate_sm=4227, asof_pitcher_reverse_rate=3570, batter_team_id=3427, asof_pitcher_prev3_game_success_rate=2903, asof_batter_success_rate_sm=1913, hand_matchup=1538, game_month=1477, asof_pitcher_prev5_game_success_rate=1220, asof_pitcher_prev1_game_success_rate=1020, asof_pitcher_ball_rate=925, asof_pitcher_middle_rate=904
+
+[fold] train 2019-2023 → valid 2024   best_iter=140  (29s)
+  const = oracle(valid mean)         Brier=0.249807  BSS=    -0.0  AUC=0.4936  pred_mean=0.4861 (true 0.4861, level_loss=0.000000) 
+  const = last train season          Brier=0.249999  BSS=   -76.8  AUC=0.4936  pred_mean=0.5000 (true 0.4861, level_loss=0.000192) 
+  LGBM raw                           Brier=0.249421  BSS=   154.6  AUC=0.5390  pred_mean=0.5063 (true 0.4861, level_loss=0.000408) 
+  LGBM + shift→oracle                Brier=0.249022  BSS=   314.3  AUC=0.5390  pred_mean=0.4861 (true 0.4861, level_loss=0.000000) 
+  LGBM + shift→R1_last               Brier=0.249208  BSS=   239.8  AUC=0.5390  pred_mean=0.5000 (true 0.4861, level_loss=0.000192) [est=0.5000]
+  LGBM + shift→R2_last+delta         Brier=0.249254  BSS=   221.4  AUC=0.5390  pred_mean=0.4710 (true 0.4861, level_loss=0.000228) [est=0.4710]
+  LGBM + shift→R3_last+half_delta    Brier=0.249022  BSS=   314.1  AUC=0.5390  pred_mean=0.4855 (true 0.4861, level_loss=0.000000) [est=0.4855]
+  LGBM + shift→R4_last+mean_delta    Brier=0.249028  BSS=   311.9  AUC=0.5390  pred_mean=0.4838 (true 0.4861, level_loss=0.000005) [est=0.4838]
+  LGBM + shift→R5_last+half_mean_delta Brier=0.249053  BSS=   301.9  AUC=0.5390  pred_mean=0.4919 (true 0.4861, level_loss=0.000033) [est=0.4919]
+  top15 gain: game_type=80181, asof_pitcher_success_rate_sm=49653, asof_pitcher_success_rate=30953, asof_batter_success_rate=16470, asof_pitcher_prev1_game_success_rate=16146, asof_pitcher_reverse_rate=15481, asof_pitcher_prev3_game_success_rate=10586, asof_pitcher_reverse_rate_sm=8189, asof_pitcher_prev5_game_success_rate=8151, asof_pitcher_n=6553, asof_batter_success_rate_sm=6523, pitcher_team_id=6214, hand_same=6134, batter_team_id=4992, asof_pitcher_offspeed_rate=4986
+
+====================================================================================================
+### recency-weighted
+====================================================================================================
+
+[fold] train 2019-2022 → valid 2023   best_iter=15  (16s)
+  const = oracle(valid mean)         Brier=0.250000  BSS=    -0.0  AUC=0.5073  pred_mean=0.5000 (true 0.5000, level_loss=0.000000) 
+  const = last train season          Brier=0.250839  BSS=  -335.5  AUC=0.5073  pred_mean=0.5289 (true 0.5000, level_loss=0.000839) 
+  LGBM raw                           Brier=0.250714  BSS=  -285.4  AUC=0.5269  pred_mean=0.5290 (true 0.5000, level_loss=0.000841) 
+  LGBM + shift→oracle                Brier=0.249879  BSS=    48.3  AUC=0.5269  pred_mean=0.5000 (true 0.5000, level_loss=0.000000) 
+  LGBM + shift→R1_last               Brier=0.250711  BSS=  -284.5  AUC=0.5269  pred_mean=0.5289 (true 0.5000, level_loss=0.000839) [est=0.5289]
+  LGBM + shift→R2_last+delta         Brier=0.250505  BSS=  -201.9  AUC=0.5269  pred_mean=0.5251 (true 0.5000, level_loss=0.000631) [est=0.5251]
+  LGBM + shift→R3_last+half_delta    Brier=0.250604  BSS=  -241.7  AUC=0.5269  pred_mean=0.5270 (true 0.5000, level_loss=0.000731) [est=0.5270]
+  LGBM + shift→R4_last+mean_delta    Brier=0.250166  BSS=   -66.4  AUC=0.5269  pred_mean=0.5170 (true 0.5000, level_loss=0.000291) [est=0.5170]
+  LGBM + shift→R5_last+half_mean_delta Brier=0.250403  BSS=  -161.3  AUC=0.5269  pred_mean=0.5230 (true 0.5000, level_loss=0.000529) [est=0.5230]
+  top15 gain: game_type=45138, asof_pitcher_success_rate_sm=14522, asof_pitcher_success_rate=7279, asof_batter_success_rate=3960, asof_pitcher_reverse_rate_sm=2445, asof_pitcher_prev3_game_success_rate=1325, asof_pitcher_prev1_game_success_rate=1134, batter_team_id=1009, asof_pitcher_reverse_rate=973, hand_matchup=891, asof_batter_success_rate_sm=777, asof_pitcher_ball_rate_sm=775, game_month=613, hand_same=611, asof_pitcher_prev5_game_success_rate=610
+
+[fold] train 2019-2023 → valid 2024   best_iter=134  (28s)
+  const = oracle(valid mean)         Brier=0.249807  BSS=    -0.0  AUC=0.4936  pred_mean=0.4861 (true 0.4861, level_loss=0.000000) 
+  const = last train season          Brier=0.249999  BSS=   -76.8  AUC=0.4936  pred_mean=0.5000 (true 0.4861, level_loss=0.000192) 
+  LGBM raw                           Brier=0.248902  BSS=   362.1  AUC=0.5420  pred_mean=0.5042 (true 0.4861, level_loss=0.000327) 
+  LGBM + shift→oracle                Brier=0.248578  BSS=   492.0  AUC=0.5420  pred_mean=0.4861 (true 0.4861, level_loss=0.000000) 
+  LGBM + shift→R1_last               Brier=0.248768  BSS=   416.0  AUC=0.5420  pred_mean=0.5000 (true 0.4861, level_loss=0.000192) [est=0.5000]
+  LGBM + shift→R2_last+delta         Brier=0.248807  BSS=   400.2  AUC=0.5420  pred_mean=0.4710 (true 0.4861, level_loss=0.000228) [est=0.4710]
+  LGBM + shift→R3_last+half_delta    Brier=0.248578  BSS=   491.8  AUC=0.5420  pred_mean=0.4855 (true 0.4861, level_loss=0.000000) [est=0.4855]
+  LGBM + shift→R4_last+mean_delta    Brier=0.248584  BSS=   489.7  AUC=0.5420  pred_mean=0.4838 (true 0.4861, level_loss=0.000005) [est=0.4838]
+  LGBM + shift→R5_last+half_mean_delta Brier=0.248610  BSS=   479.0  AUC=0.5420  pred_mean=0.4919 (true 0.4861, level_loss=0.000033) [est=0.4919]
+  top15 gain: asof_pitcher_success_rate=22069, game_type=18154, asof_pitcher_success_rate_sm=17155, asof_pitcher_prev1_game_success_rate=10841, asof_pitcher_prev5_game_success_rate=8611, asof_batter_success_rate=7988, asof_pitcher_prev3_game_success_rate=6950, asof_pitcher_n=4972, asof_pitcher_reverse_rate=4618, hand_same=4215, asof_pitcher_reverse_rate_sm=3987, pitcher_ball_minus_strike=3296, pitcher_team_id=3083, asof_pitcher_ball_rate_sm=2829, asof_batter_success_rate_sm=2685
+
+total 98s

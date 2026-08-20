@@ -1,0 +1,49 @@
+
+=== fold 2021  학습 481,500  검증 247,088  (9s) ===
+   tighter  leaves  15  min_data  8000  l2   100   BSS    986.5   (21s)
+     tight  leaves  15  min_data  4000  l2    50   BSS   1004.9   (34s)
+      base  leaves  31  min_data  2000  l2    30   BSS    973.2   (47s)
+     loose  leaves  63  min_data   500  l2    10   BSS    941.9   (68s)
+    looser  leaves 127  min_data   100  l2     1   BSS    898.5   (86s)
+
+=== fold 2022  학습 728,588  검증 247,472  (87s) ===
+   tighter  leaves  15  min_data  8000  l2   100   BSS   1833.8   (104s)
+     tight  leaves  15  min_data  4000  l2    50   BSS   1843.0   (123s)
+      base  leaves  31  min_data  2000  l2    30   BSS   1849.2   (154s)
+     loose  leaves  63  min_data   500  l2    10   BSS   1850.9   (182s)
+    looser  leaves 127  min_data   100  l2     1   BSS   1793.3   (266s)
+
+=== fold 2023  학습 976,060  검증 245,525  (282s) ===
+   tighter  leaves  15  min_data  8000  l2   100   BSS     31.2   (334s)
+     tight  leaves  15  min_data  4000  l2    50   BSS     43.2   (358s)
+      base  leaves  31  min_data  2000  l2    30   BSS    -10.2   (394s)
+     loose  leaves  63  min_data   500  l2    10   BSS    -45.7   (441s)
+    looser  leaves 127  min_data   100  l2     1   BSS    -91.6   (495s)
+
+=== fold 2024  학습 1,221,585  검증 253,507  (499s) ===
+   tighter  leaves  15  min_data  8000  l2   100   BSS    722.2   (531s)
+     tight  leaves  15  min_data  4000  l2    50   BSS    728.8   (568s)
+      base  leaves  31  min_data  2000  l2    30   BSS    741.9   (600s)
+     loose  leaves  63  min_data   500  l2    10   BSS    729.3   (657s)
+    looser  leaves 127  min_data   100  l2     1   BSS    677.0   (703s)
+
+========================================================================================
+용량 × 시즌 신호량  (BSS oracle, 트리 단일 모델)
+========================================================================================
+  fold   tighter     tight      base     loose    looser        최적    base대비
+  2021     986.5    1004.9     973.2     941.9     898.5     tight     +31.7
+  2022    1833.8    1843.0    1849.2    1850.9    1793.3     loose      +1.7
+  2023      31.2      43.2     -10.2     -45.7     -91.6     tight     +53.4
+  2024     722.2     728.8     741.9     729.3     677.0      base      +0.0
+
+  fold    신호량(base)       최적 용량 순위  (0=가장 조임, 4=가장 풂)
+  2023        -10.2              1
+  2024        741.9              2
+  2021        973.2              1
+  2022       1849.2              3
+
+  신호량 vs 최적용량 순위  상관 +0.807  (n=4)
+
+  ⚠️ n=4다. 상관계수 하나로 채택하지 않는다. 추세가 보이면 배포 구조(앙상블+MLP 블렌드)로 fold2023·2024에서 다시 재고, 조건 ①②③으로 판정한다.
+
+total 703s

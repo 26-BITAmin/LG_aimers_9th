@@ -1,0 +1,59 @@
+매핑된 투수 706명
+매핑되는 trackman 행 1,751,413 / 전체 (4s)
+
+테이블 (3290, 30)  → D:\projects\LG aimers 야구\submit\model\trackman_pitcher.csv
+시즌별 행 수:
+season
+2020    352
+2021    455
+2022    529
+2023    599
+2024    649
+2025    706
+
+피처 28개: ['tm_n', 'tm_relh_mean', 'tm_relh_std', 'tm_rels_mean', 'tm_rels_std', 'tm_ext_mean', 'tm_ext_std', 'tm_velo_mean', 'tm_velo_std', 'tm_spin_mean', 'tm_spin_std', 'tm_ivb_mean', 'tm_ivb_std', 'tm_hb_mean', 'tm_hb_std', 'tmfb_n', 'tmfb_relh_mean', 'tmfb_relh_std', 'tmfb_rels_mean', 'tmfb_rels_std', 'tm_share_fastball', 'tm_share_breaking', 'tm_share_offspeed', 'tm_share_other', 'tm_n_pitchtypes', 'tm_velo_gap', 'tm_relpoint_disp', 'tmfb_relpoint_disp']
+
+결측률(2025):
+pitcher_id            0.0
+season                0.0
+tm_n                  0.0
+tm_relh_mean          0.0
+tm_relh_std           0.0
+tm_rels_mean          0.0
+tm_rels_std           0.0
+tm_ext_mean           0.0
+tm_ext_std            0.0
+tm_velo_mean          0.0
+tm_velo_std           0.0
+tm_spin_mean          0.0
+tm_spin_std           0.0
+tm_ivb_mean           0.0
+tm_ivb_std            0.0
+tm_hb_mean            0.0
+tm_hb_std             0.0
+tmfb_n                0.1
+tmfb_relh_mean        0.1
+tmfb_relh_std         0.1
+tmfb_rels_mean        0.1
+tmfb_rels_std         0.1
+tm_share_fastball     0.0
+tm_share_breaking     0.0
+tm_share_offspeed     0.0
+tm_share_other        0.0
+tm_n_pitchtypes       0.0
+tm_velo_gap           0.7
+tm_relpoint_disp      0.0
+tmfb_relpoint_disp    0.1
+
+릴리스포인트 산포 분포 (2025):
+       tm_relpoint_disp  tmfb_relpoint_disp  tm_relh_std  tm_rels_std
+count          706.0000            705.0000     706.0000     706.0000
+mean             0.1145              0.1080       0.0576       0.0962
+std              0.0436              0.0438       0.0285       0.0403
+min              0.0414              0.0000       0.0192       0.0293
+25%              0.0824              0.0762       0.0428       0.0655
+50%              0.1061              0.0993       0.0499       0.0874
+75%              0.1368              0.1302       0.0618       0.1196
+max              0.2964              0.2979       0.2565       0.2634
+
+total 7s
