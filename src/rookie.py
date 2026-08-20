@@ -44,8 +44,15 @@ import foldcache
 #    "캐시 없음"으로 판단해 fold당 20분짜리 재학습을 시작한다 (실제로 발생 —
 #    달력 피처 DROP 후보가 들어와 faa19e0e95 → 5488ef1b18).
 #    새 구성으로 다시 재려면 이 상수를 지우거나 새 지문으로 바꾼다.
-S23_KEY = "faa19e0e95"
-foldcache._key = lambda: S23_KEY
+#    기본값은 s23(§7.79~7.81 기록의 기준). s24 이후 구성으로 재측정할 땐
+#    환경변수로 지문을 넘긴다:  LGA_FOLD_KEY=5488ef1b18
+#    "auto"를 주면 현재 config에서 계산한 지문을 쓴다 (핀 해제).
+import os as _os
+_PIN = _os.environ.get("LGA_FOLD_KEY") or "faa19e0e95"
+if _PIN != "auto":
+    _orig_key = foldcache._key
+    foldcache._key = lambda: _PIN
+FOLD_KEY = _PIN
 
 from config import (ASOF_AXES, ASOF_STRENGTH, CONTAM_AXES, CTX_AXES, CTX_HALF_LIFE,
                     CTX_K, MLP_ALPHA, TARGET_COL, TRAIN_CSV)
