@@ -1,0 +1,86 @@
+==============================================================================
+§7.103 표 기반모델 F 전문가 — TABPFNMIX, NORI, TABICL, TABDPT-TURBO  (가용 RAM 7.78GB)
+  fold 2023H2: 검증 122,215행  F 학습 14,535/검증 11,151  위약 학습 14,332/검증 14,462   (9s)
+  fold 2024: 검증 253,507행  F 학습 25,686/검증 30,010  위약 학습 28,794/검증 30,087   (13s)
+  프레임 해제 후 가용 RAM 7.36GB
+
+=== 대조군 — 현행 LightGBM F 전문가 ===
+  fold 2023H2 F     기준 753.3   배포 a=0.15 -> 754.8 (D +1.57)   최적 a=0.15 -> 754.8 (D +1.57)   (15s)
+  fold 2023H2 위약    기준 753.3   배포 a=0.15 -> 750.0 (D -3.29)   최적 a=0.00 -> 753.3 (D +0.00)   (17s)
+  fold 2024 F     기준 837.6   배포 a=0.15 -> 840.0 (D +2.47)   최적 a=0.45 -> 842.0 (D +4.43)   (20s)
+  fold 2024 위약    기준 837.6   배포 a=0.15 -> 834.5 (D -3.06)   최적 a=0.00 -> 837.6 (D +0.00)   (23s)
+
+=== TABPFNMIX — 컨텍스트 사다리 (선택은 2023H2에서만) ===
+  --- F ---
+    ctx  3,000  기준 753.3 -> 753.7  a=0.15  D +0.47   (RAM 7.1GB, 41s)
+    ctx  6,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 7.1GB, 57s)
+    ctx 12,000  기준 753.3 -> 753.4  a=0.10  D +0.17   (RAM 7.1GB, 80s)
+    ctx 25,686  기준 753.3 -> 754.0  a=0.15  D +0.68   (RAM 7.2GB, 104s)
+    선택: ctx 25,686  a=0.15  (2023H2 754.0)
+  --- 위약 ---
+    ctx  3,000  기준 753.3 -> 753.6  a=0.10  D +0.35   (RAM 7.2GB, 118s)
+    ctx  6,000  기준 753.3 -> 755.4  a=0.25  D +2.08   (RAM 7.2GB, 135s)
+    ctx 12,000  기준 753.3 -> 755.3  a=0.25  D +2.03   (RAM 7.2GB, 162s)
+    ctx 25,686  기준 753.3 -> 754.7  a=0.20  D +1.44   (RAM 7.2GB, 188s)
+    선택: ctx 6,000  a=0.25  (2023H2 755.4)
+  === TABPFNMIX fold2024 적용 (처음 보는 곳) ===
+    F    ctx 25,686 a=0.15   837.6 -> 833.9  D -3.68    (현행 LightGBM D +2.47, 차 -6.14)
+    위약   ctx 6,000 a=0.25   837.6 -> 830.6  D -6.99    (현행 LightGBM D -3.06, 차 -3.93)
+
+=== NORI — 컨텍스트 사다리 (선택은 2023H2에서만) ===
+  --- F ---
+    ctx  3,000  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    ctx  6,000  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    ctx 12,000  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    ctx 25,686  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    F: 전 구간 실패
+  --- 위약 ---
+    ctx  3,000  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    ctx  6,000  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    ctx 12,000  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    ctx 25,686  FAIL FAIL | RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no models were fit. Alternatively,
+    위약: 전 구간 실패
+  === NORI fold2024 적용 (처음 보는 곳) ===
+
+=== TABICL — 컨텍스트 사다리 (선택은 2023H2에서만) ===
+  --- F ---
+    ctx  3,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 7.5GB, 317s)
+    ctx  6,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 7.5GB, 337s)
+    ctx 12,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 8.4GB, 372s)
+    ctx 25,686  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 9.1GB, 416s)
+    선택: ctx 3,000  a=0.00  (2023H2 753.3)
+  --- 위약 ---
+    ctx  3,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 9.1GB, 437s)
+    ctx  6,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 9.0GB, 459s)
+    ctx 12,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 9.1GB, 494s)
+    ctx 25,686  FAIL out of memory | ) and disk offload is not available. Please specify disk_offload_dir in the configuration to enable disk offloading, or reduce the output size (estimated: 4275M
+    선택: ctx 3,000  a=0.00  (2023H2 753.3)
+  === TABICL fold2024 적용 (처음 보는 곳) ===
+    F: FAIL out of memory | ) and disk offload is not available. Please specify disk_offload_dir in the configuration to enable disk offloading, or reduce the output size (estimated: 5080M
+    위약: FAIL out of memory | ) and disk offload is not available. Please specify disk_offload_dir in the configuration to enable disk offloading, or reduce the output size (estimated: 5092M
+
+=== TABDPT-TURBO — 컨텍스트 사다리 (선택은 2023H2에서만) ===
+  --- F ---
+    ctx  3,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 8.5GB, 558s)
+    ctx  6,000  기준 753.3 -> 753.3  a=0.00  D +0.00   (RAM 8.5GB, 585s)
+    ctx 12,000  기준 753.3 -> 753.6  a=0.15  D +0.36   (RAM 8.6GB, 638s)
+    ctx 25,686  기준 753.3 -> 754.9  a=0.30  D +1.61   (RAM 8.5GB, 708s)
+    선택: ctx 25,686  a=0.30  (2023H2 754.9)
+  --- 위약 ---
+    ctx  3,000  기준 753.3 -> 754.0  a=0.10  D +0.74   (RAM 8.4GB, 726s)
+    ctx  6,000  기준 753.3 -> 753.9  a=0.15  D +0.66   (RAM 8.4GB, 754s)
+    ctx 12,000  기준 753.3 -> 753.4  a=0.10  D +0.16   (RAM 8.5GB, 812s)
+    ctx 25,686  기준 753.3 -> 753.5  a=0.10  D +0.21   (RAM 8.5GB, 885s)
+    선택: ctx 3,000  a=0.10  (2023H2 754.0)
+  === TABDPT-TURBO fold2024 적용 (처음 보는 곳) ===
+    F    ctx 25,686 a=0.30   837.6 -> 834.2  D -3.36    (현행 LightGBM D +2.47, 차 -5.83)
+    위약   ctx 3,000 a=0.10   837.6 -> 835.9  D -1.64    (현행 LightGBM D -3.06, 차 +1.42)
+
+=== 판정 (fold2024) — 채택 기준: F 이득 > 위약 이득 & > 현행 ===
+  현행 LightGBM     F  +2.47   위약  -3.06   → 통과
+  TABPFNMIX       F  -3.68   위약  -6.99   → 탈락  (현행 대비 -6.14)
+  NORI            판정 불가 (측정 결손: ['F', '위약'])
+  TABICL          판정 불가 (측정 결손: ['F', '위약'])
+  TABDPT-TURBO    F  -3.36   위약  -1.64   → 탈락  (현행 대비 -5.83)
+
+완료 (1117s, 가용 RAM 8.30GB)
