@@ -28,7 +28,9 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 
-from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
+from config import (FSPEC_ALPHA, FSPEC_MAX_ROUNDS, FSPEC_MIN_SEASON,
+                    FSPEC_PARAMS, FSPEC_SEEDS,
+                    CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
                     MLP_ALPHA, MLP_AUX_LAMBDA, MLP_AUX_MODES, MLP_SEEDS,
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
                     MODEL_DIR, N_ROUNDS,
@@ -188,6 +190,65 @@ def train_ensemble(X, y, w, init_score, X_ref, model_dir, t0=None):
             raw += bst.predict(X_ref, raw_score=True)
             print(f"  [{len(members)}/{n}] {tag} 완료  ({time.time()-t0:.0f}s)")
     return members, raw / len(members)
+
+
+def train_fspec(df, build_X, X_ref, model_dir, t0=None):
+    """F 전용 전문가 (§7.101). 반환: (태그들, X_ref에 대한 평균 로짓, 학습 행 수).
+
+    ⚠️ 학습 데이터는 **2023년 이후 F만**이다. 2019~22 F는 reverse 검출 실패로 라벨이
+       오염돼 있고(§7.48·§7.70), 표본 수를 똑같이 맞춰 넣어도 F_self가 537 → 92로
+       무너진다 (N 통제 Δ +445.1 ± 53.8). "많을수록 좋다"가 성립하지 않는 구간이다.
+
+    라운드 수는 학습셋 **내부** 시간분할(뒤 25%)로 정한다. 검증 fold를 보지 않는다.
+    """
+    t0 = time.time() if t0 is None else t0
+    m = ((df["game_type"].to_numpy().astype(str) == "F")
+         & (df["season"].to_numpy() >= FSPEC_MIN_SEASON))
+    sub = df[m]
+    Xf = build_X(sub)
+    yf = sub[TARGET_COL].to_numpy(dtype=np.float64)
+    # 시즌×월을 하나의 시간축으로 — 2023·2024가 섞여 있으므로 월만 쓰면 안 된다
+    tt = sub["season"].to_numpy(dtype=np.int64) * 12 + sub["game_month"].to_numpy(dtype=np.int64)
+    cut = np.quantile(tt, 0.75)
+    itr, iva = tt <= cut, tt > cut
+    tags, z = [], np.zeros(len(X_ref))
+    for seed in FSPEC_SEEDS:
+        prm = dict(FSPEC_PARAMS, seed=seed, bagging_seed=seed,
+                   feature_fraction_seed=seed, data_random_seed=seed)
+        b0 = lgb.train(prm, lgb.Dataset(Xf[itr], yf[itr]),
+                       num_boost_round=FSPEC_MAX_ROUNDS,
+                       valid_sets=[lgb.Dataset(Xf[iva], yf[iva])],
+                       callbacks=[lgb.early_stopping(100, verbose=False)])
+        nr = max(50, b0.best_iteration)
+        bst = lgb.train(prm, lgb.Dataset(Xf, yf), num_boost_round=nr)
+        tag = f"fspec_{seed}"
+        (model_dir / f"lgbm_{tag}.txt").write_text(bst.model_to_string(),
+                                                   encoding="utf-8")
+        tags.append(tag)
+        z += bst.predict(X_ref, raw_score=True)
+        print(f"  F전문가 {tag}  rounds={nr}  ({time.time()-t0:.0f}s)")
+    return tags, z / len(tags), int(m.sum())
+
+
+def fspec_ref_logit(model_dir, tags, X_ref):
+    """저장된 F전문가로 참조행 로짓만 다시 계산 (--artifacts-only 경로)."""
+    z = np.zeros(len(X_ref))
+    for tag in tags:
+        txt = (model_dir / f"lgbm_{tag}.txt").read_text(encoding="utf-8")
+        z += lgb.Booster(model_str=txt).predict(X_ref, raw_score=True)
+    return z / len(tags)
+
+
+def blend_fspec(df, raw_ref, z_fs, n_train):
+    """참조행(REF_SEASON)의 **F 행에만** 전문가를 섞는다. 추론과 같은 지점·같은 α."""
+    ref_isF = (df.loc[df.season == REF_SEASON, "game_type"]
+                 .to_numpy().astype(str) == "F")
+    raw_ref = raw_ref.copy()
+    raw_ref[ref_isF] = ((1 - FSPEC_ALPHA) * raw_ref[ref_isF]
+                        + FSPEC_ALPHA * z_fs[ref_isF])
+    print(f"  F전문가 블렌드 α={FSPEC_ALPHA}: 학습 {n_train:,}행 · "
+          f"참조행 F {int(ref_isF.sum()):,}/{len(ref_isF):,} ({ref_isF.mean():.1%})")
+    return raw_ref
 
 
 def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None, *, y_aux):
@@ -383,9 +444,17 @@ def main():
             print(f"  블렌드: (1-{MLP_ALPHA})·lgbm + {MLP_ALPHA}·mlp   "
                   f"(로짓 상관 {np.corrcoef(raw_ref, z_mlp_ref)[0,1]:.3f})")
             raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref
+        fspec_tags = list(old.get("fspec_members") or [])
+        if FSPEC_ALPHA > 0 and fspec_tags:
+            raw_ref = blend_fspec(df, raw_ref,
+                                  fspec_ref_logit(MODEL_DIR, fspec_tags, X_ref), -1)
+        elif FSPEC_ALPHA > 0:
+            raise SystemExit(
+                "FSPEC_ALPHA > 0 인데 저장된 fspec 멤버가 없다 — F전문가는 새 모델이라 "
+                "--artifacts-only 로는 만들 수 없다. 전체 학습을 한 번 돌릴 것.")
         return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
                        mlp_tags, mlp_wts, mlp_enc, fhash, t0,
-                       soft_h=old.get("soft_h", {}))
+                       soft_h=old.get("soft_h", {}), fspec_tags=fspec_tags)
 
     # ── soft label (§7.70) — LGBM과 MLP가 **같은** (X, y, w, aux)를 봐야
     #    하므로 보조 라벨을 먼저 복원하고 soften을 한 번만 적용한다.
@@ -414,6 +483,14 @@ def main():
               f"(로짓 상관 {np.corrcoef(raw_ref, z_mlp_ref)[0,1]:.3f})")
         raw_ref = (1 - MLP_ALPHA) * raw_ref + MLP_ALPHA * z_mlp_ref
 
+    # ── F 전용 전문가 (§7.101) — 블렌드 **이후**, δ 보정 **이전** ──────
+    # 이 순서가 fspec_verify.py에서 α를 고른 지점과 같아야 한다.
+    # ⚠️ X는 soften으로 행이 복제된 뒤라 df와 정렬이 깨져 있다 → df에서 다시 만든다.
+    fspec_tags = []
+    if FSPEC_ALPHA > 0:
+        fspec_tags, z_fs, n_fs = train_fspec(df, build_X, X_ref, MODEL_DIR, t0)
+        raw_ref = blend_fspec(df, raw_ref, z_fs, n_fs)
+
     # ── 사후 로짓 보정도 delta보다 **먼저** 얹는다 ──────────────
     # predict.py의 순서(블렌드 → 보정 → prior shift)와 같아야 한다.
     # `logit_adjust`는 추론·검증과 **같은 함수**다 — 축을 늘려도 여기는 안 고친다.
@@ -422,11 +499,13 @@ def main():
     #    (실측 hand −0.0001 / count4 +0.0007) 미적중은 0으로 떨어지므로 레벨 영향이
     #    사실상 없다. 조회 키에 season이 안 들어가는 것이 Trackman과의 결정적 차이다.
     return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
-                   mlp_tags, mlp_wts, mlp_enc, fhash, t0, soft_h=soft_h)
+                   mlp_tags, mlp_wts, mlp_enc, fhash, t0, soft_h=soft_h,
+                   fspec_tags=fspec_tags)
 
 
 def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
-            mlp_tags, mlp_wts, mlp_enc, fhash, t0, *, soft_h=None):
+            mlp_tags, mlp_wts, mlp_enc, fhash, t0, *, soft_h=None,
+            fspec_tags=None):
     """블렌드 이후 — 보정 가산 → prior shift → 저장.
 
     전체 학습과 `--artifacts-only`가 **이 함수 하나를 공유한다.** 두 경로가
@@ -457,11 +536,18 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
                  #    "저장된 모델이 이 피처로 학습된 것인가"를 판정할 수 있다.
                  "feature_hash": fhash,
                  # ⚠️ soft label(§7.70)은 피처 해시에 안 잡힌다 — 따로 기록해 막는다.
-                 "soft_label_f": SOFT_LABEL_F, "soft_h": dict(soft_h or {})},
+                 "soft_label_f": SOFT_LABEL_F, "soft_h": dict(soft_h or {}),
+                 # F 전용 전문가 (§7.101). α=0이거나 멤버가 없으면 추론에서 건너뛴다.
+                 "fspec_members": list(fspec_tags or []),
+                 "fspec_alpha": FSPEC_ALPHA if fspec_tags else 0.0,
+                 "fspec_min_season": FSPEC_MIN_SEASON},
                 MODEL_DIR / "artifacts.joblib", compress=3)
     (MODEL_DIR / "meta.json").write_text(json.dumps({
         "seeds": list(SEED_ENSEMBLE), "variants": list(ENSEMBLE_VARIANTS),
         "n_members": len(members), "n_rounds": N_ROUNDS,
+        "fspec_members": list(fspec_tags or []),
+        "fspec_alpha": FSPEC_ALPHA if fspec_tags else 0.0,
+        "fspec_min_season": FSPEC_MIN_SEASON,
         "use_mlp": USE_MLP, "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0,
         "mlp_aux_lambda": MLP_AUX_LAMBDA if USE_MLP else 0.0,
         # ⚠️ 축 목록도 반드시 남긴다. λ만 남기면 헤드 2개짜리와 4개짜리가

@@ -169,6 +169,29 @@ FINAL_LGB_PARAMS = dict(
     verbosity=-1,
 )
 
+# ── F 전용 전문가 모델 (§7.101) ─────────────────────────────────
+# game_type='F' 행만 별도 LGBM으로 다시 예측해 **로짓 공간에서** 섞는다.
+# 왜 이게 되는가: 전역 모델은 122만행을 보고도 F 행에서 2.5만행짜리 전문가와
+# 같은 수준밖에 못 낸다 (같은 크기 R전문가는 R행에서 −226.4로 참패한다 — §7.101①).
+#
+# ⚠️ 학습 데이터는 **2023년 이후 F만**. 2019~22 F는 라벨이 오염돼 있어(§7.48·§7.70)
+#    표본 수를 똑같이 맞춰도 F_self가 537 → 92로 무너진다 (N 통제 Δ +445.1 ± 53.8).
+#
+# α는 fold "2023H2"(2023 7~9월 검증)에서 골랐다 — **2024는 보지 않았다.**
+# 그 α로 fold2024를 재면 +2.53 (95% 부트스트랩 [+1.04, +4.08]), 2023H2는 +1.59.
+# 부호 일치 O, 크기비 1.6배. 참고로 2024를 보고 고르면 α=0.45에 +4.4가 되는데
+# 그 +2.0이 정확히 낙관 편향의 크기다.
+FSPEC_ALPHA = 0.15
+FSPEC_MIN_SEASON = 2023
+FSPEC_SEEDS = (42, 7, 2024)
+# 소표본(5.6만행)용. 배포값(min_data_in_leaf=2000)을 그대로 쓰면 잎이 안 갈라진다.
+FSPEC_PARAMS = dict(
+    objective="binary", learning_rate=0.03, num_leaves=15, min_data_in_leaf=100,
+    feature_fraction=0.7, bagging_fraction=0.7, bagging_freq=1, lambda_l2=10.0,
+    max_bin=127, num_threads=6, verbosity=-1,
+)
+FSPEC_MAX_ROUNDS = 3000     # 실제 라운드 수는 학습셋 내부 시간분할 early stopping
+
 # 최종 학습 트리 수. 홀드아웃이 없어 early stopping을 못 쓰므로 고정값.
 # fold2에서 best_iteration=292였고, 최종은 2024가 추가되지만 hl=0.5라
 # 유효 표본 수는 거의 그대로다 → 소폭만 늘린다.

@@ -46,10 +46,22 @@ class Predictor:
         # model_file= 이 아니라 model_str= 로 읽는다.
         # LightGBM의 C 파일 API는 Windows에서 경로를 ANSI 코드페이지로 해석하므로
         # 경로에 비ASCII 문자가 있으면 조용히 깨진다. 파일 I/O는 파이썬에 맡긴다.
+        # F 전용 전문가 (§7.101) — game_type=='F' 행만 다시 예측해 로짓에서 섞는다.
+        # 옛 아티팩트에는 없는 키이므로 get()으로 읽고, 없으면 α=0이 되어 꺼진다.
+        self.fspec_alpha = float(bundle.get("fspec_alpha") or 0.0)
+        self.fspec = []
+
         self.boosters = []
         for tag in bundle.get("members") or [f"{s}" for s in bundle.get("seeds", [])]:
             with open(os.path.join(model_dir, f"lgbm_{tag}.txt"), encoding="utf-8") as f:
                 self.boosters.append(lgb.Booster(model_str=f.read()))
+        if self.fspec_alpha > 0:
+            for tag in bundle.get("fspec_members") or []:
+                with open(os.path.join(model_dir, f"lgbm_{tag}.txt"),
+                          encoding="utf-8") as f:
+                    self.fspec.append(lgb.Booster(model_str=f.read()))
+            if not self.fspec:
+                self.fspec_alpha = 0.0
 
     def predict(self, test_df):
         """test_df의 각 행을 **독립적으로** 예측한다.
@@ -96,6 +108,26 @@ class Predictor:
                 for m, wt in zip(self.mlps, self.mlp_w):
                     zm += wt * m.logit(X)
             z = (1.0 - self.alpha) * z + self.alpha * zm
+
+        # ── F 전용 전문가 블렌드 (§7.101) ─────────────────────
+        # LGBM+MLP **이후**, δ 보정·prior shift **이전**. 이 지점이 α를 고른
+        # 검증(fspec_verify.py)과 같아야 한다.
+        # game_type은 각 행이 스스로 들고 있는 값이라 행 간 정보가 아니다 —
+        # 여기서 하는 건 라우팅이지 test 통계 계산이 아니다 (CLAUDE.md §3.2).
+        # ⚠️ game_type은 피처로는 여전히 드랍돼 있다 (§7.71). 학습기가 F−R 레벨차를
+        #    표현하게 두면 시즌마다 뒤집혀 독이 된다. 여기서는 **어느 모델에 물을지**만 가른다.
+        self.fspec_rate = 0.0
+        if self.fspec_alpha > 0 and "game_type" in test_df.columns:
+            is_f = test_df["game_type"].to_numpy().astype(str) == "F"
+            self.fspec_rate = float(is_f.mean())
+            if is_f.any():
+                Xf = X.iloc[np.flatnonzero(is_f)]
+                zf = np.zeros(len(Xf))
+                for bst in self.fspec:
+                    zf += bst.predict(Xf, raw_score=True)
+                zf /= len(self.fspec)
+                z[is_f] = ((1.0 - self.fspec_alpha) * z[is_f]
+                           + self.fspec_alpha * zf)
 
         # 사후 로짓 보정 (투수 × 상황 δ) — **블렌드 이후, prior shift 이전**.
         # 이 순서는 검증에서 잰 순서와 같아야 한다 (2 fold에서 β 스윕한 그 지점).

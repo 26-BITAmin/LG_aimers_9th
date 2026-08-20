@@ -1,0 +1,8 @@
+  팔                            subBSS     AUC  pred_sd   Δ vs LGBM      SE      t     소요
+  LGBM F전문가 (기준)                426.8  0.5392   0.0310           —                      
+  TabPFN est1 (4차 재현)           415.6  0.5377   0.0266       -11.3    89.5  -0.13    21s
+  TabICL est1                  -250.8  0.5219   0.0477      -677.6   200.7  -3.38     3s
+  TabICL est4                   153.7  0.5275   0.0337      -273.1   145.5  -1.88     7s
+  TabICL est8 ← 기본값             155.5  0.5281   0.0354      -271.3   154.4  -1.76    12s
+  TabICL est8 temp1.5           214.5  0.5281   0.0213      -212.3   126.3  -1.68    11s
+  TabICL ctx전체 est8           FAIL RuntimeError: CPU memory allocation failed (CUDA error: out of

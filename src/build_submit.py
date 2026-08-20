@@ -283,6 +283,12 @@ def describe_tokens(meta):
     # h_s는 학습 데이터에서 유도되는 값(자유 파라미터 아님)이라 on/off만 표기한다.
     if meta.get("soft_label_f"):
         tok["soft"] = "sl"
+    # F 전용 전문가 블렌드 (MODEL.md §7.101).  α=0.15 -> fs15.  끄면 생략.
+    # ⚠️ α만 태그한다. 학습 시즌 하한(FSPEC_MIN_SEASON)은 meta.json에 있고,
+    #    그 값을 건드리는 실험을 하면 여기에 같이 넣어야 한다 (§7.63의 교훈).
+    fa = float(meta.get("fspec_alpha") or 0.0)
+    if fa:
+        tok["fspec"] = f"fs{fa * 100:.0f}"
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
         tok["tm"] = {"release": "tmR", "release_ext": "tmE"}.get(tm, "tmA")

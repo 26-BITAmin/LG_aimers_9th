@@ -1,0 +1,29 @@
+컨텍스트 풀 (25686, 78)   속도 400행 / 정확도 8000행
+예산 573s ÷ 29,000행 = 19.8 ms/행
+
+  [기준] LGBM F전문가  subBSS    426.8  (2s)
+
+  설정                          fit     ms/행    test환산      판정    VRAM
+INFO: You are downloading 'tabicl-classifier-v2-20260212.ckpt', the latest best-performing version, used in our TabICLv2 paper.
+
+Checkpoint 'tabicl-classifier-v2-20260212.ckpt' not cached.
+ Downloading from Hugging Face Hub (jingang/TabICL).
+
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\huggingface_hub\file_download.py:143: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in D:\cache\huggingface\hub\models--jingang--TabICL. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+  TabICL  ctx10k  est1      12.6s    54.57     1583s    2.8x    3.0G
+  TabICL  ctx전체 est1         1.6s   755.89    21921s   38.3x    4.8G
+  TabICL  ctx전체 est4         4.2s    24.95      723s    1.3x    5.9G
+  TabPFN  ctx5k   est1       3.5s     9.08      263s      OK    2.1G
+  TabPFN  ctx10k  est1       0.6s    23.87      692s    1.2x    4.0G
+  TabPFN  ctx전체 est1         1.0s   137.17     3978s    6.9x    2.9G
+
+  2단계 — 8,000행. LGBM 전문가와 **쌍체** 비교
+  설정                         subBSS   Δ vs LGBM     쌍체SE      소요
+  TabPFN  ctx5k   est1        296.1      -130.7    101.8      7s
+  TabPFN  ctx10k  est1        363.3       -63.5     91.7     17s
+  TabICL  ctx전체 est4         -551.4      -978.2    227.5     15s
+  TabICL  ctx10k  est1      (생략 — 437s 예상)
+  TabPFN  ctx전체 est1        (생략 — 1097s 예상)
+  TabICL  ctx전체 est1        (생략 — 6047s 예상)
