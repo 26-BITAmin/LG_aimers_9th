@@ -1,0 +1,126 @@
+fold 2021  n(R)=221,227  BSS(전체)=1154.0  피처 78개  (9s)
+fold 2022  n(R)=217,024  BSS(전체)=1563.0  피처 78개  (15s)
+fold 2023  n(R)=219,839  BSS(전체)=805.5  피처 78개  (21s)
+fold 2024  n(R)=223,497  BSS(전체)=921.1  피처 78개  (29s)
+
+======================================================================================================================
+피처                                         잔차 rz 21/22/23/24    t23    t24     yz̄  ycorr   zR²%
+pitcher_team_id                      8.1   5.2  68.4   4.2    -8.9   -0.4    62.8   0.08   9.04
+batter_team_id                      10.3  11.6  47.0  14.9    -6.3   -1.9    26.2  -0.21   3.16
+CTL_month                           14.8  24.5  10.8   2.6    +4.9   -2.0    27.5  -0.22   0.91
+pitcher_ball_minus_strike            6.5   0.6  21.2   1.7    -6.4   +1.6   105.6   0.89  22.43
+CTL_pidhash                          3.1   3.5  19.2   4.3    -3.3   +1.0    40.7   0.56   5.59
+batter_hand                          8.1  -0.1  18.9  -0.1    -5.3   +0.9     3.3    nan   0.24
+asof_pitcher_prev3_game_middle_rate   3.4  17.3   9.9   5.0    -5.1   -2.6    13.6  -0.05   1.52
+asof_pitcher_ball_rate_sm            4.2   1.9  15.6   1.4    -5.9   +0.6   124.0   0.92  27.36
+asof_pitcher_prev5_game_middle_rate   5.6  15.4  11.2   1.5    -6.4   -2.9    14.2  -0.12   1.70
+asof_pitcher_strike_rate_sm          2.3   3.1  12.4   2.8    +6.2   -2.6    65.1   0.86  13.88
+asof_pitcher_ball_rate               6.8   0.9  12.1   0.4    -5.7   +0.5   113.1   0.94  26.49
+asof_pitcher_strike_rate             2.2   2.4  11.5   3.0    +5.2   -2.7    60.1   0.88  13.38
+pitcher_id                           0.2   5.8  11.4   1.6    -0.3   -3.1    31.3   0.24   7.11
+asof_pitcher_prev5_game_success_rate   0.7   6.5  11.4   1.4    +6.4   +0.8   154.9   0.94  35.66
+asof_pitcher_middle_rate             1.9   2.6   8.4  11.3    -4.3   -5.2    24.0   0.31   4.08
+asof_pitcher_n                       4.1   3.5  10.9   2.1    +2.0   +2.2    37.6   0.62   7.52
+asof_pitcher_pitchmix_n              4.1   3.5  10.9   2.1    +2.0   +2.2    37.6   0.62   7.52
+hand_matchup                        10.3   2.2  10.6  -0.6    -0.4   -0.5    72.1   0.94   8.56
+asof_batter_n                        3.2   0.8  10.5   2.4    +3.6   +0.5     3.3  -0.07   0.51
+asof_pitcher_fastball_rate_sm        8.7   4.2   9.6   6.0    +4.9   -3.1    32.1   0.49   8.12
+pitchmix_nonfastball                 8.7   4.2   9.6   6.0    -4.9   +3.1    32.1   0.49   8.12
+asof_pitcher_middle_rate_sm          0.2   2.0   8.9   7.0    -5.3   -4.4    21.1   0.33   3.51
+matchup_middle_edge                 -0.5  -0.3   8.4   0.3    -4.3   -0.9     7.3   0.27   1.15
+pitcher_hand                         8.3   0.4   0.2  -0.3    +1.1   -0.7    29.3    nan   1.98
+asof_batter_success_rate_sm          7.5   1.7   8.0  -0.8    -5.3   +1.5     5.1   0.11   4.08
+run_bot_before                       3.2   7.9   0.5   7.1    -0.5   +0.7    13.3   0.51   1.54
+form_p3_minus_career                 3.7   5.9   7.9   2.6    +4.9   -1.5    24.9   0.75   4.22
+form_p1_minus_p5                     7.6   1.6   1.2  -0.8    -1.6   -0.8    13.4   0.67   3.02
+hand_same                            7.6   1.2   4.6  -0.3    -2.7   +0.7    62.6    nan   4.28
+fail_middle_share                    6.3   4.3   7.4   1.7    -2.3   -1.3   114.3   0.86  33.11
+asof_batter_success_rate             7.3   1.9   7.1  -0.9    -2.0   +2.3     4.8   0.40   3.68
+run_top_before                       1.9   7.1   0.7   0.1    -0.5   +0.8    10.3   0.73   2.07
+form_p3_minus_p5                     3.2   1.1   7.0   2.6    -0.5   -0.8    11.3   0.55   2.03
+form_p1_minus_career                 6.9   2.6   1.1   1.6    +1.7   -1.3    25.5   0.80   4.51
+asof_pitcher_prev3_game_success_rate   3.8   1.1   6.7   1.4    +5.2   +0.2   127.2   0.95  30.52
+asof_pitcher_success_rate            1.8   4.1   6.6   4.7    +2.8   +4.2   237.4   0.98  65.66
+asof_pitcher_offspeed_rate           2.2  -0.5   6.5   2.6    -0.8   +2.5    50.8   0.75  13.90
+abs_score_diff                       2.9   3.1   6.5   2.5    +0.2   +0.3    13.5   0.70   2.28
+pitchmix_entropy                     1.5   1.7   6.3   1.2    -4.9   +2.9    41.1   0.69  12.79
+score_diff_home                      2.3   1.5   6.2   3.7    +0.0   -0.1    12.4   0.60   2.13
+we_margin                            3.1   5.9  -1.2   1.1    -0.7   -0.8    14.1   0.79   2.98
+asof_pitcher_fastball_rate           5.8  -0.4   4.0   3.0    +4.2   -2.9    29.9   0.48   8.37
+run_total_before                     1.9   5.6   0.5   1.4    -0.6   +0.9    13.7   0.73   2.98
+count_diff                           1.3   2.8   1.0   5.6    -0.0   +2.5    20.8   0.80   2.54
+matchup_success_edge                 5.1   1.8   5.5   4.3    +3.8   +2.4   184.8   0.98  45.81
+asof_pitcher_prev1_game_success_rate   5.2   2.8   5.4   1.4    +2.2   -0.3    83.2   0.90  20.00
+asof_pitcher_offspeed_rate_sm        1.2   1.9   5.3   2.5    -1.1   +2.3    48.1   0.76  13.58
+asof_batter_middle_rate_sm          -0.1   0.4   1.4   5.1    -0.4   -4.9     8.0   0.48   2.07
+asof_pitcher_reverse_rate            4.8   3.6   3.5   1.9    -1.8   -2.2   194.8   0.97  55.51
+CTL_dow                              1.9   0.6   4.8   2.9    -2.1   +1.6     4.2   0.06   0.23
+home_win_expectancy                  4.4   3.8  -0.9   2.0    +1.0   -1.9    13.7   0.78   2.93
+is_full_count                       -0.3   2.2   4.2  -0.7    -2.6   -0.2    28.1    nan   1.65
+count_state                          1.0   1.6   0.5   4.1    -0.6   +0.1    19.4   0.85   3.86
+asof_pitcher_success_rate_sm         1.8   4.1   0.7   3.7    +1.9   +3.1   244.8   0.99  65.95
+asof_batter_middle_rate             -1.0   1.2   0.4   4.0    -0.3   -5.1     6.8   0.42   1.74
+is_three_balls                      -0.5   3.9  -0.3  -0.7    -0.8   +0.2    41.2    nan   2.84
+asof_pitcher_reverse_rate_sm         2.3   0.3   3.6   1.8    -0.7   -1.4   196.9   0.98  55.30
+asof_pitcher_prev1_game_middle_rate   3.1   0.6   3.6   2.5    -4.5   -1.5     9.9   0.52   1.51
+form_mid_p1_minus_career             2.8   1.1   2.7   1.6    -3.6   -0.5    11.0   0.45   1.46
+asof_pitcher_breaking_rate           0.4   1.5   2.8  -0.5    -2.7   +0.1    19.6   0.38   4.41
+asof_pitcher_breaking_rate_sm        1.2  -0.3   2.8   0.5    -2.7   +0.3    18.8   0.35   4.04
+score_diff_pitcher_team              2.1   2.7   1.6   1.0    -0.5   +0.2    12.6   0.77   2.58
+batter_id                            2.6   0.9   1.8   2.6    -1.3   -1.1     2.0  -0.11   0.45
+num_runners_on                      -0.7   2.5   2.6   1.2    -1.6   +0.6     4.1   0.92   0.14
+base_state                          -0.2   0.9   2.6   1.0    +1.3   -0.3     3.3   0.73   0.20
+inning                              -0.2   2.4   1.1   0.2    -0.2   -0.2    10.8   0.24   3.03
+li                                   1.2   2.2  -0.4  -0.3    -0.8   +0.5    11.3   0.86   2.51
+is_two_strikes                      -0.4   0.9   0.4   2.2    -1.2   +2.0     2.3    nan   0.09
+runner_on_2b                        -0.2  -0.2   2.0   0.2    -2.0   +1.1     0.7    nan   0.04
+is_late_close                        0.3   2.0  -0.5   0.8    -0.5   +1.4     3.0    nan   0.37
+is_pitcher_home                      1.9  -0.6   1.4   0.9    -1.7   +1.5     0.5    nan   0.05
+top_bottom                           1.9  -0.6   1.4   0.9    -1.7   +1.5     0.5    nan   0.05
+balls_before                         1.4   1.9  -1.0  -0.7    -0.5   -0.6    28.3   1.00   3.42
+strikes_before                      -0.3   1.2   0.1   1.8    -0.7   +2.3     3.1   0.79   0.16
+miss_prev_game                       1.5   1.5  -0.7   0.4    -0.0   -1.3    -0.4    nan   0.05
+miss_pitcher_asof                    1.4  -0.7  -0.4  -0.7    -0.6   +0.1    -0.5    nan   0.02
+outs_before                          1.0   0.0  -0.2   0.3    +1.2   +1.3     3.0   0.92   0.20
+runner_on_1b                        -0.4   0.7  -0.4  -0.7    -0.7   -0.2    -0.0    nan   0.01
+is_first_pitch                      -0.6  -0.7  -0.7   0.4    -0.3   -1.3     0.7    nan   0.11
+miss_batter_asof                    -0.6  -0.2  -0.7  -0.4    -0.2   -0.7    -0.6    nan   0.01
+runner_on_3b                         0.3  -0.5  -0.5  -0.5    -0.5   +0.5    -0.5    nan   0.01
+
+눈금(CTL_dow): |rz| ≤ 4.8   yz̄ ≈ 4.2   (투수 입도 각주 CTL_pidhash: |rz| ≤ 19.2)
+
+A. 축 자체가 죽어 있음 (yz̄ ≤ 눈금×1.5, 잔차도 평평) — 16개
+   miss_batter_asof                   yz̄  -0.6   zR² 0.01%
+   runner_on_3b                       yz̄  -0.5   zR² 0.01%
+   miss_pitcher_asof                  yz̄  -0.5   zR² 0.02%
+   miss_prev_game                     yz̄  -0.4   zR² 0.05%
+   runner_on_1b                       yz̄  -0.0   zR² 0.01%
+   is_pitcher_home                    yz̄   0.5   zR² 0.05%
+   top_bottom                         yz̄   0.5   zR² 0.05%
+   is_first_pitch                     yz̄   0.7   zR² 0.11%
+   runner_on_2b                       yz̄   0.7   zR² 0.04%
+   batter_id                          yz̄   2.0   zR² 0.45%
+   is_two_strikes                     yz̄   2.3   zR² 0.09%
+   is_late_close                      yz̄   3.0   zR² 0.37%
+   outs_before                        yz̄   3.0   zR² 0.20%
+   strikes_before                     yz̄   3.1   zR² 0.16%
+   base_state                         yz̄   3.3   zR² 0.20%
+   num_runners_on                     yz̄   4.1   zR² 0.14%
+
+B. 신호는 있는데 시즌 간 전이 안 됨 (ycorr < 0.2) — 4개
+   batter_team_id                     ycorr -0.21   yz̄  26.2
+   asof_pitcher_prev5_game_middle_rate ycorr -0.12   yz̄  14.2
+   asof_pitcher_prev3_game_middle_rate ycorr -0.05   yz̄  13.6
+   pitcher_team_id                    ycorr +0.08   yz̄  62.8
+
+C. 잔차에 남은 구조 (부호 안정 |t|≥2 양쪽) — 8개
+   asof_pitcher_prev3_game_middle_rate t23 -5.1   t24 -2.6
+   asof_pitcher_prev5_game_middle_rate t23 -6.4   t24 -2.9
+   asof_pitcher_middle_rate           t23 -4.3   t24 -5.2
+   asof_pitcher_n                     t23 +2.0   t24 +2.2
+   asof_pitcher_pitchmix_n            t23 +2.0   t24 +2.2
+   asof_pitcher_middle_rate_sm        t23 -5.3   t24 -4.4
+   asof_pitcher_success_rate          t23 +2.8   t24 +4.2
+   matchup_success_edge               t23 +3.8   t24 +2.4
+
+총 31s

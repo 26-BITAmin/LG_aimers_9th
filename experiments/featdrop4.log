@@ -1,0 +1,40 @@
+  중요도(total_gain) 하위 10  (92s)
+    miss_batter_asof                     gain            0   NaN 0
+    miss_pitcher_asof                    gain            0   NaN 0
+    miss_prev_game                       gain            5   NaN 0
+    is_first_pitch                       gain          245   NaN 0
+    is_full_count                        gain          300   NaN 0
+    top_bottom                           gain          337   NaN 0
+    pitcher_hand                         gain          363   NaN 0
+    runner_on_3b                         gain          407   NaN 0
+    runner_on_2b                         gain          437   NaN 0
+    batter_hand                          gain          634   NaN 0
+  → 복제 대상: miss_batter_asof
+
+=== fold 2023: 피처 79개 (+miss_batter_asof_dup) (92s) ===
+  lgbm add 12개 (349s)
+  mlp emb4_42 완료  단독 629.7  (454s)
+  mlp emb4_7 완료  단독 609.9  (545s)
+  mlp emb4_2024 완료  단독 604.1  (634s)
+  mlp emb4_1234 완료  단독 605.8  (724s)
+  mlp emb4_31337 완료  단독 590.7  (814s)
+  mlp noid_42 완료  단독 592.2  (874s)
+  mlp noid_7 완료  단독 611.8  (931s)
+  mlp noid_2024 완료  단독 627.2  (990s)
+  lgb 단독  ctl   620.2  add   620.2  Δ   +0.00 ± 0.00  (t +nan)
+  mlp 단독  ctl   638.4  add   636.7  Δ   -1.69 ± 2.78  (t -0.6)
+  블렌드    ctl   641.9  add   641.0  Δ   -0.92 ± 1.11  (t -0.8)
+
+=== fold 2024: 피처 79개 (+miss_batter_asof_dup) (995s) ===
+  lgbm add 12개 (1335s)
+  mlp emb4_42 완료  단독 773.5  (1458s)
+  mlp emb4_7 완료  단독 745.1  (1576s)
+  mlp emb4_2024 완료  단독 760.0  (1694s)
+  mlp emb4_1234 완료  단독 785.7  (1807s)
+  mlp emb4_31337 완료  단독 801.7  (1925s)
+  mlp noid_42 완료  단독 807.5  (1998s)
+  mlp noid_7 완료  단독 791.2  (2071s)
+  mlp noid_2024 완료  단독 786.4  (2141s)
+  lgb 단독  ctl   811.6  add   811.6  Δ   +0.00 ± 0.00  (t +nan)
+  mlp 단독  ctl   826.4  add   825.6  Δ   -0.84 ± 3.40  (t -0.2)
+  블렌드    ctl   837.6  add   837.1  Δ   -0.44 ± 1.36  (t -0.3)
