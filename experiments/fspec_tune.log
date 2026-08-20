@@ -1,0 +1,28 @@
+  캐시 적중: fold2023H2_5488ef1b18.npz
+  캐시 적중: fold2024_5488ef1b18.npz
+  fold 2023H2: 검증 122,215행  F 학습 14,535/검증 11,151  위약 학습 14,332/검증 14,462   (4s)
+  fold 2024: 검증 253,507행  F 학습 25,686/검증 30,010  위약 학습 28,794/검증 30,087   (10s)
+
+  기준: 현재 배포 설정 (α=0.15)
+
+  === F — 좌표 하강 (선택은 2023H2에서만) ===
+    출발     754.8 (α=0.15, 기준 753.3, Δ +1.6)
+    p1 num_leaves         15 → 31   754.8 → 755.0  (α=0.15)  (18s)
+    p1 min_data_in_leaf   100 → 30   755.0 → 755.7  (α=0.15)  (24s)
+    최종     755.7 (α=0.15, Δ +2.4)   {'objective': 'binary', 'learning_rate': 0.03, 'num_leaves': 31, 'min_data_in_leaf': 30, 'feature_fraction': 0.7, 'bagging_fraction': 0.7, 'bagging_freq': 1, 'lambda_l2': 10.0, 'max_bin': 127, 'num_threads': 6, 'verbosity': -1}
+    ── fold2024 적용 ──
+      현재 배포      α=0.15   837.6 → 840.0   Δ +2.47
+      튜닝 결과      α=0.15   837.6 → 839.5   Δ +1.98
+
+  === 위약 — 좌표 하강 (선택은 2023H2에서만) ===
+    출발     753.3 (α=0.00, 기준 753.3, Δ +0.0)
+    p1 num_leaves         15 → 7   753.3 → 753.3  (α=0.00)  (87s)
+    p1 min_data_in_leaf   100 → 30   753.3 → 753.3  (α=0.00)  (91s)
+    p1 learning_rate      0.03 → 0.015   753.3 → 753.3  (α=0.00)  (94s)
+    p1 feature_fraction   0.7 → 0.5   753.3 → 753.3  (α=0.00)  (97s)
+    p1 lambda_l2          10.0 → 3.0   753.3 → 753.3  (α=0.05)  (103s)
+    p2 min_data_in_leaf   30 → 100   753.3 → 753.3  (α=0.05)  (116s)
+    최종     753.3 (α=0.05, Δ +0.0)   {'objective': 'binary', 'learning_rate': 0.015, 'num_leaves': 7, 'min_data_in_leaf': 100, 'feature_fraction': 0.5, 'bagging_fraction': 0.7, 'bagging_freq': 1, 'lambda_l2': 3.0, 'max_bin': 127, 'num_threads': 6, 'verbosity': -1}
+    ── fold2024 적용 ──
+      현재 배포      α=0.15   837.6 → 834.5   Δ -3.06
+      튜닝 결과      α=0.05   837.6 → 836.7   Δ -0.84
