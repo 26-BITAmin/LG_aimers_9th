@@ -1,0 +1,176 @@
+SEASONS F í•™ìŠµí–‰ ì‹œì¦Œ êµ¬ì„±: 2023:25,686
+RAMFREE ê°€ìš© 2.67GB
+
+===== MITRA ctx=3000 =====
+Verbosity: 2 (Standard Logging)
+=================== System Info ===================
+AutoGluon Version:  1.6.1
+Python Version:     3.13.14
+Operating System:   Windows
+Platform Machine:   AMD64
+Platform Version:   10.0.26200
+CPU Count:          6
+Pytorch Version:    2.11.0+cu128
+CUDA Version:       12.8
+GPU Memory:         GPU 0: 7.96/7.96 GB
+Total GPU Memory:   Free: 7.96 GB, Allocated: 0.00 GB, Total: 7.96 GB
+GPU Count:          1
+Memory Avail:       2.09 GB / 15.31 GB (13.7%)
+Disk Space Avail:   261.21 GB / 475.92 GB (54.9%)
+===================================================
+No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...
+	Recommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):
+	presets='extreme'  : Use this if you have a GPU. The go-to preset for best results, and the one to use for benchmark comparisons. New in v1.6: far better than 'best' on datasets <100000 samples by using Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: Nori, TabICLv2, and TabDPT-Turbo. Every model is free for commercial use. Requires `pip install autogluon.tabular[tabarena]`.
+	presets='noncommercial': New in v1.6: 'extreme' plus TabPFN-3, a frontier tabular foundation model created by Prior Labs. Stronger still, but commercial use requires a TabPFN-3 license: https://docs.priorlabs.ai/models#tabpfn-model-license
+	presets='best'     : Use this if you do not have a GPU. Maximize accuracy. Use in competitions.
+	presets='best_v150': New in v1.5: Better quality than 'best' and 5x+ faster to train. Give it a try!
+	presets='high'     : Strong accuracy with fast inference speed.
+	presets='high_v150': New in v1.5: Better quality than 'high' and 5x+ faster to train. Give it a try!
+	presets='good'     : Good accuracy with very fast inference speed.
+	presets='medium'   : Fast training time, ideal for initial prototyping.
+Beginning AutoGluon training ...
+AutoGluon will save models to "C:\Users\°­¿ø¿ì\AppData\Local\Temp\agdiag_MITRA_3000"
+Train Data Rows:    3000
+Train Data Columns: 78
+Label Column:       __y
+Problem Type:       binary
+Preprocessing data...
+Selected class <--> label mapping:  class 1 = 1, class 0 = 0
+Using Feature Generators to preprocess the data ...
+Fitting AutoMLPipelineFeatureGenerator...
+	Available Memory:                    2137.15 MB
+	Train Data (Original)  Memory Usage: 0.89 MB (0.0% of available memory)
+	Inferring data type of each feature based on column values. Set feature_metadata_in to manually specify special dtypes of the features.
+	Stage 1 Generators:
+		Fitting AsTypeFeatureGenerator...
+			Note: Converting 16 features to boolean dtype as they only contain 2 unique values.
+	Stage 2 Generators:
+		Fitting FillNaFeatureGenerator...
+	Stage 3 Generators:
+		Fitting IdentityFeatureGenerator...
+	Stage 4 Generators:
+		Fitting DropUniqueFeatureGenerator...
+	Stage 5 Generators:
+		Fitting DropDuplicatesFeatureGenerator...
+	Unused Original Features (Count: 2): ['asof_pitcher_pitchmix_n', 'top_bottom']
+		These features were not used to generate any of the output features. Add a feature generator compatible with these features to utilize them.
+		Features can also be unused if they carry very little information, such as being categorical but having almost entirely unique values or being duplicates of other features.
+		These features do not need to be present at inference time.
+		('float', []) : 2 | ['asof_pitcher_pitchmix_n', 'top_bottom']
+	Types of features in original data (raw dtype, special dtypes):
+		('float', []) : 76 | ['inning', 'balls_before', 'strikes_before', 'outs_before', 'run_top_before', ...]
+	Types of features in processed data (raw dtype, special dtypes):
+		('float', [])     : 61 | ['inning', 'balls_before', 'strikes_before', 'outs_before', 'run_top_before', ...]
+		('int', ['bool']) : 15 | ['runner_on_1b', 'runner_on_2b', 'runner_on_3b', 'pitcher_hand', 'batter_hand', ...]
+	0.1s = Fit runtime
+	76 features in original data used to generate 76 features in processed data.
+	Train Data (Processed) Memory Usage: 0.74 MB (0.0% of available memory)
+Data preprocessing and feature engineering runtime = 0.09s ...
+AutoGluon will gauge predictive performance using evaluation metric: 'log_loss'
+	This metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.
+	This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()
+	To change this, specify the eval_metric parameter of Predictor()
+Automatically generating train/validation split with holdout_frac=0.1667, Train Rows: 2499, Val Rows: 501
+User-specified model hyperparameters to be fit:
+{
+	'MITRA': [{'ag.max_memory_usage_ratio': 12.0}],
+}
+Fitting 1 L1 models, fit_strategy="sequential" ...
+Fitting model: Mitra ...
+	Fitting with cpus=6, gpus=1, mem=16.3/2.1 GB
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Reducing max_samples_support from 8192to 4096 due to OOM error.
+Reducing max_samples_support from 4096to 2048 due to OOM error.
+Reducing max_samples_support from 2048to 1024 due to OOM error.
+	-0.6904	 = Validation score   (-log_loss)
+	5403.03s	 = Training   runtime
+	22.63s	 = Validation runtime
+AutoGluon training complete, total runtime = 5427.01s ... Best model: Mitra | Estimated inference throughput: 22.1 rows/s (501 batch size)
+Disabling calibration for metric `log_loss` due to having fewer than 3000 rows of validation data for calibration, to avoid overfitting (501 rows). Force calibration via specifying `calibrate=True`. (calibrate='auto')
+TabularPredictor saved. To load, use: predictor = TabularPredictor.load("C:\Users\°­¿ø¿ì\AppData\Local\Temp\agdiag_MITRA_3000")
+  RESULT OK ['Mitra']
+
+===== TABPFNMIX ctx=6000 =====
+Verbosity: 2 (Standard Logging)
+=================== System Info ===================
+AutoGluon Version:  1.6.1
+Python Version:     3.13.14
+Operating System:   Windows
+Platform Machine:   AMD64
+Platform Version:   10.0.26200
+CPU Count:          6
+Pytorch Version:    2.11.0+cu128
+CUDA Version:       12.8
+GPU Memory:         GPU 0: 7.94/7.96 GB
+Total GPU Memory:   Free: 7.94 GB, Allocated: 0.02 GB, Total: 7.96 GB
+GPU Count:          1
+Memory Avail:       2.18 GB / 15.31 GB (14.2%)
+Disk Space Avail:   260.73 GB / 475.92 GB (54.8%)
+===================================================
+No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...
+	Recommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):
+	presets='extreme'  : Use this if you have a GPU. The go-to preset for best results, and the one to use for benchmark comparisons. New in v1.6: far better than 'best' on datasets <100000 samples by using Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: Nori, TabICLv2, and TabDPT-Turbo. Every model is free for commercial use. Requires `pip install autogluon.tabular[tabarena]`.
+	presets='noncommercial': New in v1.6: 'extreme' plus TabPFN-3, a frontier tabular foundation model created by Prior Labs. Stronger still, but commercial use requires a TabPFN-3 license: https://docs.priorlabs.ai/models#tabpfn-model-license
+	presets='best'     : Use this if you do not have a GPU. Maximize accuracy. Use in competitions.
+	presets='best_v150': New in v1.5: Better quality than 'best' and 5x+ faster to train. Give it a try!
+	presets='high'     : Strong accuracy with fast inference speed.
+	presets='high_v150': New in v1.5: Better quality than 'high' and 5x+ faster to train. Give it a try!
+	presets='good'     : Good accuracy with very fast inference speed.
+	presets='medium'   : Fast training time, ideal for initial prototyping.
+Beginning AutoGluon training ...
+AutoGluon will save models to "C:\Users\°­¿ø¿ì\AppData\Local\Temp\agdiag_TABPFNMIX_6000"
+Train Data Rows:    6000
+Train Data Columns: 78
+Label Column:       __y
+Problem Type:       binary
+Preprocessing data...
+Selected class <--> label mapping:  class 1 = 1, class 0 = 0
+Using Feature Generators to preprocess the data ...
+Fitting AutoMLPipelineFeatureGenerator...
+	Available Memory:                    2220.61 MB
+	Train Data (Original)  Memory Usage: 1.79 MB (0.1% of available memory)
+	Inferring data type of each feature based on column values. Set feature_metadata_in to manually specify special dtypes of the features.
+	Stage 1 Generators:
+		Fitting AsTypeFeatureGenerator...
+			Note: Converting 16 features to boolean dtype as they only contain 2 unique values.
+	Stage 2 Generators:
+		Fitting FillNaFeatureGenerator...
+	Stage 3 Generators:
+		Fitting IdentityFeatureGenerator...
+	Stage 4 Generators:
+		Fitting DropUniqueFeatureGenerator...
+	Stage 5 Generators:
+		Fitting DropDuplicatesFeatureGenerator...
+	Unused Original Features (Count: 2): ['asof_pitcher_pitchmix_n', 'top_bottom']
+		These features were not used to generate any of the output features. Add a feature generator compatible with these features to utilize them.
+		Features can also be unused if they carry very little information, such as being categorical but having almost entirely unique values or being duplicates of other features.
+		These features do not need to be present at inference time.
+		('float', []) : 2 | ['asof_pitcher_pitchmix_n', 'top_bottom']
+	Types of features in original data (raw dtype, special dtypes):
+		('float', []) : 76 | ['inning', 'balls_before', 'strikes_before', 'outs_before', 'run_top_before', ...]
+	Types of features in processed data (raw dtype, special dtypes):
+		('float', [])     : 61 | ['inning', 'balls_before', 'strikes_before', 'outs_before', 'run_top_before', ...]
+		('int', ['bool']) : 15 | ['runner_on_1b', 'runner_on_2b', 'runner_on_3b', 'pitcher_hand', 'batter_hand', ...]
+	0.1s = Fit runtime
+	76 features in original data used to generate 76 features in processed data.
+	Train Data (Processed) Memory Usage: 1.48 MB (0.1% of available memory)
+Data preprocessing and feature engineering runtime = 0.18s ...
+AutoGluon will gauge predictive performance using evaluation metric: 'log_loss'
+	This metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.
+	This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()
+	To change this, specify the eval_metric parameter of Predictor()
+Automatically generating train/validation split with holdout_frac=0.1, Train Rows: 5400, Val Rows: 600
+User-specified model hyperparameters to be fit:
+{
+	'TABPFNMIX': [{'ag.max_memory_usage_ratio': 12.0}],
+}
+Fitting 1 L1 models, fit_strategy="sequential" ...
+Fitting model: TabPFNMix ...
+	Fitting with cpus=6, gpus=1, mem=8.2/2.2 GB
+	-0.6906	 = Validation score   (-log_loss)
+	2.19s	 = Training   runtime
+	31.77s	 = Validation runtime
+AutoGluon training complete, total runtime = 34.57s ... Best model: TabPFNMix | Estimated inference throughput: 18.9 rows/s (600 batch size)
+Disabling calibration for metric `log_loss` due to having fewer than 3000 rows of validation data for calibration, to avoid overfitting (600 rows). Force calibration via specifying `calibrate=True`. (calibrate='auto')
+TabularPredictor saved. To load, use: predictor = TabularPredictor.load("C:\Users\°­¿ø¿ì\AppData\Local\Temp\agdiag_TABPFNMIX_6000")
+  RESULT OK ['TabPFNMix']

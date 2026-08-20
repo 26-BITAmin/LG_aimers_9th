@@ -1,0 +1,13 @@
+==============================================================================
+cuda=True  NVIDIA GeForce RTX 5060 Laptop GPU
+VRAM 전체 8.5GB  가용 7.4GB
+F 학습 (25686, 79)  추론 표본 (2000, 78)  (전체 추론 대상 30,010행)
+프레임 해제 후 가용 RAM 1.4GB
+
+=== MITRA ===
+  ctx  3,000  FAIL RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no model
+
+=== TABPFNMIX ===
+  ctx  3,000  fit    27s  predict    0.3ms/행  VRAM  0.6GB  → fold2024 9s  fold2023H2 3s
+  ctx  6,000  FAIL RuntimeError: No models were trained successfully during fit(). Inspect the log output or increase verbosity to determine why no model
+
