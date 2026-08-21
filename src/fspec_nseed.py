@@ -1,4 +1,4 @@
-"""F 전문가 — 멤버 수가 몇 점짜리인가 (§7.109)
+"""F 전문가 — 멤버 수가 몇 점짜리인가 (§7.110)
 
 왜 재는가 (사용자 지적)
     배포 경로는 전역 LightGBM 12멤버(변형 4 × 시드 3), MLP 8멤버(emb4 5 + noid 3)를
@@ -87,7 +87,7 @@ def fit_spec(Xtr, ytr, tt, Xva, params, seeds):
 def main():
     t0 = time.time()
     emit("=" * 78)
-    emit(f"§7.109 F 전문가 멤버 수 — 시드 {list(SEED_ENSEMBLE)}")
+    emit(f"§7.110 F 전문가 멤버 수 — 시드 {list(SEED_ENSEMBLE)}")
 
     df = load_csv(TRAIN_CSV)
     cache = foldcache.load(FOLDS)
