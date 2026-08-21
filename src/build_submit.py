@@ -5,6 +5,7 @@
 """
 import ast
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,11 @@ SUBMIT = ROOT / "submit"
 # src → submit 으로 복사되는 파일 (단일 진실 소스는 항상 src/)
 # mlp_infer.py는 **numpy 전용** 순전파다 — torch는 제출물에 들어가지 않는다.
 COPY_FILES = ["features.py", "predict.py", "mlp_infer.py", "contam.py"]
+
+# SUBMISSIONS.md **제출 표**의 행. 본문의 다른 표(fold·α 스윕 등)와 구분하려면
+# "번호 + 백틱으로 시작하는 파일명"을 둘 다 요구해야 한다 (§s26에서 속았다).
+# `re.M` 은 파일 전체를 finditer 할 때 필요하고, 한 줄 match 에는 무해하다.
+ROW_RE = re.compile(r"^\| (\d+) \| `", re.M)
 
 # 추론 코드에서 test 데이터프레임에 대해 호출되면 안 되는 것들 (CLAUDE.md §3.2)
 FORBIDDEN_CALLS = {
@@ -359,6 +365,13 @@ def next_zip_path(meta, suffix=""):
         head = p.stem.split("_")[0][1:]
         if head.isdigit():
             used.append(int(head))
+    # ⚠️ 디스크의 zip만 세면 **다른 사람이 만든 제출을 못 본다.** s26에서 실제로 났다 —
+    #    혜진 `p_a60.zip`이 26번으로 표에 올라와 있는데 글롭(`sNN_*.zip`)에 안 걸려
+    #    26이 재발급됐다. 표가 팀 전체의 번호대장이므로 거기 쓰인 번호도 합친다.
+    sub = ROOT / "SUBMISSIONS.md"
+    if sub.exists():
+        used += [int(m.group(1)) for m
+                 in ROW_RE.finditer(sub.read_text(encoding="utf-8"))]
     n = max(used) + 1
 
     tok = describe_tokens(meta)
@@ -463,9 +476,12 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
            f"{cfg} | | |")
 
     # ⚠️ append하면 표 아래 본문에 줄이 붙는다. **표의 마지막 행 뒤에 끼워 넣는다.**
+    # ⚠️ "'| ' 뒤 2글자가 숫자"만 보면 **본문의 다른 표에 속는다.** s26에서 실제로 났다 —
+    #    fold 표의 `| 2024 | 0.60 | ...` 가 표의 마지막 행으로 잡혀 그 아래 끼어들었다.
+    #    제출 표의 행은 **두 번째 칸이 백틱으로 시작하는 파일명**이다. 그걸 요구한다.
     lines = path.read_text(encoding="utf-8").split("\n")
     last = max((i for i, l in enumerate(lines)
-                if l.startswith("| ") and l[2:4].isdigit()), default=None)
+                if ROW_RE.match(l)), default=None)
     if last is None:
         print(f"  ⚠️ {path.name}에서 표를 못 찾았다. 수동으로 추가할 것:\n    {row}")
         return

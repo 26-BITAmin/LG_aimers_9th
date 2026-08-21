@@ -1,0 +1,70 @@
+=== 1. 리키지 정적 검사 ===
+  ✅ groupby/value_counts/rolling/fit/quantile 등 금지 호출 없음
+
+=== 2. src → submit 복사 ===
+  features.py
+  predict.py
+  mlp_infer.py
+  contam.py
+  부스터 23개: ['lgbm_base_1234.txt', 'lgbm_base_2024.txt', 'lgbm_base_31337.txt', 'lgbm_base_42.txt', 'lgbm_base_7.txt', 'lgbm_extra_1234.txt', 'lgbm_extra_2024.txt', 'lgbm_extra_31337.txt', 'lgbm_extra_42.txt', 'lgbm_extra_7.txt', 'lgbm_fspec_2024.txt', 'lgbm_fspec_42.txt', 'lgbm_fspec_7.txt', 'lgbm_lowff_1234.txt', 'lgbm_lowff_2024.txt', 'lgbm_lowff_31337.txt', 'lgbm_lowff_42.txt', 'lgbm_lowff_7.txt', 'lgbm_wide_1234.txt', 'lgbm_wide_2024.txt', 'lgbm_wide_31337.txt', 'lgbm_wide_42.txt', 'lgbm_wide_7.txt']
+  MLP 8개: ['mlp_emb4_1234.npz', 'mlp_emb4_2024.npz', 'mlp_emb4_31337.npz', 'mlp_emb4_42.npz', 'mlp_emb4_7.npz', 'mlp_noid_2024.npz', 'mlp_noid_42.npz', 'mlp_noid_7.npz']  (alpha=0.6)
+
+=== 3. 추론 시간 측정 (245,789행 더미) ===
+Load model...
+  features=78  logit_delta=-0.03432
+Load test data...
+  test=245789  submission=245789
+Predict...
+  mean=0.4801  min=0.3229  max=0.6609
+Saved: ./output/submission.csv (rows=245789)  elapsed=23.0s
+  ⏱ 25.2s / 600s 한도  (4.2%)
+  submission 검증 OK  mean=0.4801
+
+=== 4. zip 패키징 ===
+  제외: ['pitcher_id_map.csv', 'trackman_pitcher.csv']  (TRACKMAN_MODE=none)
+       2,721  contam.py
+      29,288  features.py
+       2,180  history.json
+       5,669  mlp_infer.py
+   1,723,942  model/artifacts.joblib
+      16,914  model/batter_id_map.csv
+   1,187,192  model/lgbm_base_1234.txt
+   1,187,415  model/lgbm_base_2024.txt
+   1,187,304  model/lgbm_base_31337.txt
+   1,187,326  model/lgbm_base_42.txt
+   1,187,351  model/lgbm_base_7.txt
+   1,193,771  model/lgbm_extra_1234.txt
+   1,193,545  model/lgbm_extra_2024.txt
+   1,193,723  model/lgbm_extra_31337.txt
+   1,193,907  model/lgbm_extra_42.txt
+   1,193,726  model/lgbm_extra_7.txt
+     124,007  model/lgbm_fspec_2024.txt
+     160,366  model/lgbm_fspec_42.txt
+     153,052  model/lgbm_fspec_7.txt
+   1,185,227  model/lgbm_lowff_1234.txt
+   1,185,013  model/lgbm_lowff_2024.txt
+   1,185,392  model/lgbm_lowff_31337.txt
+   1,185,058  model/lgbm_lowff_42.txt
+   1,184,716  model/lgbm_lowff_7.txt
+   4,516,648  model/lgbm_wide_1234.txt
+   4,518,829  model/lgbm_wide_2024.txt
+   4,526,902  model/lgbm_wide_31337.txt
+   4,520,689  model/lgbm_wide_42.txt
+   4,525,047  model/lgbm_wide_7.txt
+       3,102  model/meta.json
+     148,408  model/mlp_emb4_1234.npz
+     148,408  model/mlp_emb4_2024.npz
+     148,408  model/mlp_emb4_31337.npz
+     148,408  model/mlp_emb4_42.npz
+     148,408  model/mlp_emb4_7.npz
+     117,728  model/mlp_noid_2024.npz
+     117,728  model/mlp_noid_42.npz
+     117,728  model/mlp_noid_7.npz
+   1,534,599  model/trackman_batter.csv
+       7,594  predict.py
+          97  requirements.txt
+       3,088  script.py
+
+✅ s26_a60803e.zip  (20.9 MB)
+  이력 기록: submit/history.json (s26, 지문 803e)
+  이력 추가: SUBMISSIONS.md (표 147번째 행 뒤)
