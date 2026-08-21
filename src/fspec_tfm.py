@@ -59,20 +59,50 @@ EXP = Path(__file__).resolve().parents[1] / "experiments"
 
 FOLDS = ["2023H2", 2024]
 INNER = "2023H2"
-ALPHA_GRID = np.round(np.arange(0.0, 0.801, 0.05), 3)
+# α 격자 상한도 환경변수로 넓힐 수 있다. ctx 12,000·25,686에서 최적 α가
+# 0.80(=기존 상한)에 붙어 나왔으므로 경계 효과인지 확인해야 한다.
+ALPHA_GRID = np.round(np.arange(0.0, float(os.environ.get("ALPHA_MAX", 0.80))
+                                + 1e-9 + 0.001, 0.05), 3)
 PLACEBO_RATE = 0.118
 PLACEBO_SEED = 20260820           # fspec_tune.py와 동일 — 같은 행이 태그된다
-CONTEXTS = [3000, 6000, 12000, 25686]
+# 환경변수로 사다리를 좁힐 수 있다. 특정 ctx의 시즌 간 전이만 물을 때 쓴다.
+CONTEXTS = [int(x) for x in
+            os.environ.get("CTX_LADDER", "3000,6000,12000,25686").split(",")]
 GROUPS = ("F", "위약")
 EPS = 1e-6
-FIT_TIME_LIMIT = 900              # 초. Mitra가 5,427초를 먹은 사고의 재발 방지장치
+# 초. Mitra가 5,427초를 먹은 사고의 재발 방지장치.
+# TabPFN 직접 경로는 큰 ctx에서 이 값을 넘기므로 환경변수로 올린다.
+FIT_TIME_LIMIT = int(os.environ.get("FIT_TIME_LIMIT", 900))
 SEED = 42
 
 
 # ─────────────────────────────────────────────────────────────
 # 워커 — 프로세스 하나가 fit 하나만 하고 죽는다
 # ─────────────────────────────────────────────────────────────
-def worker(npz_path, model_key, ctx, out_path):
+def parse_model(spec):
+    """'TABDPT-TURBO:n_ensembles=8,temperature=0.9' → ('TABDPT-TURBO', {...})"""
+    if ":" not in spec:
+        return spec, {}
+    key, rest = spec.split(":", 1)
+    hp = {}
+    for item in rest.split(","):
+        if not item:
+            continue
+        k, _, v = item.partition("=")
+        if v.lower() in ("true", "false"):
+            hp[k] = v.lower() == "true"
+        elif v.lower() == "none":
+            hp[k] = None
+        else:
+            try:
+                hp[k] = int(v) if v.isdigit() or (v[:1] == "-" and v[1:].isdigit()) \
+                    else float(v)
+            except ValueError:
+                hp[k] = v
+    return key, hp
+
+
+def worker(npz_path, model_key, ctx, out_path, extra_hp):
     import pandas as pd
     import truststore
 
@@ -85,7 +115,9 @@ def worker(npz_path, model_key, ctx, out_path):
     ytr = d["ytr"]
     Xq = pd.DataFrame(d["Xva"], columns=cols)
 
-    rng = np.random.default_rng(SEED)
+    # 컨텍스트 추출 시드. 기본은 SEED지만, 같은 ctx를 다른 draw로 반복해
+    # 이득이 재현되는지(신호) 흔들리는지(노이즈) 보려면 바꿔 넣는다.
+    rng = np.random.default_rng(int((extra_hp or {}).pop("ctx_seed", SEED)))
     if ctx < len(Xtr):
         idx = np.sort(rng.choice(len(Xtr), size=ctx, replace=False))
     else:
@@ -93,10 +125,36 @@ def worker(npz_path, model_key, ctx, out_path):
     sub = Xtr.iloc[idx].reset_index(drop=True).copy()
     sub["__y"] = ytr[idx].astype(int)
 
+    # TabPFN v2는 AutoGluon 래퍼를 못 쓴다 — 1.6.1의 래퍼가 최신 tabpfn API를
+    # 전제하는데(WindowsPath 슬라이싱 · .to() · v2.6 체크포인트), 그 최신 버전
+    # (8.2.0)은 **원격 로그인/API 키를 요구**한다. 대회는 오프라인이고 원격 API
+    # 호출이 금지라 버전을 올릴 수 없다. 그래서 2.2.1을 직접 부른다.
+    if model_key == "TABPFN-DIRECT":
+        from tabpfn import TabPFNClassifier
+
+        hp2 = dict(extra_hp or {})
+        # 5,000행 청크에서 fold2024 도중 세그폴트가 났다(exit 139). 기본 2,000.
+        CH = int(hp2.pop("chunk", 2000))
+        kw = dict(device="cuda", ignore_pretraining_limits=True,
+                  random_state=SEED, n_estimators=4)
+        kw.update(hp2)
+        clf = TabPFNClassifier(**kw)
+        clf.fit(sub.drop(columns="__y").to_numpy(np.float32),
+                sub["__y"].to_numpy())
+        Xq_np = Xq.to_numpy(np.float32)
+        # 30,010행을 한 번에 넣으면 VRAM이 터진다. 청크로 나눈다.
+        chunks = [clf.predict_proba(Xq_np[i:i + CH])[:, 1]
+                  for i in range(0, len(Xq_np), CH)]
+        p = np.clip(np.concatenate(chunks), EPS, 1 - EPS)
+        np.save(out_path, np.log(p / (1 - p)))
+        return
+
     path = str(TMP / f"agtfm_{model_key}_{ctx}_{os.getpid()}")
     pred = TabularPredictor(label="__y", problem_type="binary",
                             eval_metric="log_loss", verbosity=1, path=path)
-    pred.fit(sub, hyperparameters={model_key: {"ag.max_memory_usage_ratio": 12.0}},
+    hp = {"ag.max_memory_usage_ratio": 12.0}
+    hp.update(extra_hp or {})
+    pred.fit(sub, hyperparameters={model_key: hp},
              fit_weighted_ensemble=False, num_bag_folds=0, num_stack_levels=0,
              ag_args_fit={"num_gpus": 1}, time_limit=FIT_TIME_LIMIT)
     p = np.clip(pred.predict_proba(Xq)[1].to_numpy(), EPS, 1 - EPS)
@@ -116,6 +174,9 @@ def main(models):
     from data import load_csv
     from validation import bss, shift_to_prior
 
+    parsed = [parse_model(m) for m in models]
+    models = [k for k, _ in parsed]
+    HP = {k: hp for k, hp in parsed}
     tag = "_".join(m.lower().replace("-", "") for m in models)
     log = EXP / f"fspec_tfm_{tag}.log"
 
@@ -131,6 +192,12 @@ def main(models):
     CACHE.mkdir(parents=True, exist_ok=True)
     emit("=" * 78)
     emit(f"§7.103 표 기반모델 F 전문가 — {', '.join(models)}  (가용 RAM {ram():.2f}GB)")
+    emit(f"  모델 하이퍼파라미터: {HP}")
+    emit(f"  MLP_ALPHA={MLP_ALPHA}  FSPEC_ALPHA={FSPEC_ALPHA}")
+    emit("  ⚠️ 전제: features.py/foldcache.py가 다른 세션에서 편집 중이고 fold 캐시는")
+    emit("     그 이전 것이다. 캐시 키는 features.py 내용을 해싱하지 않으므로 조용히")
+    emit("     재사용된다. 두 팔이 같은 z_dep·같은 X를 쓰므로 Δ 비교는 유효하나,")
+    emit("     절대 BSS는 현재 배포와 일치하지 않을 수 있다.")
 
     df = load_csv(TRAIN_CSV)
     cache = foldcache.load(FOLDS)
@@ -193,10 +260,16 @@ def main(models):
         d = D[f]["g"][group]
         out = CACHE / f"z_{model_key}_{f}_{group}_{ctx}.npy"
         cmd = [sys.executable, "-u", str(Path(__file__).resolve()),
-               "--fit", d["npz"], model_key, str(ctx), str(out)]
-        r = subprocess.run(cmd, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace",
-                           timeout=FIT_TIME_LIMIT + 600)
+               "--fit", d["npz"], model_key, str(ctx), str(out),
+               json.dumps(HP.get(model_key, {}))]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace",
+                               timeout=FIT_TIME_LIMIT + 600)
+        except subprocess.TimeoutExpired:
+            # 이걸 안 잡으면 부모가 통째로 죽는다. 실제로 ctx 12,000 fold2024에서
+            # 그렇게 exit 1로 날아갔다 — rung 하나의 초과가 실행 전체를 없앴다.
+            return None, "TIMEOUT | 서브프로세스 시간 초과"
         if r.returncode != 0 or not out.exists():
             blob = (r.stderr or "") + (r.stdout or "")
             hint = ""
@@ -311,7 +384,7 @@ def main(models):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--fit":
-        _, _, npz, model_key, ctx, out = sys.argv
-        worker(npz, model_key, int(ctx), out)
+        _, _, npz, model_key, ctx, out, hp = sys.argv
+        worker(npz, model_key, int(ctx), out, json.loads(hp))
     else:
         main(sys.argv[1:] or ["TABPFNMIX"])
