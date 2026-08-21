@@ -128,7 +128,11 @@ TRACKMAN_MODE = "none"
 # init_score로 (시즌 x game_type) 레벨을 학습 전에 제거할지.
 # 켜면 DROP_FEATURES에서 game_type을 빼고 피처로 남겨도 안전하다
 # (레벨은 init_score가 흡수하고, 모델은 조건부 구조만 학습한다).
-USE_INIT_SCORE = False
+# 환경변수로 켠다 (CENTER_ASOF 와 같은 방식) — 기본값은 배포 상태 그대로 False.
+#   USE_INIT_SCORE=1 LGA_MODEL_DIR=submit/model_init .venv/Scripts/python.exe src/train.py
+# ⚠️ 켜면 init_score 는 **soften 뒤**에서 가중 레벨로 만들어진다 (§7.109 ④).
+#    원자료 레벨을 쓰면 소프트 라벨과 이중교정이 나서 fold2023 이 620 → −107 이 된다.
+USE_INIT_SCORE = os.environ.get("USE_INIT_SCORE", "0") == "1"
 
 # ── asof (시즌 × game_type) 중심화 — MODEL.md §7.106 ──────────────
 # `season`·`game_type`이 피처가 아닌데 `asof_*`의 리그 평균은 시즌마다 컬럼 std의

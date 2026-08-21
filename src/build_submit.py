@@ -260,6 +260,13 @@ def describe_tokens(meta):
     ca = meta.get("contam_axes") or ()
     if ca and set(ca) != {"p", "b"}:
         tok["contam"] = "cf" + "".join(ca)
+    # init_score 로 (시즌 × game_type) 레벨 제거 (MODEL.md §7.109). 끄면 생략.
+    # ⚠️ **이 함수가 세 번째로 같은 일을 당했다.** 새 축을 배포에 넣으면서 식별 함수에
+    #    안 넣으면 빌드가 직전 제출과 같은 이름을 만든다 (s21의 asof_strength,
+    #    그리고 이번 §7.109). foldcache._key·jointbeta pin 과 같은 부류다 —
+    #    **식별자를 만드는 함수는 새 노브를 자동으로 알지 못한다.**
+    if meta.get("use_init_score"):
+        tok["init"] = "is"
     # 시즌 진행분 (MODEL.md §7.55 사후가산 · §7.56 컬럼). 둘은 배타적이다.
     #   사후 가산  0.02 -> as2   (β는 δ축보다 두 자릿수 작으므로 ×100)
     #   컬럼       gap_success+n_szn -> ac2   (ac + 컬럼 수)
@@ -471,6 +478,10 @@ def log_submission(zip_path, meta, pred_mean, elapsed):
     # 행 단위 F 레벨 δ_F (§7.69)
     if float(meta.get("gt_f_delta") or 0.0) * float(meta.get("gt_f_beta") or 0.0):
         cfg += f"+F레벨 δ{meta['gt_f_delta']} β{meta['gt_f_beta']}"
+    # init_score (§7.109). **여섯 번째 같은 누락이다** — 위 주석들이 다섯 번을 세고 있다.
+    # 레벨은 soften 뒤 가중 양성률로 만든다(그게 아니면 소프트라벨과 이중교정).
+    if meta.get("use_init_score"):
+        cfg += "+init_score(시즌×gt, soften후 레벨)"
     row = (f"| {zip_path.stem.split('_')[0][1:]} | `{zip_path.name}` | "
            f"{meta.get('trackman_mode','none')} | {meta['target_prior_2025']} | "
            f"{cfg} | | |")

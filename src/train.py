@@ -314,6 +314,25 @@ def train_mlp_members(X, y, w, X_ref, art, model_dir, t0=None, *, y_aux):
     return tags, weights, enc, z_ref
 
 
+def _season_gt_level(ss, gg, y, w, min_n=500):
+    """(시즌 × game_type) **가중** 양성률의 로짓. 행별 init_score 벡터.
+
+    ⚠️ `w`를 soften 후 가중치로 넘기는 것이 요점이다 (§7.109 ④). 소프트 라벨이
+       오염 F 행의 양성을 되돌린 **뒤**의 양성률이라야 탈오염 레벨이 되고, 그래야
+       소프트 라벨과 같은 것을 두 번 빼지 않는다.
+    ⚠️ 표본이 얇은 조합은 전체 평균으로 떨어뜨린다 — 조합 하나가 튀면 그 조합의
+       모든 행이 통째로 밀린다.
+    """
+    ug = np.unique(gg)
+    k = ss * len(ug) + np.searchsorted(ug, gg)
+    out = np.empty(len(k), dtype=np.float64)
+    gm = float(np.average(y, weights=w))
+    for kk in np.unique(k):
+        m = k == kk
+        out[m] = float(np.average(y[m], weights=w[m])) if m.sum() >= min_n else gm
+    return _logit(out)
+
+
 def solve_delta(z_ref, target_mean, tol=1e-11, max_iter=300):
     """참조 분포의 로짓 z_ref에 대해 mean(sigmoid(z_ref + d)) == target_mean 인 d.
 
@@ -396,14 +415,20 @@ def main():
           f"  ({time.time()-t0:.1f}s)")
 
     # ── init_score: (시즌 x game_type) 레벨을 학습 전에 제거 ──
+    # ⚠️ `init_tr` 자체는 **soften 뒤에서** 만든다 (아래 §7.109 블록). 두 이유다:
+    #   ① 정렬 — soften이 행을 복제하므로 init_tr도 같이 늘어나야 한다.
+    #      (예전 `assert init_tr is None`이 막고 있던 것이 이것이다.)
+    #   ② **이중교정** — 소프트 라벨과 init_score는 보완재가 아니라 **대체재**다.
+    #      둘 다 오염 F 행의 레벨을 낮춘다. 원자료 레벨로 빼면 두 번 빼서
+    #      fold2023이 620.2 → −106.9가 된다 (§7.109 ③, 회복분 +1206.5).
+    #      soften **후**의 가중 양성률이 곧 탈오염 레벨이고 그것만이 안전하다.
+    # base(추론용)는 스칼라라 여기서 잡아도 된다 — `_finish`의 solve_delta가 흡수하므로
+    # 값 자체는 결과를 바꾸지 않는다 (그래서 그룹별로 주면 안 된다 — §7.109 ①).
+    init_tr = None
+    base = 0.0
     if USE_INIT_SCORE:
-        rates = df.groupby(["season", "game_type"], observed=True)[TARGET_COL].mean()
-        key = list(zip(df["season"].to_numpy(), df["game_type"].astype("object").to_numpy()))
-        init_tr = _logit(np.array([rates[k] for k in key]))
         base = float(_logit(np.array([df.loc[df.season == REF_SEASON, TARGET_COL].mean()]))[0])
-        print(f"init_score 사용: base(추론용, {REF_SEASON} 레벨)={base:+.5f}")
-    else:
-        init_tr, base = None, 0.0
+        print(f"init_score 사용(§7.109): base(추론용, {REF_SEASON} 레벨)={base:+.5f}")
 
     # ── 앙상블 학습 ──────────────────────────────────────────
     # 참조 행렬은 **추론 시점의 피처 분포**를 재현한 것이다 (reference_matrix 참조).
@@ -465,12 +490,29 @@ def main():
         print(f"  보조 라벨 복원 {aux_cov:.1%}  λ={MLP_AUX_LAMBDA}  "
               f"축 {list(MLP_AUX_MODES)} ({aux.shape[1]}개)")
     soft_h = {}
+    ss_lv = df["season"].to_numpy(dtype=np.int64)
+    gt_lv = df["game_type"].astype("object").to_numpy().astype(str)
     if SOFT_LABEL_F:
-        assert init_tr is None, "soften은 init_score와 동시 사용 불가 (§7.70)"
         n0 = len(y)
+        # 복제 마스크를 **soften과 같은 정의로** 미리 잡는다 (soften.py의 dup).
+        # y가 soften에서 재할당되므로 반드시 호출 **전에** 계산해야 한다.
+        h_pre = soften.fit_h(df)
+        h_row = np.zeros(len(df))
+        for _yr, _v in h_pre.items():
+            h_row[(ss_lv == _yr) & (gt_lv == "F")] = _v
+        dup = (h_row > 0) & (y == 1)
         X, y, w, aux, soft_h = soften.soften(df, X, y, w, aux)
+        ss_lv = np.concatenate([ss_lv, ss_lv[dup]])
+        gt_lv = np.concatenate([gt_lv, gt_lv[dup]])
         print(f"soft label(§7.70): +{len(y)-n0:,}행 복제  h = "
               + "  ".join(f"{k}:{v:.3f}" for k, v in sorted(soft_h.items())))
+
+    # ── init_score 본체 (§7.109 ④) — **soften 후** 가중 레벨 = 탈오염 레벨 ──
+    if USE_INIT_SCORE:
+        init_tr = _season_gt_level(ss_lv, gt_lv, y, w)
+        assert len(init_tr) == len(X) == len(y) == len(w), "init_score 정렬이 깨졌다"
+        print(f"  init_score 레벨: {len(np.unique(np.round(init_tr, 6)))}개 구간, "
+              f"평균 {init_tr.mean():+.5f}  범위 [{init_tr.min():+.5f}, {init_tr.max():+.5f}]")
 
     members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
 
