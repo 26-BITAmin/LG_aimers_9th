@@ -33,6 +33,24 @@ SMOOTH_SPEC = [
 
 _PITCHER_N_COLS = {"asof_pitcher_n", "asof_pitcher_pitchmix_n"}
 
+# ── (시즌 × game_type) 중심화 — MODEL.md §7.106 ────────────────────────
+# `season`·`game_type`은 모델 피처가 아니다(DROP_FEATURES). 그런데 `asof_*`의 리그
+# 평균은 시즌마다 컬럼 std의 0.75~1.12배씩 움직인다. 그래서 같은 asof=0.52가
+# 2019엔 평균 이하, 2024엔 평균 이상인데 모델은 둘을 구분할 수단이 없다.
+#
+#   측정된 결과는 '감쇠'가 아니라 **증폭**이었다 (asofctr.py B):
+#     풀링 기울기 / 시즌내 기울기 = 0.43~1.30. 타자 컬럼은 2배 이상 부풀려져 있다.
+#     피처와 타깃이 같은 방향으로 드리프트하니 시즌 간 공분산이 기울기에 덧붙는다.
+#   → **test에는 시즌이 하나뿐이라 그 성분은 존재할 수 없다.** 편향으로만 남는다.
+#
+# 변환:  v ← v − μ(season, game_type) + μ_global
+#   전역 평균을 다시 더하는 이유는 스무딩 prior·`form_*`·`matchup_*`의 스케일을
+#   그대로 두기 위함이다. 트리에는 상수항이 무의미하므로 "평균 0"과 동치다.
+#
+# ⚠️ 2025(및 각 fold의 검증 시즌)는 표에 없다 → **외삽**한다. fold 검증 시즌이
+#    항상 미지라서, fold 실험이 외삽 오차까지 같이 평가한다. 설계상 그렇게 뒀다.
+# (대상 컬럼 목록 CENTER_COLS 는 PREV_COLS 정의 뒤에 있다.)
+
 # 범주형 → 정수 코드 (미지값 -1).
 # str/int을 분리해 두는 이유: train은 dtype을 명시해 읽지만 평가 서버의 test는
 # pandas 기본 추론으로 읽힐 수 있다. int16 vs int64가 섞이면 dict 조회가 조용히
@@ -47,6 +65,58 @@ PREV_COLS = [
     "asof_pitcher_prev5_game_success_rate", "asof_pitcher_prev1_game_middle_rate",
     "asof_pitcher_prev3_game_middle_rate", "asof_pitcher_prev5_game_middle_rate",
 ]
+
+# 중심화 대상 = 스무딩 대상 rate 전부 + 직전등판 rate 전부.
+# prev{1,3,5}가 드리프트가 가장 크다 (−0.058, 컬럼 std의 0.45~0.79배).
+CENTER_COLS = [c for c, _ in SMOOTH_SPEC] + PREV_COLS
+
+
+def fit_asof_center(train_df, cols=CENTER_COLS, min_n=500):
+    """(시즌 × game_type) → 평균 표 + **다음 시즌 외삽** 규칙. train에서만 호출."""
+    ss = train_df["season"].to_numpy(dtype=np.int64)
+    gg = train_df["game_type"].astype("object").to_numpy().astype(str)
+    ug = np.unique(gg)
+    out = {"table": {}, "fallback": {}, "global": {}}
+    for col in cols:
+        v = train_df[col].to_numpy(dtype=np.float64)
+        fin = np.isfinite(v)
+        out["global"][col] = float(v[fin].mean()) if fin.any() else 0.5
+        tab, fb = {}, {}
+        for gtv in ug:
+            pts = []
+            for yy in sorted(set(ss[gg == gtv].tolist())):
+                m = (ss == yy) & (gg == gtv) & fin
+                if m.sum() >= min_n:
+                    tab[(int(yy), gtv)] = float(v[m].mean())
+                    pts.append((int(yy), float(v[m].mean())))
+            if len(pts) >= 2:
+                # 연속 차분의 평균으로 1스텝 외삽 (TARGET_PRIOR_2025와 같은 규칙)
+                d = float(np.mean(np.diff([p[1] for p in pts])))
+                fb[gtv] = (pts[-1][0], pts[-1][1], d)
+            elif pts:
+                fb[gtv] = (pts[-1][0], pts[-1][1], 0.0)
+        out["table"][col], out["fallback"][col] = tab, fb
+    return out
+
+
+def _center_offset(g, ac, col):
+    """행별 μ(season, game_type). 표에 없는 시즌은 외삽. **행 단위 조회일 뿐이다.**"""
+    ss = g["season"].to_numpy(dtype=np.int64)
+    gg = g["game_type"].astype("object").to_numpy().astype(str)
+    ug = np.unique(gg)
+    code = np.searchsorted(ug, gg)
+    k = ss * len(ug) + code
+    tab, fb, gm = ac["table"][col], ac["fallback"][col], ac["global"][col]
+    out = np.full(len(k), gm, dtype=np.float64)
+    for kk in np.unique(k):                       # 조합이 십수 개뿐이다
+        yy, c = int(kk // len(ug)), int(kk % len(ug))
+        gtv = str(ug[c])
+        val = tab.get((yy, gtv))
+        if val is None:
+            f = fb.get(gtv)
+            val = (f[1] + f[2] * (yy - f[0])) if f else gm
+        out[k == kk] = val
+    return out
 
 
 # ── 사후 로짓 보정항 (post-hoc logit adjustment) ──────────────────────
@@ -259,7 +329,7 @@ def logit_adjust(df, art):
 
 def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_table=None,
                   clip=None, ctx=None, contam_axes=None, tmb_table=None, asof=None,
-                  mix=None):
+                  mix=None, center_asof=False):
     """train에서만 호출. 추론 시 필요한 상수들을 계산해 딕셔너리로 반환.
 
     tm_table: (pitcher_id, season) → Trackman 요약 피처 DataFrame.
@@ -289,6 +359,10 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
         art[slot] = {"keys": key[order],
                      "values": table[cols].to_numpy(dtype=np.float32)[order],
                      "cols": list(cols)}
+
+    # (시즌 × game_type) 중심화 표 — 있으면 build_features가 자동으로 쓴다 (§7.106)
+    if center_asof:
+        art["asof_center"] = fit_asof_center(train_df)
 
     w = np.ones(len(train_df)) if weights is None else np.asarray(weights, dtype=np.float64)
 
@@ -426,6 +500,8 @@ def build_features(df, art):
             cadj["asof_batter_success_rate"] = -contam.adjust(
                 g, ct, "b").astype(np.float32)
 
+    _ac = art.get("asof_center") if art else None
+
     sm = {}
     for col, ncol in SMOOTH_SPEC:
         # 꼬리를 먼저 자른 뒤 스무딩·파생으로 내려보낸다. 자르는 것은 값이 아니라
@@ -434,13 +510,22 @@ def build_features(df, art):
         if col in cadj:                               # NaN은 NaN으로 남는다
             v0 = np.clip(v0 + cadj[col], 0.0, 1.0)
         raw = _clip32(v0, art, col)
+        # ── (시즌 × game_type) 중심화 (§7.106) ─────────────────
+        # 클리핑 **뒤**여야 한다 — clip 경계는 원래 스케일에서 적합됐다.
+        # 스무딩 **앞**이어야 한다 — 그래야 `_sm`·`form_*`·`matchup_*`가 전부
+        # 중심화된 값을 본다 (오염 보정과 같은 이유, 삽입 위치가 전파 범위다).
+        if _ac is not None and col in _ac["table"]:
+            raw = (raw - _center_offset(g, _ac, col) + _ac["global"][col]).astype(np.float32)
         out[col] = raw                                    # 원본 (NaN 그대로 → LGBM이 처리)
         s = _smooth(raw, n_map[ncol], art["priors"][col], art["smooth_k"][col])
         sm[col] = s
         out[col + "_sm"] = s.astype(np.float32)
 
     for col in PREV_COLS:
-        out[col] = _clip32(g[col].to_numpy(dtype=np.float32), art, col)
+        pv = _clip32(g[col].to_numpy(dtype=np.float32), art, col)
+        if _ac is not None and col in _ac["table"]:
+            pv = (pv - _center_offset(g, _ac, col) + _ac["global"][col]).astype(np.float32)
+        out[col] = pv
 
     # ── 최근 폼 변화 (차분은 트리가 스스로 못 만든다) ────────
     pr = art["priors"]

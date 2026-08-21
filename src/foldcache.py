@@ -34,7 +34,7 @@ from config import (CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PAR
                     MLP_AUX_LAMBDA, MLP_AUX_MODES, MLP_SEEDS, MLP_VARIANTS,
                     N_ROUNDS, RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
                     SMOOTH_K_PITCHER, SOFT_LABEL_F, TARGET_COL, TRAIN_CSV,
-                    USE_PLAYER_IDS)
+                    USE_PLAYER_IDS, CENTER_ASOF)
 from data import load_csv, recency_weight
 from features import build_features, fit_artifacts
 
@@ -52,7 +52,11 @@ def _key():
               sorted((k, sorted(v.items())) for k, v in ENSEMBLE_VARIANTS.items()),
               sorted((k, sorted(c.items()), n) for k, (c, n) in MLP_VARIANTS.items()),
               MLP_SEEDS, SMOOTH_K_PITCHER, SMOOTH_K_BATTER,
-              CONTAM_AXES, SOFT_LABEL_F, MLP_AUX_LAMBDA, tuple(MLP_AUX_MODES)])
+              CONTAM_AXES, SOFT_LABEL_F, MLP_AUX_LAMBDA, tuple(MLP_AUX_MODES)]
+             # ⚠️ 기본값일 때는 **지문에 넣지 않는다** — 넣으면 기존 캐시가 통째로
+             #    무효가 되어 베이스라인까지 다시 학습해야 한다. 새 옵션을 켤 때만
+             #    키가 갈라지면 충분하다.
+             + ([("center_asof", True)] if CENTER_ASOF else []))
     return hashlib.sha1(s.encode()).hexdigest()[:10]
 
 
@@ -82,7 +86,8 @@ def fold_data(df, fold):
     w = recency_weight(tr.season.to_numpy(), RECENCY_HALF_LIFE,
                        ref_season=int(tr.season.max()))
     art = fit_artifacts(tr, weights=w, k_pitcher=SMOOTH_K_PITCHER,
-                        k_batter=SMOOTH_K_BATTER, contam_axes=CONTAM_AXES)
+                        k_batter=SMOOTH_K_BATTER, contam_axes=CONTAM_AXES,
+                        center_asof=CENTER_ASOF)
 
     def X(d):
         x = build_features(d, art)
