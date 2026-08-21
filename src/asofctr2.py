@@ -29,6 +29,21 @@ import config
 
 FOLDS = [2023, 2024]
 
+# ⚠️⚠️ **지문은 `jointbeta` 를 import 하기 전에 계산해야 한다.**
+#   jointbeta.py:60 이 `foldcache._key = lambda: _PIN` 으로 지문을 "5488ef1b18" 에
+#   **못 박는다.** config 가 바뀌어도 fold 재학습이 안 시작되게 하는 안전장치인데,
+#   이번처럼 **의도적으로 지문을 갈라야 할 때는 정반대로 작동한다** — 두 팔이 같은
+#   캐시를 읽어 Δ가 전부 +0.0 으로 나왔다(한 번 속았다).
+#   여기서는 pin 이 걸리기 전에 진짜 `_key()` 를 두 번 불러 둔다.
+import foldcache as _fc
+
+_KEYS = {}
+for _flag in (False, True):
+    _fc.CENTER_ASOF = _flag
+    _KEYS[_flag] = _fc._key()
+_fc.CENTER_ASOF = config.CENTER_ASOF
+assert _KEYS[False] != _KEYS[True], "지문이 안 갈렸다 — pin 이 이미 걸렸는지 확인"
+
 
 def main():
     import foldcache
@@ -53,10 +68,20 @@ def main():
 
     res = {}
     for arm, flag in (("raw (배포)", False), ("centered", True)):
-        foldcache.CENTER_ASOF = flag          # _key() 와 fold_data() 가 같이 본다
-        config.CENTER_ASOF = flag
-        print(f"\n{'='*72}\n■ {arm}   지문 {foldcache._key()}\n{'='*72}")
-        cached = foldcache.load(FOLDS, verbose=True)
+        # ⚠️ 모듈 속성만 바꿔서 `_key()`가 갈리길 기대했다가 사고를 냈다 — 두 팔이
+        #    같은 캐시를 읽어 Δ가 전부 +0.0으로 나왔다. 지금은 **지문으로 npz를 직접
+        #    연다.** 학습은 별도 프로세스에서:
+        #      CENTER_ASOF=1 .venv/Scripts/python.exe src/foldcache.py 2023 2024
+        key = _KEYS[flag]           # pin 걸리기 전에 계산해 둔 진짜 지문
+        print(f"\n{'='*72}\n■ {arm}   지문 {key}\n{'='*72}")
+        cached = {}
+        for f in FOLDS:
+            pth = foldcache.CACHE / f"fold{f}_{key}.npz"
+            if not pth.exists():
+                raise SystemExit(f"캐시 없음 {pth.name} → CENTER_ASOF={int(flag)} 로 먼저 학습")
+            with np.load(pth) as d:
+                cached[f] = (d["z_lgb"], d["z_mlp"], d["y"], None)
+            print(f"  {pth.name}")
         res[arm] = {}
         for f in FOLDS:
             zl, zm, yv = cached[f][0], cached[f][1], cached[f][2]
