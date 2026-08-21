@@ -739,3 +739,69 @@ exp56의 불확실한 결과(특히 fold C −10.2)를 분해: LGB seed0/avg × 
 CI로 확정될 만큼 살아남지 않는다 — **완전히 종결, 더 이상 추진 안 함.**
 `submit/`은 전혀 안 건드림, 챔피언은 여전히 사후보정만 적용된 단일시드 앙상블
 (LB 834.44).
+
+## wonwoo 최신 SOTA 코드 재현 (2026-08-21) — 재현 성공, 단 그들의 참조값이 낡음
+
+사용자 요청으로 `origin/wonwoo` HEAD(`8e05019`, config 기준 LB≈1069.82 — 이후
+알파=0.60 프로브는 config.py 미반영, SUBMISSIONS.md 기록만)의 실제 소스를
+**그대로**(재해석 없이) `wonwoo_repro/`에 격리 이식해 그들의 `verify_pipeline.py`로
+검증 재현을 시도했다.
+
+### 방법
+- `wonwoo_repro/.venv`(Python 3.12, 이 머신엔 3.13 없음)에 그들 `requirements-dev.txt`
+  버전 그대로 설치(lightgbm 4.6.0, numpy 2.2.6, pandas 2.3.3, **torch 2.13.0+cpu**
+  — CUDA 빌드가 아니라 CPU 빌드로 명시 설치, RNG/부동소수점 경로를 그들 환경과
+  맞추기 위해. 우리 메인 venv는 건드리지 않음).
+- `src/{config,data,features,contam,contam_fit,ctxfit,asofdelta,mixent,foldcache,
+  modelabel,soften,numemb,mlp,mlp_infer,validation,trackman_features,train,predict,
+  verify_pipeline}.py` 19개 파일을 `git show origin/wonwoo:...`로 바이트 그대로 가져옴.
+  코드 재작성 없음.
+- `data/train.csv`는 심볼릭 링크로 우리 원본 사용 — SHA-256
+  `d2081186…8763ff`가 wonwoo·hyejin 양쪽 기록과 일치(같은 파일 재확인).
+- `verify_pipeline.py`(그들의 실제 검증 스크립트, fold=2024 홀드아웃)를 그대로 실행.
+
+### 결과
+```
+soft label h = 2019:0.093 2020:0.110 2021:0.243 2022:0.297   ← MODEL.md/hyejin 기록과 완전 일치
+δ hand: 1,413셀 std=0.01750 β=1.875 / count4: 2,783셀 std=0.01299 β=1.25
+train/serve skew        = 0.000e+00  ✅
+행 독립성(조각 20x1000)  = 0.000e+00  ✅
+행 순서 독립성(셔플)     = 0.000e+00  ✅
+BSS(oracle shift, fold2024) = 921.4   (fspec 미포함)
+```
+`verify_pipeline.py` 원본에는 §7.101에서 추가된 fspec(F전용 전문가, α=0.15)
+블렌드가 빠져 있었다(그들 저장소 자체의 검증 스크립트 누락 — `train.py`엔 있는데
+`verify_pipeline.py`엔 없음). `verify_pipeline_fspec.py`를 별도로 만들어
+`train.py`와 같은 순서(블렌드→fspec→ctx보정→prior shift)로 끼워 넣어 재실행:
+**BSS(oracle) = 921.4 (fspec 포함해도 소수 첫째자리까지 동일, raw BSS만 827.1→828.1)**.
+
+### 검증 점수가 그들 문서와 같게 나왔는가 — **아니오, 그러나 이유를 찾았다**
+
+MODEL.md §7.101이 인용한 배포 스택 기준값은 **fold2024 BSS oracle = 837.6**
+("foldcache의 배포 스택" 기준)이다. 우리 재현값(921.4)과 **84점 차이**.
+
+세 가지 근거로 **버그가 아니라 그들 쪽 참조값이 낡은 것**이라고 판단한다:
+1. **내부 자체검증 전부 통과** — skew/행독립성/soft label h값까지 소수점 단위로
+   그들 기록과 일치. 재구현이 잘못됐다면 이 정도로 정합적일 수 없다.
+2. **그들 자신의 실제(fresh) `verify_pipeline.py` 실행 기록이 921.4에 훨씬 가깝다.**
+   soft label 막 채택한 시점(§7.70)의 진짜 fresh 실행값이 **917.0**이었고,
+   그 뒤 ASOF_STRENGTH 200→35 스윕(§7.63, fold2024 블렌드 기준 +9.08)과 달력
+   피처 제거(§7.78, fold2024 블렌드 +9.36)가 **순서대로 추가 채택**됐다 —
+   917.0 + 이 증분들의 궤적이 921.4와 정확히 같은 방향·규모다.
+3. **그들 스스로 캐시 노후화를 명시적으로 경고해뒀다** — §7.78 직후: *"foldcache
+   지문도 faa19e0e95 → 5488ef1b18. 재측정 전까지 아래 수치를 현행 배포의 성질로
+   인용하지 말 것."* §7.101이 쓴 "foldcache의 배포 스택"이 정확히 이 경고가
+   가리키는 대상일 가능성이 높다 — 신선한 재실행이 아니라 **오래된 캐시 로짓**을
+   기준선으로 썼을 수 있다.
+
+**결론**: wonwoo의 코드는 문서화된 그대로 정확히 작동하고 완전히 재현 가능하다
+(정합성 3종 전부 0, byte-level 중간값 전부 일치). 다만 그들이 최근 절(§7.101)에서
+인용한 "837.6/840.0"이라는 특정 숫자 자체가 캐시 노후화로 실제보다 낮게 잡혔을
+가능성이 크고, 진짜 현재 파이프라인의 fold2024 성능은 **921점대**로 보는 게 더
+정확하다. (팀 통합 시 hyejin 브랜치에 전달할 가치가 있는 발견 — DIRECTION.md의
+"판정 하니스 우선" 방향과 정확히 같은 종류의 이슈다.)
+
+### 산출물
+`wonwoo_repro/`(git 미추적, 로컬 전용) — 격리 venv + 소스 19개 + 확장 검증 스크립트.
+재현에 필요한 시간: LightGBM 20부스터 ~1,300s + MLP 8멤버 ~730s + fspec ~10s
+(우리 하드웨어 기준, 그들 REPRODUCE.md의 "28분"과 같은 규모).
