@@ -104,7 +104,7 @@
   },
   {
     "n": 26,
-    "file": "s27_a60803e.zip",
+    "file": "s26_a60803e.zip",
     "tokens": {
       "alpha": "a60",
       "ctx:hand": "h188",
@@ -118,5 +118,22 @@
     },
     "fingerprint": "803e",
     "full_tag": "a60h188c125nocalas30bs30k35slfs15"
+  },
+  {
+    "n": 28,
+    "file": "s28_a758bdc.zip",
+    "tokens": {
+      "alpha": "a75",
+      "ctx:hand": "h188",
+      "ctx:count4": "c125",
+      "dropx": "nocal",
+      "asof:gap_success": "as30",
+      "asof:gap_bsuccess": "bs30",
+      "k": "k35",
+      "soft": "sl",
+      "fspec": "fs15"
+    },
+    "fingerprint": "8bdc",
+    "full_tag": "a75h188c125nocalas30bs30k35slfs15"
   }
 ]
