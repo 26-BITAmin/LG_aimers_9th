@@ -153,7 +153,10 @@ CI가 0을 포함해 확정 안 됨(fold C는 CatBoost 시드평균이 원흉, �
 모델로 철저히 검증 후 완전 종결 ·
 사후 ctx보정 축 확장 — outs/base_state/top_bottom/inning3(exp57) 전부 무효과,
 hand×count4 결합축(exp58)도 데이터 희석으로 소폭 손해 — hand+count4 애디티브가
-이 메커니즘의 최종형 ·
+이 메커니즘의 최종형, 초구(0-0카운트) 축(exp61)도 채널 포화로 기각 ·
+게임 경계 복원 기반 원시 피처 — 이닝당 투구수·당경기 매치업 반복횟수(exp62/63,
+경계 복원 로직 자체는 검증됨·4872경기) 둘 다 fold A/B 양수·C 음수로 부호 불일치,
+Trackman과 같은 "fold마다 관계 방향 반전" 패턴 ·
 `far_off`·`overlap` 누적 피처(−19~+27) · 타자 정체성·`li`·WE·`inning`·구종 배합 ·
 카운트 조건부 투수 이력(−30.9) · Trackman ID 매핑 · test 기반 importance weighting ·
 fold A/B 단독 판단
