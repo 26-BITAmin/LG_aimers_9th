@@ -1,22 +1,23 @@
 """검증 폴드 정의 — EDA_정리.md §9, CLAUDE.md 검증 프로토콜과 동일.
 
+2026-08-21부로 wonwoo의 2-fold 확장(forward-chaining) 윈도우로 완전 대체(사용자
+지시). 구 A/B/C/D(롤링 3시즌 창)는 폐기 — 옛 experiments/exp04~64는 그 정의로
+기록됐으니 재실행하지 말고 당시 결과를 그대로 읽을 것.
+
 절대 규칙 (CLAUDE.md):
 - 학습에서 game_type=="F" & season<=2022 105,308행은 항상 제외 (튜닝 대상 아님)
 - 평가는 R 전용
-- fold D는 최종 확인 전용, 재튜닝 금지
 """
 import numpy as np
 import pandas as pd
 
 FOLDS = {
-    "A": dict(train=(2019, 2021), valid=2022),
-    "B": dict(train=(2020, 2022), valid=2023),
-    "C": dict(train=(2021, 2023), valid=2024),  # 드리프트 대응 주근거 — 튜닝은 여기서
-    "D": dict(train=(2019, 2023), valid=2024),  # 최종 확인 전용 — 재튜닝 금지
+    "2023": dict(train=(2019, 2022), valid=2023),
+    "2024": dict(train=(2019, 2023), valid=2024),  # 드리프트 대응 주근거 · 최종 확인
 }
 
-TUNING_FOLDS = ("A", "B", "C")
-FINAL_CHECK_FOLD = "D"
+TUNING_FOLDS = ("2023", "2024")
+FINAL_CHECK_FOLD = "2024"
 
 
 def _drop_bad_f(df: pd.DataFrame) -> pd.Series:

@@ -58,7 +58,7 @@ def run_fold_cb(df, fold_name, feature_cols, cat_cols, cb_params, use_custom,
 
 
 def run_experiment_cb(label, feature_cols, cat_cols, cb_params, use_custom,
-                       fold_names=("A", "B", "C"), num_boost_round=3000,
+                       fold_names=("2023", "2024"), num_boost_round=3000,
                        early_stopping_rounds=100, seed=0, notes="",
                        use_trend=False, use_failmode=False, use_ballstrike=False,
                        use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False,

@@ -93,7 +93,7 @@ def log_result(label, fold, res, seed=0, notes=""):
 
 
 def run_experiment(label, feature_cols, cat_cols, lgb_params, use_custom,
-                    fold_names=("A", "B", "C"), num_boost_round=2000,
+                    fold_names=("2023", "2024"), num_boost_round=2000,
                     early_stopping_rounds=50, seed=0, notes="",
                     use_trend=False, use_failmode=False, use_ballstrike=False,
                     use_failmode_platoon=False, use_n_exposed=False, use_season_trend=False,
