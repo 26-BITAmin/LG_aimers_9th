@@ -99,6 +99,24 @@ def fit_asof_center(train_df, cols=CENTER_COLS, min_n=500):
     return out
 
 
+def _center_base(art, ac, col):
+    """중심화 후 값이 앉을 기준점. **스무딩 prior 와 같아야 한다.**
+
+    ⚠️ 처음엔 `ac["global"]`(비가중 전체 평균)을 더했다가 틀렸다 (§7.106 ⑧).
+       근거는 "트리에는 상수항이 무의미하니 평균 0 과 동치" 였는데, 이 컬럼은 트리로
+       바로 안 가고 **먼저 `_smooth` 를 통과한다.** 스무딩은 평행이동에 불변이 아니다:
+
+           _smooth(v, n, prior, k) = (n·v + k·prior) / (n + k)
+
+       `prior` 는 고정인데 `v` 만 밀면 그 간격만큼 **저표본 행만 끌려간다.**
+       실측: prior(recency 가중) .52686 vs global(비가중) .54018 → 간격 +0.01331.
+       같은 시즌 안에서 n 에 따라 인위적 0.013 격차가 생겼고, 이는 §7.106 ⑦이 찾은
+       진짜 교란(신인–베테랑 +0.035)과 **같은 방향**이라 손해를 키웠다.
+    """
+    p = (art or {}).get("priors", {})
+    return float(p[col]) if col in p else float(ac["global"][col])
+
+
 def _center_offset(g, ac, col):
     """행별 μ(season, game_type). 표에 없는 시즌은 외삽. **행 단위 조회일 뿐이다.**"""
     ss = g["season"].to_numpy(dtype=np.int64)
@@ -360,10 +378,6 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
                      "values": table[cols].to_numpy(dtype=np.float32)[order],
                      "cols": list(cols)}
 
-    # (시즌 × game_type) 중심화 표 — 있으면 build_features가 자동으로 쓴다 (§7.106)
-    if center_asof:
-        art["asof_center"] = fit_asof_center(train_df)
-
     w = np.ones(len(train_df)) if weights is None else np.asarray(weights, dtype=np.float64)
 
     # 스무딩용 리그 평균 — 가중 평균으로 최근 시즌 쪽에 맞춘다
@@ -394,6 +408,22 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
         rev = np.where(np.isnan(lab["reverse"]), 0.0, np.round(lab["reverse"]))
         art["contam"] = _cfit.fit_contam(train_df, rev)
         art["contam"]["axes"] = tuple(contam_axes)
+
+    # (시즌 × game_type) 중심화 표 (§7.106) — **맨 마지막에, 2패스로 만든다.**
+    # ⚠️ 표를 원본 컬럼에서 적합하면 안 된다 (§7.106 ⑧의 두 번째 결함). 중심화는
+    #    `build_features` 안에서 **오염보정·클리핑 뒤**에 걸리는데, 오염보정은 2023·2024
+    #    행에도 걸린다 — 그 투수의 **커리어에 pre-2023 F 투구가 섞여 있기 때문**이다.
+    #    보정량이 누적 F 노출(≈ n)의 함수라, 원본에서 적합한 표로 빼면 잔차가 정확히
+    #    **신인–베테랑 축**에 남는다. 실측에서 그 격차가 +0.008 → +0.018 로 커졌다.
+    # → 중심화 없는 아티팩트로 한 번 돌려 **실제로 모델이 볼 값**에서 표를 만든다.
+    if center_asof:
+        adj = build_features(train_df, art)          # art 에 asof_center 가 아직 없다
+        tmp = train_df[["season", "game_type"]].copy()
+        for c in CENTER_COLS:
+            if c in adj.columns:
+                tmp[c] = adj[c].to_numpy(dtype=np.float64)
+        art["asof_center"] = fit_asof_center(tmp, cols=[c for c in CENTER_COLS
+                                                        if c in adj.columns])
 
     return art
 
@@ -515,7 +545,7 @@ def build_features(df, art):
         # 스무딩 **앞**이어야 한다 — 그래야 `_sm`·`form_*`·`matchup_*`가 전부
         # 중심화된 값을 본다 (오염 보정과 같은 이유, 삽입 위치가 전파 범위다).
         if _ac is not None and col in _ac["table"]:
-            raw = (raw - _center_offset(g, _ac, col) + _ac["global"][col]).astype(np.float32)
+            raw = (raw - _center_offset(g, _ac, col) + _center_base(art, _ac, col)).astype(np.float32)
         out[col] = raw                                    # 원본 (NaN 그대로 → LGBM이 처리)
         s = _smooth(raw, n_map[ncol], art["priors"][col], art["smooth_k"][col])
         sm[col] = s
@@ -524,7 +554,7 @@ def build_features(df, art):
     for col in PREV_COLS:
         pv = _clip32(g[col].to_numpy(dtype=np.float32), art, col)
         if _ac is not None and col in _ac["table"]:
-            pv = (pv - _center_offset(g, _ac, col) + _ac["global"][col]).astype(np.float32)
+            pv = (pv - _center_offset(g, _ac, col) + _center_base(art, _ac, col)).astype(np.float32)
         out[col] = pv
 
     # ── 최근 폼 변화 (차분은 트리가 스스로 못 만든다) ────────
