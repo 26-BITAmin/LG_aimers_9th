@@ -157,10 +157,18 @@ def encode(Xtr, Xva, art):
 
 
 def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
-              y_aux=None, **cfg):
+              y_aux=None, offset=None, **cfg):
     """에폭마다 valid 로짓을 남긴다. 최적 에폭은 호출자가 고른다.
 
     반환: (모델, [에폭별 valid 로짓]) — 곡선을 봐야 조기중단 지점을 알 수 있다.
+
+    `offset` — 학습 행별 시작 로짓 (LightGBM 의 `init_score` 에 해당, MODEL.md §7.114).
+        손실을 `sigmoid(z + offset)` 로 계산하므로 모델은 **레벨을 뺀 편차만** 배운다.
+        ⚠️ 반환하는 로짓에는 offset 을 **더하지 않는다** — LGBM `raw_score` 와 같은
+           규약이라 블렌드가 편차 공간에서 이뤄지고 레벨은 prior shift 가 맡는다.
+        ⚠️ **보조 헤드에는 안 붙인다.** 보조 타깃(몰림·반대)은 다른 과제고 자기 레벨을
+           갖는다. 여기에 주 타깃의 레벨을 얹으면 조용히 틀린다.
+        None 이면 기존 동작과 **비트 단위로 같다**.
     """
     import torch
     import torch.nn as nn
@@ -339,6 +347,10 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
     tC = torch.from_numpy(Ctr).to(dev)
     ty = torch.from_numpy(y.astype(np.float32)).to(dev)
     tw = torch.from_numpy((w / w.mean()).astype(np.float32)).to(dev)
+    toff = (None if offset is None
+            else torch.from_numpy(np.asarray(offset, dtype=np.float32)).to(dev))
+    if toff is not None and len(toff) != n:
+        raise ValueError(f"offset 길이 {len(toff)} != 학습행 {n} — 정렬이 깨졌다")
     g = torch.Generator().manual_seed(seed)
 
     t0, curve = time.time(), []
@@ -351,12 +363,14 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
             if len(idx) < 2:                       # BatchNorm은 배치 1을 못 받는다
                 continue
             opt.zero_grad(set_to_none=True)
+            off = 0.0 if toff is None else toff[idx]
             if lam and taux is not None:
                 z_, za_ = m.forward_aux(tA[idx], tC[idx])
-                l = (lossf(z_, ty[idx]) * tw[idx]).mean()
+                l = (lossf(z_ + off, ty[idx]) * tw[idx]).mean()
+                # 보조 헤드에는 offset 을 안 붙인다 — 다른 과제고 자기 레벨을 갖는다
                 l = l + lam * (auxf(za_, taux[idx]).mean(1) * tw[idx]).mean()
             else:
-                l = (lossf(m(tA[idx], tC[idx]), ty[idx]) * tw[idx]).mean()
+                l = (lossf(m(tA[idx], tC[idx]) + off, ty[idx]) * tw[idx]).mean()
             l.backward()
             opt.step()
             sched.step()
