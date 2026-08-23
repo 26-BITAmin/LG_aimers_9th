@@ -153,5 +153,26 @@
   },
   "fingerprint": "c56e",
   "full_tag": "a75h188c125nocalisas30bs30k35slfs15"
+ },
+ {
+  "n": 30,
+  "file": "s30_n1c105lv6873cae.zip",
+  "tokens": {
+   "alpha": "a75",
+   "noid": "n1",
+   "ctx:hand": "h188",
+   "ctx:count4": "c125",
+   "dropx": "nocal",
+   "init": "is",
+   "asof:gap_success": "as30",
+   "asof:gap_bsuccess": "bs30",
+   "k": "k35",
+   "soft": "sl",
+   "fspec": "fs15",
+   "pscale": "c105",
+   "lv": "lv687"
+  },
+  "fingerprint": "3cae",
+  "full_tag": "a75n1h188c125nocalisas30bs30k35slfs15c105lv687"
  }
 ]

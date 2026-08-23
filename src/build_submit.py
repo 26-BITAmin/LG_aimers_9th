@@ -23,10 +23,12 @@ try:
 except Exception:
     pass
 
+import joblib
 import numpy as np
 import pandas as pd
 
 from config import ROOT, TEST_CSV, TRAIN_CSV
+from predict import PROB_CENTER, PROB_SCALE, PROB_SHIFT, PROB_TARGET
 
 SRC = ROOT / "src"
 SUBMIT = ROOT / "submit"
@@ -70,12 +72,21 @@ def leakage_scan(paths):
     return hits
 
 
-def make_dummy_test(n=245789):
+def make_dummy_test(n=245789, art=None):
     """평가 규모(245,789행)의 더미 test.
 
-    2024 시즌 행을 쓴다. 2025 test의 피처 분포에 가장 가까우므로
-    추론 **시간**뿐 아니라 예측 **평균**도 의미 있는 검사가 된다
-    (logit_delta를 2024 행 기준으로 풀었으니 평균이 TARGET_PRIOR_2025 근처여야 한다).
+    2024 시즌 행에 `season = 2025` 라벨을 붙인다.
+
+    ⚠️ **`art`를 주지 않으면 예측 평균을 읽으면 안 된다** (§7.121).
+       `asof_*`는 **커리어 누적**이고 시즌 진행분은 `n_szn = asof_n − n_off(id, season)`
+       으로 계산되는데, `n_off(·, 2025)`는 **2024 종료 시점 누적**이다. 2024 행의
+       `asof_n`은 항상 그보다 작으므로 라벨만 바꾸면 **100% 행이 `n_szn ≤ 0`**
+       (평균 −708.7)이 되어 축 2개가 상수로 죽는다. 실제 2025 test는 `n_szn > 0`이다.
+       그 상태로 잰 평균은 **+0.0044 위로 편향**된다 (0.4758 → 0.4801).
+
+       `art`(= artifacts.joblib의 "artifacts")를 주면 시즌 진행분을 보존해
+       **재기준화**한다: `n' = n_off₂₅ + (n − n_off₂₄)`, `k`도 같은 방식.
+       추론 **시간** 측정만 할 거면 `art` 없이 써도 무해하다.
     """
     df = pd.read_csv(TRAIN_CSV)
     df = df[df.season == 2024].drop(columns=["control_success"]).reset_index(drop=True)
@@ -83,6 +94,26 @@ def make_dummy_test(n=245789):
     out = pd.concat([df] * reps, ignore_index=True).iloc[:n].copy()
     out["season"] = 2025
     out["row_id"] = [f"TEST_{i:06d}" for i in range(n)]
+
+    for a in (art or {}).get("asof", []):
+        ids = out[a["id"]].to_numpy(dtype=np.int64)
+
+        def _off(season):
+            kv = ids * 10000 + season
+            j = np.clip(np.searchsorted(a["keys"], kv), 0, max(len(a["keys"]) - 1, 0))
+            hit = (len(a["keys"]) > 0) & (a["keys"][j] == kv)
+            return np.where(hit, a["n_off"][j], 0.0), np.where(hit, a["k_off"][j], 0.0)
+
+        n24, k24 = _off(2024)
+        n25, k25 = _off(2025)
+        n_old = out[a["n_col"]].to_numpy(dtype=np.float64)
+        # r×n 의 정수 복원은 asof_lookup 이 쓰는 전제와 같다 (max|r×n − round| < 0.008)
+        k_old = np.round(out[a["r_col"]].to_numpy(dtype=np.float64) * n_old)
+        n_new = n25 + (n_old - n24)
+        k_new = k25 + (k_old - k24)
+        out[a["n_col"]] = n_new
+        out[a["r_col"]] = np.where(n_new > 0, k_new / np.maximum(n_new, 1.0),
+                                   float(a["league"]))
     return out
 
 
@@ -111,6 +142,25 @@ def main():
         raise SystemExit("model/lgbm_*.txt 없음. 먼저 src/train.py를 실행할 것.")
     print(f"  부스터 {len(boosters)}개: {[p.name for p in boosters]}")
     meta = json.loads((model_dir / "meta.json").read_text(encoding="utf-8"))
+    # 확률공간 레벨 시프트는 **추론 층 상수**라 train.py가 쓴 meta.json에 없다.
+    # 태그·지문·이력이 이 축을 보게 하려면 여기서 얹어야 한다 (describe_tokens 참조).
+    meta["prob_shift"] = PROB_SHIFT
+    meta["prob_scale"] = PROB_SCALE
+    # ⚠️ `mlp_variant_weight`는 train.py가 **config 값**을 적어둔 것이다.
+    #    artifacts.joblib의 `mlp_weights`를 직접 패치하면(§7.120 `_vw` 축)
+    #    meta.json은 옛 값을 그대로 들고 있어 태그가 축 변경을 놓친다 —
+    #    §7.61이 정확히 이 실패였다. **서빙되는 값**을 진실 소스로 쓴다.
+    _b = joblib.load(model_dir / "artifacts.joblib")
+    _mem, _w = _b.get("mlp_members") or [], _b.get("mlp_weights") or []
+    if _mem and _w:
+        served = {}
+        for m, wt in zip(_mem, _w):
+            served[m.split("_")[0]] = served.get(m.split("_")[0], 0.0) + float(wt)
+        cfg = meta.get("mlp_variant_weight") or {}
+        if cfg and any(abs(served.get(g, 0.0) - float(v)) > 1e-9 for g, v in cfg.items()):
+            print(f"  ⚠️ mlp_variant_weight 불일치 — config {cfg} vs 서빙 {served}")
+            print("     (artifacts.joblib 직접 패치. 태그는 서빙값 기준으로 붙인다)")
+        meta["mlp_variant_weight"] = served
 
     mlps = sorted(model_dir.glob("mlp_*.npz"))
     if meta.get("use_mlp"):
@@ -124,7 +174,9 @@ def main():
     print("\n=== 3. 추론 시간 측정 (245,789행 더미) ===")
     dummy_dir = SUBMIT / "data"
     dummy_dir.mkdir(exist_ok=True)
-    dummy = make_dummy_test()
+    # 재기준화에 asof 오프셋이 필요하다 (§7.121). `_b`는 위에서 이미 읽었다.
+    dummy = make_dummy_test(art=_b.get("artifacts"))
+    print("  더미: 시즌 진행분 재기준화 적용 (asof n_szn > 0 유지)")
     dummy.to_csv(dummy_dir / "test.csv", index=False, encoding="utf-8")
     pd.DataFrame({"row_id": dummy["row_id"], "control_success": 0.5}).to_csv(
         dummy_dir / "sample_submission.csv", index=False, encoding="utf-8")
@@ -146,6 +198,18 @@ def main():
     assert out["control_success"].between(0, 1).all()
     assert out["control_success"].notna().all()
     print(f"  submission 검증 OK  mean={out['control_success'].mean():.4f}")
+    # 레벨 시프트가 켜져 있으면 **도달 평균**을 대조한다. PROB_SHIFT는 특정
+    # 아티팩트에서 잰 p̄에 묶인 상수라, 재학습하면 조용히 낡는다 — 그 경우
+    # 레벨 항이 어긋난 채로 제출된다 (§7.120: 어긋남 0.005가 −10 BSS 규모).
+    if PROB_SHIFT:
+        got = float(out["control_success"].mean())
+        off = got - PROB_TARGET
+        print(f"  레벨 대조(재기준화 더미)  실측 {got:.6f}  목표 {PROB_TARGET:.6f}  어긋남 {off:+.6f}")
+        if abs(off) > 5e-4:
+            print(f"  ❌ 레벨이 목표에서 {off:+.6f} 벗어났다. PROB_SHIFT가 낡았다.")
+            print(f"     현 아티팩트에서 p̄를 다시 재고 "
+                  f"PROB_SHIFT = {PROB_TARGET} − p̄ 로 갱신할 것.")
+            raise SystemExit("레벨 대조 실패. 제출 중단.")
     if meta.get("trackman_mode", "none") != "none":
         print("  ⚠️ 위 평균을 목표 prior와 비교하지 말 것. 더미는 2024 행이라 Trackman")
         print("     조회 적중률이 ~99%로 실제 2025(~81%)보다 높고, 커버리지가 높을수록")
@@ -302,6 +366,15 @@ def describe_tokens(meta):
     fa = float(meta.get("fspec_alpha") or 0.0)
     if fa:
         tok["fspec"] = f"fs{fa * 100:.0f}"
+    # 확률공간 스케일 c (MODEL.md §7.120).  1.05 -> c105.  1.0이면 생략.
+    pc = float(meta.get("prob_scale") or 1.0)
+    if pc != 1.0:
+        tok["pscale"] = f"c{pc * 100:.0f}"
+    # 확률공간 레벨 시프트 (MODEL.md §7.120).  +0.006874 -> lv687  (x1e5, 반올림)
+    # 음수면 `lvm...`. 0이면 생략 — 옛 태그와 호환된다.
+    ps = float(meta.get("prob_shift") or 0.0)
+    if ps:
+        tok["lv"] = f"lv{'' if ps > 0 else 'm'}{abs(ps) * 1e5:.0f}"
     tm = meta.get("trackman_mode", "none")
     if tm != "none":                        # 기본값(끔)일 때는 태그를 생략한다
         tok["tm"] = {"release": "tmR", "release_ext": "tmE"}.get(tm, "tmA")
