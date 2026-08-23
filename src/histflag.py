@@ -1,9 +1,9 @@
-"""§7.130 후속 — `miss_prev_game` 을 **컬럼 안 늘리고** 서수로 승격한다.
+"""§7.133 후속 — `miss_prev_game` 을 **컬럼 안 늘리고** 서수로 승격한다.
 
-왜 이 팔인가 (§7.130 판정에서 바로 따라 나온다)
+왜 이 팔인가 (§7.133 판정에서 바로 따라 나온다)
     `depth` 팔은 내용이 있었다:  depth - dplacebo = **+3.6 / +0.6** (관문 2 통과)
     그런데 위약 자체가 -5.1 / -2.6 이었다 — **컬럼 하나 추가하는 비용**이 내용보다 컸다.
-    -> 컬럼을 안 늘리면 그 비용을 안 낸다. 마침 §7.130 2x2 가 같은 자리에서
+    -> 컬럼을 안 늘리면 그 비용을 안 낸다. 마침 §7.133 2x2 가 같은 자리에서
        `miss_prev_game` 단독 가치를 **+4.7 / +7.9** 로 확정해줬다.
 
     miss_prev_game = 1 if prev 결측 else 0                (현행, 1.98% 만 1)
@@ -13,7 +13,7 @@
     복원하므로 **엄밀한 상위집합**이고, MLP 도 기존에 학습된 관계의 부호가 유지된다.
 
 팔
-    base       §7.130 의 base 캐시를 **재사용**한다 — 같은 코드 경로·같은 스위치 off.
+    base       §7.133 의 base 캐시를 **재사용**한다 — 같은 코드 경로·같은 스위치 off.
                **이게 앵커다**: 채점 경로가 그때와 같다면 807.2 / 924.5 가 정확히
                재현되어야 한다. 안 나오면 사후 보정 축이 그 사이 바뀐 것이고 비교 무효.
                (A 팔은 뺐다 — §7.128 로 config 지문이 갈려 옛 foldcache 가 없다.
@@ -22,7 +22,7 @@
     dfplacebo  영가설. depth 0 행은 **1.0 그대로 두고**(이진 결측 정보 보존),
                중간 등급을 받을 행만 (시즌 x gt) 안에서 재배정한다.
                -> 주변분포도 이진 결측정보도 같고 **'어느 행이 얕은가'만 끊긴다.**
-               §7.130 에서 위약 없이 봤으면 depth 를 "내용이 해롭다"로 오독했을 것이다
+               §7.133 에서 위약 없이 봤으면 depth 를 "내용이 해롭다"로 오독했을 것이다
                ([[noise-floor-is-learner-specific]]).
 
 채택 기준 (실행 전에 박아둔다)
@@ -34,7 +34,7 @@
     !! 부호가 엇갈려도 각 fold 구간을 보고 판단한다
        ([[sign-isnt-evidence-when-the-interval-spans-zero]])
 
-내 예측 (§7.130 에서 셋 다 틀렸으므로 근거를 좁혀 적는다):
+내 예측 (§7.133 에서 셋 다 틀렸으므로 근거를 좁혀 적는다):
     컬럼 비용이 없어졌으니 base 대비 부호는 depth(-1.4/-1.9)보다 **위로 간다**.
     내용 성분 +3.6/+0.6 이 그대로 남는다면 +0~+4 대. 다만 fold2024 내용이 +0.6 뿐이라
     **fold2023 만 양수인 갈림**이 가장 그럴듯하다. 그러면 (1) 에서 걸린다.
@@ -75,13 +75,20 @@ from config import MLP_SEEDS as _MLP_SEEDS_CUR                      # noqa: E402
 from config import MLP_VARIANTS as _MLP_VARIANTS_CUR                # noqa: E402
 
 # ⚠️ **MLP 멤버 수를 8 로 고정한다.** §7.128(커밋 09efe0f)이 k=8->16 을 채택하면서
-#    config 의 시드 배정이 바뀌었다. 이 실험의 `base` 는 §7.130 이 **8 멤버**로 학습한
+#    config 의 시드 배정이 바뀌었다. 이 실험의 `base` 는 §7.133 이 **8 멤버**로 학습한
 #    캐시를 재사용하므로, 여기서 config 를 그대로 읽으면 base(8) vs 후보(16) 를
 #    비교하게 된다 — 팔의 차이가 아니라 **앙상블 크기의 차이**를 재는 꼴이다.
 #    (그래서 foldcache 지문도 5488ef1b18 -> d477b355b6 으로 갈렸고, 옛 A 팔 캐시가
 #     새 키로는 존재하지 않는다. 아래에서 A 팔을 빼고 base 앵커로 대신한다.)
-#    ⇒ 이 라운드의 수치는 **pre-s32 스택** 위의 값이다. 채택하려면 현행 스택에서
-#      다시 재야 한다. 여기서 묻는 것은 "컬럼 비용을 없애면 내용이 살아나나" 뿐이다.
+#
+# ★ 후일담 — **이 고정이 결과적으로 현행과 일치한다.** 다른 세션의 §7.130 이 s32 를
+#   LB 로 재보니 **-2.30** 이었고(1104.9203 vs s30 1107.2194) k=8->16 을 롤백했다
+#   (커밋 669a9c1, "부호 보장이 틀렸다"). config 가 m8 로 되돌아오면서 지문도
+#   5488ef1b18 로 복귀했다 — 즉 이 라운드 수치는 stale 이 아니라 **현행 fold 스택**
+#   위의 값이다. 위 assert 가 그것까지 지켜준다.
+#   ⚠️ 단, 챔피언은 그 뒤 s33/s34 로 1108.7575 까지 올라갔다. 그건 **추론측**
+#     (fspec_alpha·상수 큐) 변경이라 이 하네스의 학습 경로를 안 건드리고, base 앵커
+#     +0.03 이 그걸 확인해준다. 채택 판단의 **대조군**은 그래도 팀 최고여야 한다.
 MLP_SEEDS = _MLP_SEEDS_CUR[:5]
 MLP_VARIANTS = {"emb4": (_MLP_VARIANTS_CUR["emb4"][0], 5),
                 "noid": (_MLP_VARIANTS_CUR["noid"][0], 3)}
@@ -96,7 +103,7 @@ MODES = ["base", "depthflag", "dfplacebo"]
 HIST = {"base": None, "depthflag": "depthflag", "dfplacebo": "depthflag"}
 PERM = {"dfplacebo"}
 CACHE = Path(__file__).parent.parent / "experiments" / "cache"
-# base 는 §7.130 이 이미 학습해뒀다. 같은 코드 경로·같은 스위치 off 라 재사용한다.
+# base 는 §7.133 이 이미 학습해뒀다. 같은 코드 경로·같은 스위치 off 라 재사용한다.
 REUSE = {"base": "histdepth"}
 SEED = 42
 ANCHOR = {2023: 807.2, 2024: 924.5}
@@ -111,7 +118,7 @@ def _placebo_flag(x, d, seed):
     """depth 0(진짜 결측)은 1.0 그대로 두고, **중간 등급만** (시즌 x gt) 안에서 재배정.
 
     이진 결측 정보(=현행 플래그가 주는 것)는 손대지 않는다. 그래야 위약이 재는 것이
-    '승격의 내용'이 되고, '플래그를 망가뜨린 손해'가 안 섞인다 — 후자는 §7.130 의
+    '승격의 내용'이 되고, '플래그를 망가뜨린 손해'가 안 섞인다 — 후자는 §7.133 의
     basenf(-5.0/-8.3)가 이미 재놨다.
     """
     rng = np.random.default_rng(seed)
@@ -229,7 +236,7 @@ def main():
         mm = mclean[vi]
         yv = y[vi]
         # A 팔은 뺐다 — 새 config 지문(d477b355b6)으로는 foldcache 가 없다.
-        # 대신 base 자체가 앵커다: §7.130 캐시를 그대로 읽으므로 채점 경로(delta 축 +
+        # 대신 base 자체가 앵커다: §7.133 캐시를 그대로 읽으므로 채점 경로(delta 축 +
         # prior shift)가 그때와 같다면 **807.2 / 924.5 가 정확히 재현되어야 한다.**
         # 안 나오면 그 사이에 사후 보정 축이 바뀐 것이고, 그때는 비교 자체가 무효다.
         arms = {}
@@ -256,7 +263,7 @@ def main():
             KEEP[(fold, lab)] = (yv[mm], z[mm], codes[vi][mm])
         print(f"  fold {fold}: " + "  ".join(f"{k} {R[(fold,k)]:.1f}" for k in labs))
         d0 = R[(fold, "base")] - ANCHOR[fold]
-        print(f"    앵커 검증: base - §7.130 기록({ANCHOR[fold]}) = {d0:+.2f}  "
+        print(f"    앵커 검증: base - §7.133 기록({ANCHOR[fold]}) = {d0:+.2f}  "
               f"{'OK' if abs(d0) < 0.1 else '!! 채점 경로가 그 사이 바뀌었다 — 비교 무효'}")
 
     print(f"\n{'='*92}\n█ 판정 — 배포 층 (a={MLP_ALPHA} + delta축 + prior shift, clean 행)\n{'='*92}")
@@ -289,7 +296,7 @@ def main():
     print(f"\n  후보 - 위약 (승격의 순수 내용 성분)")
     for f in FOLDS:
         print(f"     fold {f}: {R[(f,'depthflag')]-R[(f,'dfplacebo')]:+6.1f}"
-              f"     (참고 §7.130 depth-dplacebo: "
+              f"     (참고 §7.133 depth-dplacebo: "
               f"{'+3.6' if f == 2023 else '+0.6'})")
 
     print(f"\n  채택 기준: (1) depthflag-base 양 fold 양수 (2) depthflag-dfplacebo 양 fold 양수"

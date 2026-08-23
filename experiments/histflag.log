@@ -1,0 +1,47 @@
+train (1475092, 49)   a=0.75  init_score=ON  팔 ['base', 'depthflag', 'dfplacebo']
+
+    [base     ] 피처 78개  flag 5003c7fb1c  분포 (0.988914, 0.0, 0.0, 0.011086)
+    캐시 적중 histdepth_fold2023_base.npz
+    [depthflag] 피처 78개  flag 2b1466c4c7  분포 (0.954701, 0.023757, 0.010455, 0.011086)
+    fold 2023 [depthflag] 피처 완료 (13s)
+    fold 2023 [depthflag] lgbm 12개 (280s)
+    fold 2023 [depthflag] mlp 8개 (1005s)
+    [dfplacebo] 피처 78개  flag 3657703881  분포 (0.954701, 0.023757, 0.010455, 0.011086)
+    fold 2023 [dfplacebo] 피처 완료 (1008s)
+    fold 2023 [dfplacebo] lgbm 12개 (1311s)
+    fold 2023 [dfplacebo] mlp 8개 (2163s)
+  fold 2023: base 807.2  depthflag 807.1  dfplacebo 807.5
+    앵커 검증: base - §7.123 기록(807.2) = +0.03  OK
+    [base     ] 피처 78개  flag 7d191235eb  분포 (0.985649, 0.0, 0.0, 0.014351)
+    캐시 적중 histdepth_fold2024_base.npz
+    [depthflag] 피처 78개  flag c2c84bdd29  분포 (0.940589, 0.028697, 0.016362, 0.014351)
+    fold 2024 [depthflag] 피처 완료 (2175s)
+    fold 2024 [depthflag] lgbm 12개 (2581s)
+    fold 2024 [depthflag] mlp 8개 (3565s)
+    [dfplacebo] 피처 78개  flag afa511416d  분포 (0.940589, 0.028697, 0.016362, 0.014351)
+    fold 2024 [dfplacebo] 피처 완료 (3570s)
+    fold 2024 [dfplacebo] lgbm 12개 (3891s)
+    fold 2024 [dfplacebo] mlp 8개 (4811s)
+  fold 2024: base 924.5  depthflag 925.0  dfplacebo 923.5
+    앵커 검증: base - §7.123 기록(924.5) = +0.03  OK
+
+============================================================================================
+█ 판정 — 배포 층 (a=0.75 + delta축 + prior shift, clean 행)
+============================================================================================
+  팔             fold 2023  fold 2024 Δ vs base (2023) Δ vs base (2024)
+  base              807.2      924.5             +0.0             +0.0
+  depthflag         807.1      925.0             -0.1             +0.5
+  dfplacebo         807.5      923.5             +0.3             -1.1
+
+  클러스터 부트스트랩 (투수 복원추출 200회, 기준 = base)
+     depthflag         -0.1 [  -1.4,  +1.3]      +0.5 [  -2.2,  +3.3]
+     dfplacebo         +0.3 [  -0.6,  +1.4]      -1.1 [  -2.5,  +0.3]
+
+  후보 - 위약 (승격의 순수 내용 성분)
+     fold 2023:   -0.4     (참고 §7.123 depth-dplacebo: +3.6)
+     fold 2024:   +1.6     (참고 §7.123 depth-dplacebo: +0.6)
+
+  채택 기준: (1) depthflag-base 양 fold 양수 (2) depthflag-dfplacebo 양 fold 양수 (3) 크기비 <=3 (4) 부트스트랩 구간이 0 을 크게 밑돌지 않을 것
+  !! |Δ| < 10 은 무승부. 부호가 엇갈려도 각 fold 구간을 보고 판단한다.
+
+총 4925s
