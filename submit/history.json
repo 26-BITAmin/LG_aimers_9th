@@ -218,5 +218,48 @@
   },
   "fingerprint": "951b",
   "full_tag": "a75n1h188c125nocalisas30bs30k35slfs15m16c105lv695"
+ },
+ {
+  "n": 33,
+  "file": "s33_bm110lv698cad0.zip",
+  "tokens": {
+   "alpha": "a75",
+   "noid": "n1",
+   "ctx:hand": "h188",
+   "ctx:count4": "c125",
+   "dropx": "nocal",
+   "init": "is",
+   "asof:gap_success": "as30",
+   "asof:gap_bsuccess": "bs30",
+   "k": "k35",
+   "soft": "sl",
+   "fspec": "fs15",
+   "bmult": "bm110",
+   "pscale": "c105",
+   "lv": "lv698"
+  },
+  "fingerprint": "cad0",
+  "full_tag": "a75n1h188c125nocalisas30bs30k35slfs15bm110c105lv698"
+ },
+ {
+  "n": 34,
+  "file": "s34_fs30lv70064c8.zip",
+  "tokens": {
+   "alpha": "a75",
+   "noid": "n1",
+   "ctx:hand": "h188",
+   "ctx:count4": "c125",
+   "dropx": "nocal",
+   "init": "is",
+   "asof:gap_success": "as30",
+   "asof:gap_bsuccess": "bs30",
+   "k": "k35",
+   "soft": "sl",
+   "fspec": "fs30",
+   "pscale": "c105",
+   "lv": "lv700"
+  },
+  "fingerprint": "64c8",
+  "full_tag": "a75n1h188c125nocalisas30bs30k35slfs30c105lv700"
  }
 ]

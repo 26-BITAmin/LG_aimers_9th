@@ -62,7 +62,7 @@ PROB_SCALE = 1.05
 #    m8(s30)  p̄ = 0.475541112  ->  Δ = 0.006866833   LB 1107.2194255322
 #    m16      p̄ = 0.475456633  ->  Δ = 0.006951312   (§7.128, 멤버 2배)
 #    차이가 8.4e−05 라 잘못 두면 K·(8.4e−05)² ≈ 0.003 BSS 손해 — 작지만 공짜로 맞춘다.
-PROB_SHIFT = 0.006866833  # = PROB_TARGET − p̄(m8).  m16 은 §7.130 에서 롤백됨
+PROB_SHIFT = 0.006999915599021783  # = PROB_TARGET − p̄(m8).  m16 은 §7.130 에서 롤백됨
 # **체크섬이다 — 운영 상수가 아니다.** `make_dummy_test(art=...)`(재기준화판)
 # 위에서 아핀 변환 후 도달해야 하는 평균이고, `p̄_대리 + PROB_SHIFT` 로 정의된다.
 # build_submit.py가 매 빌드마다 대조해 어긋나면 제출을 막는다 — 재학습으로
@@ -106,6 +106,22 @@ PROB_TARGET = 0.482407945
 #    최적값을 쓰려면 {"F": +0.005614, "R": +0.007028} 이지만 슬롯 값어치가 없다.
 SEG_SHIFT = None
 
+# ── 상수 스윕용 배포층 노브 (§7.131) ────────────────────────────────
+# §7.130 의 규칙: **앙상블을 고정한 채 상수만 바꾸는 변경은 draw 노이즈가 0** 이라
+# LB 차이가 그대로 효과다. 멤버 구성을 바꾸는 변경(§7.128)과 성격이 정반대다.
+#
+# 그리고 곡률 `A₂ = Var(dp/dx)` 는 **라벨 없이** 더미에서 계산되므로
+# `BS(x) = BS₀ + (x−x₀)(A₁−2B₁) + (x−x₀)²A₂` 에서 미지수가 `B₁` 하나뿐이다
+# → **LB 한 점이 꼭짓점을 확정한다** (§7.120 레벨 축과 같은 구조).
+#
+#   K·A₂ (레벨 고정):  δ β 공통배율 83.1  ·  fspec_alpha 22.0
+#                      MLP noid 몫 17.8  ·  LGBM wide 몫 0.6 ← 딸 것이 없다
+#
+# ⚠️ 둘 다 예측 평균을 움직이므로 **`PROB_SHIFT` 를 같이 재고정**해야 한다.
+#    안 그러면 이미 최적인 레벨 항이 딸려 움직여 측정이 오염된다 (0.3~0.5 BSS 규모).
+CTX_BETA_MULT = 1.0           # 사후 로짓 보정 δ 4축의 β 공통배율 (1.0 = 배포값)
+FSPEC_ALPHA_OVERRIDE = 0.30  # None 이면 아티팩트의 fspec_alpha 를 쓴다
+
 
 class Predictor:
     def __init__(self, model_dir="./model"):
@@ -140,7 +156,9 @@ class Predictor:
         # 경로에 비ASCII 문자가 있으면 조용히 깨진다. 파일 I/O는 파이썬에 맡긴다.
         # F 전용 전문가 (§7.101) — game_type=='F' 행만 다시 예측해 로짓에서 섞는다.
         # 옛 아티팩트에는 없는 키이므로 get()으로 읽고, 없으면 α=0이 되어 꺼진다.
-        self.fspec_alpha = float(bundle.get("fspec_alpha") or 0.0)
+        self.fspec_alpha = float(FSPEC_ALPHA_OVERRIDE
+                                 if FSPEC_ALPHA_OVERRIDE is not None
+                                 else (bundle.get("fspec_alpha") or 0.0))
         self.fspec = []
 
         # 꼬리 하드 클리핑 경계 — 학습 때 얼린 숫자 두 개. 없으면 꺼진다.
@@ -234,7 +252,7 @@ class Predictor:
         # 순서를 바꾸면 solve_delta가 다른 로짓을 보게 되어 목표 prior를 못 맞춘다.
         # train.py · verify_pipeline.py가 **같은 함수**를 부른다.
         z_adj, self.ctx_hits = logit_adjust(test_df, self.art)
-        z = z + z_adj
+        z = z + CTX_BETA_MULT * z_adj
 
         # prior shift — 학습 때 고정된 스칼라(base+delta)의 행 단위 적용
         p = 1.0 / (1.0 + np.exp(-(z + self.delta)))

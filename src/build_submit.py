@@ -28,8 +28,8 @@ import numpy as np
 import pandas as pd
 
 from config import ROOT, TEST_CSV, TRAIN_CSV
-from predict import (PROB_CENTER, PROB_SCALE, PROB_SHIFT, PROB_TARGET,
-                     SEG_SHIFT)
+from predict import (CTX_BETA_MULT, FSPEC_ALPHA_OVERRIDE, PROB_CENTER,
+                     PROB_SCALE, PROB_SHIFT, PROB_TARGET, SEG_SHIFT)
 
 SRC = ROOT / "src"
 SUBMIT = ROOT / "submit"
@@ -148,6 +148,9 @@ def main():
     meta["prob_shift"] = PROB_SHIFT
     meta["prob_scale"] = PROB_SCALE
     meta["seg_shift"] = SEG_SHIFT
+    meta["ctx_beta_mult"] = CTX_BETA_MULT
+    if FSPEC_ALPHA_OVERRIDE is not None:
+        meta["fspec_alpha"] = FSPEC_ALPHA_OVERRIDE   # 배포층 오버라이드가 이긴다
     # ⚠️ `mlp_variant_weight`는 train.py가 **config 값**을 적어둔 것이다.
     #    artifacts.joblib의 `mlp_weights`를 직접 패치하면(§7.120 `_vw` 축)
     #    meta.json은 옛 값을 그대로 들고 있어 태그가 축 변경을 놓친다 —
@@ -379,6 +382,10 @@ def describe_tokens(meta):
     fa = float(meta.get("fspec_alpha") or 0.0)
     if fa:
         tok["fspec"] = f"fs{fa * 100:.0f}"
+    # δ β 공통배율 (MODEL.md §7.131).  1.10 -> bm110.  1.0 이면 생략.
+    bm = float(meta.get("ctx_beta_mult") or 1.0)
+    if bm != 1.0:
+        tok["bmult"] = f"bm{bm*100:.0f}"
     # MLP 멤버 수 (MODEL.md §7.128).  s17 에서 "s09 이후 8회 불변"이라 뺐는데
     # §7.128 이 8 -> 16 으로 바꿨다. **기본값 8 이 아니면 태그한다.**
     nm = len(meta.get("mlp_members") or [])
