@@ -228,6 +228,17 @@ def main():
     if meta.get("trackman_mode", "none") == "none":
         skip |= {"trackman_pitcher.csv", "pitcher_id_map.csv"}
 
+    # ⚠️ zip 은 `submit/` 아래를 **무조건 재귀로** 담는다. 백업 모델 디렉토리를
+    #    여기 두면 통째로 들어가서 (실제로 s32 빌드가 62.7MB 가 됐다) 코드 검증자가
+    #    "왜 안 쓰는 모델이 셋인가" 하고 본다 — 위 `skip` 주석과 같은 이유다.
+    allow = {"model", "script.py", "requirements.txt", "history.json", *COPY_FILES}
+    extra = sorted(x.name for x in SUBMIT.iterdir()
+                   if x.name not in allow and x.name != "__pycache__")
+    if extra:
+        for x in extra:
+            print(f"  ❌ submit/ 최상위에 예상 밖 항목: {x}")
+        raise SystemExit("submit/ 밖으로 옮기고 다시 실행할 것.")
+
     zip_path = next_zip_path(meta)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(SUBMIT.rglob("*")):
@@ -368,6 +379,11 @@ def describe_tokens(meta):
     fa = float(meta.get("fspec_alpha") or 0.0)
     if fa:
         tok["fspec"] = f"fs{fa * 100:.0f}"
+    # MLP 멤버 수 (MODEL.md §7.128).  s17 에서 "s09 이후 8회 불변"이라 뺐는데
+    # §7.128 이 8 -> 16 으로 바꿨다. **기본값 8 이 아니면 태그한다.**
+    nm = len(meta.get("mlp_members") or [])
+    if meta.get("use_mlp") and nm and nm != 8:
+        tok["nmlp"] = f"m{nm}"
     # 세그먼트 레벨 분해 (MODEL.md §7.123).  D̂ = Δ_R − Δ_F, x1e5 -> sg841.
     # 끄면(=None/빈dict) 생략 — 옛 태그와 호환된다.
     sg = meta.get("seg_shift") or {}
