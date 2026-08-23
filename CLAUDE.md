@@ -5,12 +5,44 @@ LG Aimers 9기 — 투구 제구 성공 확률 예측 (Dacon 코드 제출 대�
 
 이 파일은 판단 기준만 담는다. 사실은 아래에 있다.
 
+## ⚠️ 현재 파이프라인 = `wonwoo_repro/` (2026-08-23부로 전환, 사용자 지시)
+
+s01(wonwoo 순수 재현) 실제 LB **1078.84**로 원본과 일치 확인, s02(경험 티어
+슬로프 사후보정 추가) 실제 LB **1080.72**(Δ**+1.883**, 확정 이득)까지 나온
+뒤 우리 자체 51피처 LightGBM+CatBoost 파이프라인(`src/`)은 **개발 중단·보관**
+으로 전환했다. 이후 모든 신규 실험·제출은 `wonwoo_repro/`를 기반으로 진행한다.
+
+- 피처 정의 단일 진실 소스: `wonwoo_repro/src/features.py`
+  (`fit_artifacts`/`build_features` — 78개 모델 입력 피처, 목록·구조는 `model.md`
+  "wonwoo 2-fold 프로토콜 완전 전환" 절 이후 기록 참고)
+- 사후 로짓 보정 축(모델 피처 아님): `logit_adjust()` — ctx(hand/count4) + asof
+  시즌진행분(gap_success/gap_bsuccess) + gt_F 델타 + **티어 슬로프(s02, 우리 추가)**
+- 추론 코드: `wonwoo_repro/src/predict.py` (제출 zip 루트에 그대로 복사되는
+  배포 코드 — `config`/`data`/`validation` 등 학습 전용 모듈 의존 없음)
+- 제출 빌드: `wonwoo_repro/src/build_submit.py` — `next_zip_path()`가
+  `meta.json`(=`config.py` 하이퍼파라미터) 기준 중복 가드를 건다. `predict.py`만
+  바뀐 경우(우리 티어 보정처럼) 가드를 못 잡으므로 `suffix=` 수동 오버라이드 필요
+- 검증: `wonwoo_repro/src/validation.py`(`bss`/`shift_to_prior`/`decompose` 등
+  wonwoo 원본) — 이게 유일한 검증 기준. `src/verify_pipeline_calib.py`(우리가
+  추가, 티어 캘리브레이션 진단 포함)가 이 위에서 돈다
+- `wonwoo_repro/`는 **git-untracked 로컬 샌드박스**다. 정식 버전관리 편입 여부는
+  아직 사용자 결정 대기 — 그 전까지 존재를 전제하지 말고 경로로 참조할 것
+- `wonwoo_repro/SUBMISSIONS.md`가 실제 제출 이력 표(파일명/Trackman/prior/피처/
+  홀드아웃/LB) — 새 제출마다 채운다
+
+우리 자체 `src/`(51피처) 파이프라인·`experiments/exp01~66`·`results.csv`는
+**유효한 과거 기록으로 보관**하고 재실행하지 않는다. 아래 "검증 프로토콜"·
+"폐기 목록"·"Known Pitfalls"의 서술 다수가 그 파이프라인 기준으로 쓰였지만,
+방법론적 교훈(축소 강도 통일·클리핑 점수 금지·fit fold≠eval fold 등)은
+wonwoo_repro 작업에도 그대로 적용된다 — 파이프라인은 바뀌었어도 판단 기준은
+안 바뀐다.
+
 | 문서 | 언제 |
 |---|---|
-| `EDA_정리.md` | **작업 시작 전 항상.** 확정된 분석 결과 |
+| `EDA_정리.md` | **작업 시작 전 항상.** 확정된 분석 결과 (원본 데이터는 동일하므로 여전히 유효) |
 | `competition.md` | 대회 규칙·서버 환경 |
-| `submit/CHECKLIST.md` | 제출 직전 |
-| `results.csv` | 새 실험 설계 전 |
+| `model.md` | 실험사 전체 기록 — 현재 진행 중인 라인은 "wonwoo 2-fold 프로토콜 완전 전환" 절 이후 |
+| `wonwoo_repro/SUBMISSIONS.md` | 실제 제출 직전·직후 |
 
 ---
 
@@ -48,10 +80,17 @@ rate = df.groupby("pitcher_id")["y"].expanding().mean()
 `artifacts/decoded_pitch_outcomes.parquet`는 현재 투구의 **사후 정보**다.
 strictly-prior 집계 재료로만 쓰고, 현재 행에 조인하면 라벨 누출이다.
 
-**피처 정의는 `src/features.py` 한 곳에만.** `submit/script.py`는 이걸 import 하거나
-파일째 복사한다. 재구현하면 평가 서버에서만 터진다.
+**피처 정의는 `wonwoo_repro/src/features.py` 한 곳에만.** `predict.py`가 이걸
+import 한다(재구현 아님) — 학습·검증·추론 세 경로가 `build_features`/
+`logit_adjust` 같은 함수를 봐야 §7.36류 버그(축 하나가 세 경로 중 한 곳에서만
+빠지는 것)가 안 생긴다. 새 사후보정 축을 추가할 땐 `CTX_CODERS`(또는 같은 구조의
+`asof`/`mix` 리스트) 한 곳만 고친다 — 티어 슬로프처럼 `predict.py`에 직접 넣는
+방식은 예외(모델 재학습 없는 순수 로짓 후처리라 별도 아티팩트 구조가 필요 없었음).
+(우리 자체 `src/features.py`는 archived — 더 이상 단일 진실 소스가 아니다.)
 
-**anchor(`artifacts/anchor_preds.npz`)는 동결.** 실험마다 바꾸면 Δ의 의미가 달라진다.
+**anchor는 실험마다 바꾸지 않는다.** wonwoo_repro는 `submit/model/`에 학습
+아티팩트를 한 번 굳히고 재사용한다(s01→s02 전환도 재학습 없이 `predict.py`
+패치만으로 이뤄졌다) — 비교할 땐 이 동결된 아티팩트 기준으로 Δ를 본다.
 
 **점수는 리더보드 환산으로만 보고.** 원시 Brier는 폴드마다 $r$이 달라 비교 불가.
 
@@ -82,9 +121,14 @@ pts_res = 1e5 * (1 - mean((p - bias - y)**2) / den)     # 오라클 절편 = 해
 
 ## 검증 프로토콜
 
-**2026-08-21부로 wonwoo 2-fold(확장 윈도우) 방식으로 완전 대체(사용자 지시).**
+**2026-08-21부로 wonwoo 2-fold(확장 윈도우) 방식으로 완전 대체(사용자 지시),
+2026-08-23부로 wonwoo_repro 파이프라인 자체에서 직접 검증(사용자 지시).**
 옛 A/B/C/D(롤링 3시즌 창)는 폐기 — `experiments/exp04~64`는 그 정의로 기록된
 과거 결과이므로 재실행하지 말고 당시 수치를 그대로 읽는다 (`src/folds.py` 주석 참고).
+`src/folds.py`를 2-fold로 바꾼 뒤 우리 자체 파이프라인 위에서 재현한 exp65/66도
+같은 이유로 이제 과거 기록이다 — 2-fold 정의 자체(폴드 구간·지표)는 아래
+그대로 유효하지만, **적용 대상은 `wonwoo_repro/src/validation.py` +
+`src/verify_pipeline_calib.py`이지 우리 `src/folds.py`가 아니다.**
 
 | fold | train | valid | 용도 |
 |---|---|---|---|
@@ -129,13 +173,18 @@ label, fold, delta_pts, ci_lo, ci_hi, slope, n_va, seed, git_sha
 - 최고 피처는 `asof_success_R_platoon_blend`(R 전용 재구성 + strictly-prior 좌우 매치업 분할,
   노트북 05) — 4폴드 평균 600.7. `asof_success_R2`(517.5) 대비 +85~+97, 주최 제공(434.6) 대비 훨씬 큼.
   콜드스타트 무시 가능(2024 R `platoon_n` 결측 0.05%). `pitcher × batter_hand` 그룹 lookup은
-  `pitcher only` 대비 +79.4였지만 이건 별개 방식(strictly-prior 연속 누적)
+  `pitcher only` 대비 +79.4였지만 이건 별개 방식(strictly-prior 연속 누적).
+  이 항목은 **archived된 우리 자체 `src/` 파이프라인** 기준 기록 — wonwoo_repro는
+  이와 별개로 `asof_pitcher_success_rate_sm`(경험적 베이즈 스무딩, k=200) +
+  시즌진행분 gap 보정 축으로 같은 신호를 담는다(구조는 다르지만 목적 동일)
 - **이 문제는 사실상 "투수 제구력 + base rate"다.** 상황·타자 정체성·구종 배합은 해상도 ≈ 0
 
-### `artifacts/` (노트북 02~03 산출물, 재생성 불필요)
+### `artifacts/` (archived — 우리 자체 `src/` 파이프라인 전용, 노트북 02~03 산출물)
 
 `decoded_pitch_outcomes.parquet` · `rebuilt_asof_features.parquet` ·
-`pitcher_train_totals.parquet`(추론에 필요) · `anchor_preds.npz`(동결)
+`pitcher_train_totals.parquet`(추론에 필요) · `anchor_preds.npz`(동결) — 이 넷은
+`wonwoo_repro/`가 참조하지 않는다. wonwoo_repro 쪽 학습 산출물은
+`wonwoo_repro/submit/model/`(부스터·MLP·`artifacts.joblib`·`meta.json`).
 
 ---
 
