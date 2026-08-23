@@ -62,7 +62,7 @@ PROB_SCALE = 1.05
 #    m8(s30)  p̄ = 0.475541112  ->  Δ = 0.006866833   LB 1107.2194255322
 #    m16      p̄ = 0.475456633  ->  Δ = 0.006951312   (§7.128, 멤버 2배)
 #    차이가 8.4e−05 라 잘못 두면 K·(8.4e−05)² ≈ 0.003 BSS 손해 — 작지만 공짜로 맞춘다.
-PROB_SHIFT = 0.006999915599021783  # = PROB_TARGET − p̄(m8).  m16 은 §7.130 에서 롤백됨
+PROB_SHIFT = 0.007139814819161022  # = PROB_TARGET − p̄(m8).  m16 은 §7.130 에서 롤백됨
 # **체크섬이다 — 운영 상수가 아니다.** `make_dummy_test(art=...)`(재기준화판)
 # 위에서 아핀 변환 후 도달해야 하는 평균이고, `p̄_대리 + PROB_SHIFT` 로 정의된다.
 # build_submit.py가 매 빌드마다 대조해 어긋나면 제출을 막는다 — 재학습으로
@@ -120,7 +120,7 @@ SEG_SHIFT = None
 # ⚠️ 둘 다 예측 평균을 움직이므로 **`PROB_SHIFT` 를 같이 재고정**해야 한다.
 #    안 그러면 이미 최적인 레벨 항이 딸려 움직여 측정이 오염된다 (0.3~0.5 BSS 규모).
 CTX_BETA_MULT = 1.0           # 사후 로짓 보정 δ 4축의 β 공통배율 (1.0 = 배포값)
-FSPEC_ALPHA_OVERRIDE = 0.30  # None 이면 아티팩트의 fspec_alpha 를 쓴다
+FSPEC_ALPHA_OVERRIDE = None  # None 이면 아티팩트의 fspec_alpha 를 쓴다
 
 
 class Predictor:

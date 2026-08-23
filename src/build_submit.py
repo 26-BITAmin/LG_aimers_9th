@@ -166,6 +166,14 @@ def main():
             print(f"  ⚠️ mlp_variant_weight 불일치 — config {cfg} vs 서빙 {served}")
             print("     (artifacts.joblib 직접 패치. 태그는 서빙값 기준으로 붙인다)")
         meta["mlp_variant_weight"] = served
+    # 같은 이유로 `fspec_alpha` 도 **서빙되는 값**에서 읽는다 (§7.132).
+    # s35 첫 빌드가 아티팩트를 0.4580 으로 패치했는데 meta.json 이 0.15 라
+    # 태그가 `fs15` 로 나왔다 — **파일명이 거짓말을 했다.**
+    if _b.get("fspec_alpha") is not None:
+        cfa, sfa = meta.get("fspec_alpha"), float(_b["fspec_alpha"])
+        if cfa is not None and abs(float(cfa) - sfa) > 1e-12:
+            print(f"  ⚠️ fspec_alpha 불일치 — meta {cfa} vs 서빙 {sfa}  (서빙값으로 태그)")
+        meta["fspec_alpha"] = sfa
 
     mlps = sorted(model_dir.glob("mlp_*.npz"))
     if meta.get("use_mlp"):
