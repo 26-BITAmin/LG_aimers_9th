@@ -57,6 +57,48 @@ _PITCHER_N_COLS = {"asof_pitcher_n", "asof_pitcher_pitchmix_n"}
 # 전부 실패해 -1로 떨어진다 — 에러 없이 성능만 죽는 종류의 버그다.
 CATEGORICAL_STR = ["base_state", "top_bottom", "game_type"]
 CATEGORICAL_INT = ["pitcher_team_id", "batter_team_id"]
+
+# ── [실험 전용] asof 곱 상호작용 (MODEL.md §7.120) ────────────────────
+# 기본값 None → 아무 컬럼도 안 만든다. **배포 경로는 비트 단위로 그대로다.**
+# 실험 스크립트가 `features.EXTRA_PROD = "prod"` 처럼 세워서 켠다.
+#   "prod"     asof_pitcher_reverse_rate x asof_pitcher_success_rate
+#              (사용자 제안. 두 주효과는 이미 배포 피처라 base 가 곧 주효과 대조군)
+#   "placebo"  같은 success_rate x **죽은 축**(요일)  — 영가설.
+#              요일은 §7.78 에서 죽은 것이 확인된 실축이고, 공유항(success_rate)을
+#              남기므로 "컬럼 하나 더 붙은 효과"만 분리해 준다 (memory: 위약은
+#              공유 항을 남겨야 한다 / 죽은 축을 영가설로 쓰라).
+# 두 팔 모두 **같은 이름·같은 개수·같은 NaN 패턴**의 컬럼을 만든다.
+EXTRA_PROD = None
+
+# 요일(0~6)을 reverse_rate 의 5~95 퍼센타일 구간으로 늘린 값. 스케일을 맞춰야
+# 위약이 후보와 같은 프로파일을 갖는다.
+_DOW_LO, _DOW_HI = 0.119048, 0.307958
+
+# ── [실험 전용] 이력 깊이 / prev 결측 채움 (MODEL.md §7.130) ──────────
+# 기본값 None → 배포 경로는 비트 단위로 그대로다.
+#
+# 왜 있나. `prev{1,3,5}_game_*` 는 **완료 경기 수가 적으면 서로 같은 값이 된다** —
+# 경기 1개면 "직전 1/3/5경기"가 전부 그 한 경기다. 그래서 `form_p3_minus_p5` 가
+# 구조적으로 정확히 0 인 행이 train 의 **5.89%**(86,820행) 있다. 모델은 그것을
+# "폼 변화가 없다"와 구별할 수단이 없다 — `miss_prev_game` 플래그는 완료 경기
+# **0개**(1.98%)만 덮는다. 결측 표현이 이진인데 실제 조건은 서수다.
+#
+#   "depth"     `hist_depth` 서수 1개 추가 (0=이력없음 1=1경기 2=2~3 3=4+).
+#               그 행 **자신의 컬럼끼리만 비교**해서 나온다 — groupby 없음,
+#               아티팩트 없음 (CLAUDE.md §3.2 행 독립성이 자명하다).
+#   "depthnan"  위 + 구조적 0 을 NaN 으로 바꾼다. LGBM 은 결측 분기로 자동 분리,
+#               MLP 는 `nan_plan` 밖 컬럼이라 0 으로 떨어져 사실상 현행 유지 →
+#               **두 학습기가 다르게 반응한다** (§7.92 형 반전 위험을 일부러 잰다).
+#   "carry"     prev 결측을 리그 prior 가 아니라 **그 투수 자신의 커리어값**으로
+#               채운다 → form_* 이 정확히 0 이 된다. 현행은 `prior - career_i` 라
+#               커리어에 대한 **가짜 단조감소 기울기**가 1.98% 행에 깔린다.
+#   "depthflag" §7.130 후속. **컬럼을 늘리지 않고** 기존 `miss_prev_game` 을 서수로
+#               승격한다 — `depth` 팔은 내용(위약 대비 +3.6/+0.6)이 있었는데 컬럼
+#               하나 추가하는 비용(-5.1/-2.6)에 먹혔다. 방향은 원래 플래그와 맞춘다
+#               (1 = 이력 없음). 트리는 0.5 에서 쪼개면 원래 플래그를 정확히
+#               복원하므로 **엄밀한 상위집합**이다.
+HIST_MODE = None
+_HIST_MODES = ("depth", "depthnan", "carry", "depthflag")
 CATEGORICAL_COLS = CATEGORICAL_STR + CATEGORICAL_INT
 
 # prev{1,3,5}_game_* 는 항상 같이 결측된다 (등판 이력 없음) → 플래그 하나로 충분
@@ -70,21 +112,51 @@ PREV_COLS = [
 # prev{1,3,5}가 드리프트가 가장 크다 (−0.058, 컬럼 std의 0.45~0.79배).
 CENTER_COLS = [c for c, _ in SMOOTH_SPEC] + PREV_COLS
 
+# §7.119 — **부분 중심화** 대상 (사용자 지정 5개). 투수 자신의 제구 축만 건드리고
+# 타자·구종믹스·middle/ball/strike 계열은 원본을 유지한다.
+CENTER_SUBSET5 = [
+    "asof_pitcher_success_rate",
+    "asof_pitcher_reverse_rate",
+    "asof_pitcher_prev1_game_success_rate",
+    "asof_pitcher_prev3_game_success_rate",
+    "asof_pitcher_prev5_game_success_rate",
+]
+
+# mode 별 성질. 셋을 따로 두는 이유 — `mu5`(대조군)는 μ 컬럼만 추가하고 값은
+# **안 건드린다.** 그래서 priors 를 0 으로 만들면 안 된다 (값이 여전히 .5 대역).
+_SUBSET5_MODES = ("lag5", "lag5mu", "mu5", "mu5dead", "lag5sq")   # 5개만 대상
+_MU_FEATURE_MODES = ("lag5mu", "mu5", "mu5dead")        # μ 형태 컬럼 5개를 추가
+_ZERO_PRIOR_MODES = ("zero", "zero_scale", "zero_off", "lag", "lag5", "lag5mu",
+                     "lag5sq")
+
+# §7.119 위약 축 — **요일**. `DROP_FEATURES` 에 있고 §7.78 에서 죽은 것이 확인됐다.
+# `mu5dead` 는 μ 컬럼과 **같은 이름·같은 개수·같은 구조**(그룹 평균 조회)를 만들되
+# 축만 죽은 것으로 바꾼다. 목적은 "내용이 0인 컬럼 5개를 붙이는 것 자체의 비용"을
+# 재는 것 — §7.120 에서 컬럼 1개 위약이 후보와 **같은 크기로 움직였다**(둘 다 구간이
+# 0 을 포함해 부호 미확정). 그래서 그 양은 미지수이고 여기서 직접 잰다.
+# (MEMORY: 위약은 공유 항을 남겨야 한다 / 죽은 축을 영가설로 쓰라 / 노이즈 바닥은
+#  학습기마다 다르다 → 1개에서 잰 값을 5개로 외삽하지 않고 직접 잰다.)
+# ⚠️ 한계: 요일은 train·test 에 같은 수준이 전부 나타나므로 이 위약은 μ 의
+#    **범위 밖 외삽** 성분은 재현하지 않는다. 컬럼 수 성분만 격리한다.
+_DEAD_COL = "game_dayofweek"
+
 
 def fit_asof_center(train_df, cols=CENTER_COLS, min_n=500):
     """(시즌 × game_type) → 평균·표준편차 표 + **다음 시즌 외삽** 규칙. train에서만 호출."""
     ss = train_df["season"].to_numpy(dtype=np.int64)
     gg = train_df["game_type"].astype("object").to_numpy().astype(str)
     ug = np.unique(gg)
-    out = {"table": {}, "fallback": {}, "global": {}, "sd": {}, "sd_fb": {}, "sd_global": {}}
+    out = {"table": {}, "fallback": {}, "global": {}, "sd": {}, "sd_fb": {}, "sd_global": {},
+           "lag": {}, "lag_fb": {}}
     for col in cols:
         v = train_df[col].to_numpy(dtype=np.float64)
         fin = np.isfinite(v)
         out["global"][col] = float(v[fin].mean()) if fin.any() else 0.5
         out["sd_global"][col] = float(v[fin].std()) if fin.any() else 1.0
         tab, fb, sdt, sdf = {}, {}, {}, {}
+        lag, lfb = {}, {}
         for gtv in ug:
-            pts, spts = [], []
+            pts, spts, cnt = [], [], []
             for yy in sorted(set(ss[gg == gtv].tolist())):
                 m = (ss == yy) & (gg == gtv) & fin
                 if m.sum() >= min_n:
@@ -92,6 +164,7 @@ def fit_asof_center(train_df, cols=CENTER_COLS, min_n=500):
                     sdt[(int(yy), gtv)] = max(float(v[m].std()), 1e-6)
                     pts.append((int(yy), float(v[m].mean())))
                     spts.append((int(yy), max(float(v[m].std()), 1e-6)))
+                    cnt.append(int(m.sum()))
             for src, dst in ((pts, fb), (spts, sdf)):
                 if len(src) >= 2:
                     # 연속 차분의 평균으로 1스텝 외삽 (TARGET_PRIOR_2025와 같은 규칙)
@@ -99,8 +172,21 @@ def fit_asof_center(train_df, cols=CENTER_COLS, min_n=500):
                     dst[gtv] = (src[-1][0], src[-1][1], d)
                 elif src:
                     dst[gtv] = (src[-1][0], src[-1][1], 0.0)
+            # mode="lag" (§7.117) — 시즌 s 의 기준 = s **이전** 시즌들의 행수 가중
+            # 누적 평균. 첫 시즌은 과거가 없어 자기 시즌 평균. 표에 없는 시즌
+            # (fold 검증 시즌·2025)은 전체 누적을 slope 0 fallback 으로 — **외삽이
+            # 없다.** 학습·추론 모두 기준이 한 발 늦어 정렬 잔차의 생성 규칙이 같다
+            # (기각된 네 구현의 공통점인 학습/추론 정렬 비대칭을 제거하는 설계).
+            csum, cn = 0.0, 0
+            for (yy, mu), n in zip(pts, cnt):
+                lag[(yy, gtv)] = (csum / cn) if cn else mu
+                csum += mu * n
+                cn += n
+            if cn:
+                lfb[gtv] = (pts[-1][0], csum / cn, 0.0)
         out["table"][col], out["fallback"][col] = tab, fb
         out["sd"][col], out["sd_fb"][col] = sdt, sdf
+        out["lag"][col], out["lag_fb"][col] = lag, lfb
     return out
 
 
@@ -144,6 +230,42 @@ def _center_offset(g, ac, col):
     return _lookup_group(g, ac["table"][col], ac["fallback"][col], ac["global"][col])
 
 
+def fit_dead_group(train_df, cols, min_n=500):
+    """§7.119 위약 표 — (요일 × game_type) 그룹 평균. train에서만 호출.
+
+    μ 표와 **구조가 같다**(그룹 평균 조회). 축만 죽은 것이라, 여기서 나오는 차이는
+    '컬럼 5개가 붙었다'는 사실 자체의 값이다.
+    """
+    kk = train_df[_DEAD_COL].to_numpy(dtype=np.int64)
+    gg = train_df["game_type"].astype("object").to_numpy().astype(str)
+    out = {"table": {}, "global": {}}
+    for col in cols:
+        v = train_df[col].to_numpy(dtype=np.float64)
+        fin = np.isfinite(v)
+        out["global"][col] = float(v[fin].mean()) if fin.any() else 0.5
+        tab = {}
+        for gtv in np.unique(gg):
+            for dd in np.unique(kk):
+                m = (kk == dd) & (gg == gtv) & fin
+                if m.sum() >= min_n:
+                    tab[(int(dd), gtv)] = float(v[m].mean())
+        out["table"][col] = tab
+    return out
+
+
+def _lookup_dead(g, tab, gm):
+    """행별 조회. `_lookup_group`과 같은 형태지만 키가 (요일, game_type)이다."""
+    kk = g[_DEAD_COL].to_numpy(dtype=np.int64)
+    gg = g["game_type"].astype("object").to_numpy().astype(str)
+    ug = np.unique(gg)
+    k = kk * len(ug) + np.searchsorted(ug, gg)
+    out = np.full(len(k), gm, dtype=np.float64)
+    for key in np.unique(k):
+        dd, c = int(key // len(ug)), int(key % len(ug))
+        out[k == key] = tab.get((dd, str(ug[c])), gm)
+    return out
+
+
 def _center_apply(g, art, ac, col, raw):
     """중심화 적용. mode 가 설계 전체를 정한다.
 
@@ -151,8 +273,31 @@ def _center_apply(g, art, ac, col, raw):
     zero       v − μ                 **평균 0.** 이때 `priors[col]` 은 0 으로 바뀌어 있어
                                      스무딩·결측대체·form_* 가 전부 따라온다 (§7.116)
     zero_scale (v − μ) / σ           평균 0 + 시즌별 스케일 정규화
+    lag        v − μ_cum(< s)        기준이 시즌 s−1 까지의 누적 평균 (§7.117).
+                                     미지 시즌은 전체 누적 상수 — 외삽이 없어 학습/추론
+                                     정렬 비대칭이 사라진다. priors 는 zero 처럼 0.
+    lag5       lag 를 5개 컬럼에만    §7.119. 대상 축소가 유일한 차이다.
+    lag5mu     lag5 + μ 를 컬럼으로   §7.119 사용자 제안. 변환이 **가역**이 된다
+                                     (모델이 v = (v−μ) + μ 를 복원할 수 있다).
+    mu5        **중심화 안 함**       §7.119 짝지은 대조군 — μ 컬럼만 추가한다.
+                                     "μ 가 한 일"과 "중심화가 한 일"을 가른다.
     """
     mode = ac.get("mode", "base")
+    if mode in ("mu5", "mu5dead"):
+        return raw                            # 값은 그대로 — μ 컬럼만 따로 나간다
+    if mode in ("lag", "lag5", "lag5mu", "lag5sq"):
+        v = raw - _lookup_group(g, ac["lag"][col], ac["lag_fb"][col], ac["global"][col])
+        if mode == "lag5sq":
+            # §7.121 — **부호 있는 제곱** `sign(c)·c²` (사용자 수정안).
+            # 단순 제곱은 부호를 접어 정보를 버리는데, 부호를 도로 붙이면 **강단조**라
+            # 정보 손실이 없다. 그 대신:
+            #   · 트리에는 **무연산**이다 (분할이 `x ≤ t` 라 순서만 보면 된다).
+            #     → LGBM 예측이 lag5 와 같아야 정상. 하네스가 이걸 assert 한다.
+            #   · MLP 는 단조 변환에 불변이 아니라 **꼬리가 늘어난 기하**를 본다.
+            # ⚠️ 스케일 상수는 여전히 무의미하다 — sign(kc)(kc)² = k³·sign(c)c² 이고
+            #    표준화가 k³ 을 그대로 나눈다 ("×100" 이 무연산인 것과 같은 이유).
+            v = np.sign(v) * v * v
+        return v.astype(np.float32)
     v = raw - _center_offset(g, ac, col)
     if mode in ("zero", "zero_off"):
         pass                                  # 평균 0 — 더하는 상수가 없다
@@ -447,10 +592,14 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
         mode = center_asof if isinstance(center_asof, str) else "base"
         adj = build_features(train_df, art)          # art 에 asof_center 가 아직 없다
         tmp = train_df[["season", "game_type"]].copy()
-        cols = [c for c in CENTER_COLS if c in adj.columns]
+        pool = CENTER_SUBSET5 if mode in _SUBSET5_MODES else CENTER_COLS
+        cols = [c for c in pool if c in adj.columns]
         for c in cols:
             tmp[c] = adj[c].to_numpy(dtype=np.float64)
         art["asof_center"] = fit_asof_center(tmp, cols=cols)
+        if mode == "mu5dead":                       # §7.119 위약 — 죽은 축 그룹 평균
+            tmp[_DEAD_COL] = train_df[_DEAD_COL].to_numpy()
+            art["asof_center"]["dead"] = fit_dead_group(tmp, cols=cols)
         art["asof_center"]["mode"] = mode
         art["asof_center"]["season0"] = float(train_df["season"].min())
         # ★ zero 계열이면 **맞출 상수 자체를 없앤다** (§7.116).
@@ -458,7 +607,8 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
         #   NaN 채움값이다. 평균 0 으로 중심화해놓고 결측을 0.52 로 채우면 그 행만
         #   10σ 밖으로 날아간다 — §7.115 ①과 같은 종류의 함정이 세 곳에 있다.
         #   여기 한 줄로 바꾸면 셋이 전부 따라온다.
-        if mode in ("zero", "zero_scale", "zero_off"):
+        #   ⚠️ `mu5` 는 여기 없다 — 값을 안 건드리는 대조군이라 priors 가 그대로여야 한다.
+        if mode in _ZERO_PRIOR_MODES:
             for c in cols:
                 art["priors"][c] = 0.0
 
@@ -486,6 +636,19 @@ def _col64(g, col, fill, art=None):
     """
     v = _clip32(g[col].to_numpy(dtype=np.float32), art, col).astype(np.float64)
     return np.nan_to_num(v, nan=fill)
+
+
+def _col64v(g, col, fill, art=None):
+    """`_col64` 의 **행별 채움값** 판. `fill` 이 스칼라가 아니라 배열이라는 것만 다르다.
+
+    dtype 왕복(float32 → float64)은 똑같이 지킨다 — 여기서 갈라지면 `_col64` 를 쓰는
+    팔과 이 함수를 쓰는 팔이 1 ULP 씩 어긋나 **팔의 차이가 아니라 dtype 의 차이**를
+    재게 된다 (`_col64` 주석의 skew 사고와 같은 종류).
+    """
+    v = _clip32(g[col].to_numpy(dtype=np.float32), art, col).astype(np.float64)
+    m = np.isnan(v)
+    v[m] = np.asarray(fill, dtype=np.float64)[m]
+    return v
 
 
 def _smooth(rate, n, prior, k):
@@ -586,6 +749,25 @@ def build_features(df, art):
         out["season_idx"] = (g["season"].to_numpy(dtype=np.float32)
                              - float(_ac.get("season0", 2019.0)))
 
+    # ── §7.119 — μ 를 **컬럼으로도** 준다 (`lag5mu` 사용자 제안 / `mu5` 대조군) ──
+    # 중심화는 v ← v − μ 로 정보를 **버리는** 변환이다. μ 를 같이 주면 모델이
+    # v = (v−μ) + μ 로 복원할 수 있어 **가역**이 된다 — 즉 "표현을 바꾸되 정보는
+    # 안 버린다". §7.116 zero_off 가 오프셋 1개 + season_idx 로 하려던 것의
+    # 컬럼별 일반화판이다.
+    # ⚠️ μ 는 (시즌 × game_type) 의 결정적 함수 = **사실상 시즌 지시자**다. 그래서
+    #    `mu5`(중심화 없이 μ 만) 대조군이 반드시 같이 필요하다 — 안 그러면 이득/손실이
+    #    중심화 때문인지 시즌 지시자 때문인지 못 가른다 (§7.116 ⑩이 빠뜨린 대조).
+    # ⚠️ 검증/2025 의 μ 는 lag 규칙상 **전체 누적 상수**라 학습 최소값보다 약간 아래다.
+    #    트리는 최좌측 잎으로 보내는데, 드리프트가 단조라 "최좌측 = 가장 최근 시즌"이라
+    #    방향이 맞다. §7.116 의 외삽 실패(학습 범위 밖으로 크게 벗어남)와는 다르다.
+    if _ac is not None and _ac.get("mode") in _MU_FEATURE_MODES:
+        _dead = _ac.get("dead")               # 위약 팔이면 죽은 축 표를 대신 쓴다
+        for c in _ac["lag"]:
+            v_mu = (_lookup_dead(g, _dead["table"][c], _dead["global"][c])
+                    if _dead is not None else
+                    _lookup_group(g, _ac["lag"][c], _ac["lag_fb"][c], _ac["global"][c]))
+            out[c + "_mu"] = v_mu.astype(np.float32)   # 이름을 위약과 **같게** 둔다
+
     sm = {}
     for col, ncol in SMOOTH_SPEC:
         # 꼬리를 먼저 자른 뒤 스무딩·파생으로 내려보낸다. 자르는 것은 값이 아니라
@@ -613,17 +795,62 @@ def build_features(df, art):
 
     # ── 최근 폼 변화 (차분은 트리가 스스로 못 만든다) ────────
     pr = art["priors"]
-    p1 = _col64(g, "asof_pitcher_prev1_game_success_rate", pr["asof_pitcher_prev1_game_success_rate"], art)
-    p3 = _col64(g, "asof_pitcher_prev3_game_success_rate", pr["asof_pitcher_prev3_game_success_rate"], art)
-    p5 = _col64(g, "asof_pitcher_prev5_game_success_rate", pr["asof_pitcher_prev5_game_success_rate"], art)
+
+    # ── [실험 전용] 이력 깊이 — HIST_MODE 참조 (기본값 None = 없음) ──
+    # ⚠️ **원본 컬럼끼리** 비교한다. 클리핑·중심화 뒤에 재면 안 된다 — clip 은
+    #    다대일 사상이라 꼬리에 앉은 서로 다른 값이 인위적으로 같아지고, 그러면
+    #    "완료 경기가 적다"가 아닌 행이 얕은 깊이로 잘못 분류된다.
+    d0 = d1 = d3 = None
+    if HIST_MODE is not None:
+        if HIST_MODE not in _HIST_MODES:
+            raise ValueError(f"모르는 HIST_MODE: {HIST_MODE!r}")
+        r1 = g["asof_pitcher_prev1_game_success_rate"].to_numpy(dtype=np.float64)
+        r3 = g["asof_pitcher_prev3_game_success_rate"].to_numpy(dtype=np.float64)
+        r5 = g["asof_pitcher_prev5_game_success_rate"].to_numpy(dtype=np.float64)
+        d0 = np.isnan(r1)                            # 완료 경기 0  (= miss_prev_game)
+        d1 = ~d0 & (r1 == r3) & (r3 == r5)           #            1
+        d3 = ~d0 & ~d1 & (r3 == r5)                  #            2~3
+        depth = np.where(d0, 0.0, np.where(d1, 1.0, np.where(d3, 2.0, 3.0)))
+        # ⚠️ `carry` 팔에는 **넣지 않는다.** carry 는 (채움방식 x 플래그) 2x2 의 한 칸이라
+        #    컬럼이 하나 더 붙으면 한 팔에 변경이 둘이 되어 칸의 의미가 깨진다.
+        if HIST_MODE in ("depth", "depthnan"):
+            out["hist_depth"] = depth.astype(np.float32)
+        elif HIST_MODE == "depthflag":
+            # 기존 키를 **덮어쓴다** — dict 는 재대입해도 삽입 순서를 유지하므로
+            # 컬럼 수도 순서도 그대로다. 이게 이 팔의 전부이자 존재 이유다.
+            assert "miss_prev_game" in out, "플래그가 아직 안 만들어졌다 (삽입 순서 확인)"
+            out["miss_prev_game"] = ((3.0 - depth) / 3.0).astype(np.float32)
+
+    if HIST_MODE == "carry":
+        # 결측을 리그 prior 가 아니라 **그 투수 자신의 커리어(스무딩)** 로 채운다.
+        # 그러면 form_* 이 전부 정확히 0 이 되어, 현행의 `prior - career_i`
+        # (커리어에 대한 가짜 단조감소 기울기)가 사라진다. 레벨은 플래그가 흡수한다.
+        p1 = _col64v(g, "asof_pitcher_prev1_game_success_rate", sm["asof_pitcher_success_rate"], art)
+        p3 = _col64v(g, "asof_pitcher_prev3_game_success_rate", sm["asof_pitcher_success_rate"], art)
+        p5 = _col64v(g, "asof_pitcher_prev5_game_success_rate", sm["asof_pitcher_success_rate"], art)
+        m1 = _col64v(g, "asof_pitcher_prev1_game_middle_rate", sm["asof_pitcher_middle_rate"], art)
+    else:
+        p1 = _col64(g, "asof_pitcher_prev1_game_success_rate", pr["asof_pitcher_prev1_game_success_rate"], art)
+        p3 = _col64(g, "asof_pitcher_prev3_game_success_rate", pr["asof_pitcher_prev3_game_success_rate"], art)
+        p5 = _col64(g, "asof_pitcher_prev5_game_success_rate", pr["asof_pitcher_prev5_game_success_rate"], art)
+        m1 = _col64(g, "asof_pitcher_prev1_game_middle_rate", pr["asof_pitcher_prev1_game_middle_rate"], art)
+
     career = sm["asof_pitcher_success_rate"]
     out["form_p1_minus_career"] = (p1 - career).astype(np.float32)
     out["form_p3_minus_career"] = (p3 - career).astype(np.float32)
     out["form_p1_minus_p5"] = (p1 - p5).astype(np.float32)
     out["form_p3_minus_p5"] = (p3 - p5).astype(np.float32)
-
-    m1 = _col64(g, "asof_pitcher_prev1_game_middle_rate", pr["asof_pitcher_prev1_game_middle_rate"], art)
     out["form_mid_p1_minus_career"] = (m1 - sm["asof_pitcher_middle_rate"]).astype(np.float32)
+
+    if HIST_MODE == "depthnan":
+        # 구조적 0 → NaN. p1==p5 는 깊이 <=1, p3==p5 는 깊이 <=3 에서 성립한다.
+        # 깊이 0 은 **정확히 0 이 아니라** prior 끼리의 차인 상수(-0.0026 / -0.0013)로
+        # 앉는다 — 컬럼마다 prior 가 다르기 때문이다. 값은 달라도 "그 행에 대해
+        # 아무것도 말해주지 않는 고정값"이라는 성질은 같으므로 함께 지운다.
+        out["form_p1_minus_p5"] = np.where(d0 | d1, np.nan,
+                                           out["form_p1_minus_p5"]).astype(np.float32)
+        out["form_p3_minus_p5"] = np.where(d0 | d1 | d3, np.nan,
+                                           out["form_p3_minus_p5"]).astype(np.float32)
 
     # ── 매치업 엣지: 투수 제구력 vs 타자가 겪어온 제구력 ─────
     out["matchup_success_edge"] = (career - sm["asof_batter_success_rate"]).astype(np.float32)
@@ -636,6 +863,17 @@ def build_features(df, art):
                                 np.maximum(fail, 1e-6)).astype(np.float32)
     out["pitcher_ball_minus_strike"] = (sm["asof_pitcher_ball_rate"]
                                         - sm["asof_pitcher_strike_rate"]).astype(np.float32)
+
+    # ── [실험 전용] 곱 상호작용 — EXTRA_PROD 참조 (기본값 None = 없음) ──
+    if EXTRA_PROD == "prod":
+        out["revxsuc"] = (out["asof_pitcher_reverse_rate"]
+                          * out["asof_pitcher_success_rate"]).astype(np.float32)
+    elif EXTRA_PROD == "placebo":
+        dow = g["game_dayofweek"].to_numpy(dtype=np.float32) / 6.0
+        dead = _DOW_LO + (_DOW_HI - _DOW_LO) * dow
+        out["revxsuc"] = (dead * out["asof_pitcher_success_rate"]).astype(np.float32)
+    elif EXTRA_PROD is not None:
+        raise ValueError(f"모르는 EXTRA_PROD: {EXTRA_PROD!r}")
 
     # ── 구종 레퍼토리 다양성 (엔트로피) ─────────────────────
     mix = np.stack([sm["asof_pitcher_fastball_rate"],

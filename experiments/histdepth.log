@@ -1,0 +1,100 @@
+train (1475092, 49)   a=0.75  init_score=ON  팔 ['base', 'depth', 'depthnan', 'dplacebo', 'carry', 'carrynf', 'basenf']
+
+    [base     ] 피처 78개  form 3b1da4680a
+    fold 2023 [base] 피처 완료 (17s)
+    fold 2023 [base] lgbm 12개 (350s)
+    fold 2023 [base] mlp 8개 (1019s)
+    [depth    ] 피처 79개  form 3b1da4680a  hist ebbab4f3d8 (2722, 2567, 5833, 234403)
+    fold 2023 [depth] 피처 완료 (1022s)
+    fold 2023 [depth] lgbm 12개 (1286s)
+    fold 2023 [depth] mlp 8개 (1902s)
+    [depthnan ] 피처 79개  form 3b1da4680a  hist ebbab4f3d8 (2722, 2567, 5833, 234403)
+    fold 2023 [depthnan] 피처 완료 (1905s)
+    fold 2023 [depthnan] lgbm 12개 (2168s)
+    fold 2023 [depthnan] mlp 8개 (2785s)
+    [dplacebo ] 피처 79개  form 3b1da4680a  hist c0ba259d54 (2722, 2567, 5833, 234403)
+    fold 2023 [dplacebo] 피처 완료 (2788s)
+    fold 2023 [dplacebo] lgbm 12개 (3052s)
+    fold 2023 [dplacebo] mlp 8개 (3732s)
+    [carry    ] 피처 78개  form 1466c9c226
+    fold 2023 [carry] 피처 완료 (3735s)
+    fold 2023 [carry] lgbm 12개 (4052s)
+    fold 2023 [carry] mlp 8개 (4781s)
+    [carrynf  ] 피처 77개  form 1466c9c226
+    fold 2023 [carrynf] 피처 완료 (4784s)
+    fold 2023 [carrynf] lgbm 12개 (5069s)
+    fold 2023 [carrynf] mlp 8개 (5768s)
+    [basenf   ] 피처 77개  form 3b1da4680a
+    fold 2023 [basenf] 피처 완료 (5771s)
+    fold 2023 [basenf] lgbm 12개 (6052s)
+    fold 2023 [basenf] mlp 8개 (6804s)
+  fold 2023: A 807.2  base 807.2  depth 805.8  depthnan 806.4  dplacebo 802.2  carry 807.2  carrynf 802.8  basenf 802.2
+    앵커 검증: base - A(기록 807.2) = +0.0  OK
+    [base     ] 피처 78개  form 4e06cea812
+    fold 2024 [base] 피처 완료 (6814s)
+    fold 2024 [base] lgbm 12개 (7160s)
+    fold 2024 [base] mlp 8개 (7959s)
+    [depth    ] 피처 79개  form 4e06cea812  hist 33bbec0a89 (3638, 4148, 7275, 238446)
+    fold 2024 [depth] 피처 완료 (7962s)
+    fold 2024 [depth] lgbm 12개 (8300s)
+    fold 2024 [depth] mlp 8개 (9099s)
+    [depthnan ] 피처 79개  form 4e06cea812  hist 33bbec0a89 (3638, 4148, 7275, 238446)
+    fold 2024 [depthnan] 피처 완료 (9102s)
+    fold 2024 [depthnan] lgbm 12개 (9445s)
+    fold 2024 [depthnan] mlp 8개 (10229s)
+    [dplacebo ] 피처 79개  form 4e06cea812  hist c132cc6ce0 (3638, 4148, 7275, 238446)
+    fold 2024 [dplacebo] 피처 완료 (10233s)
+    fold 2024 [dplacebo] lgbm 12개 (10577s)
+    fold 2024 [dplacebo] mlp 8개 (11356s)
+    [carry    ] 피처 78개  form 9b601b0e77
+    fold 2024 [carry] 피처 완료 (11360s)
+    fold 2024 [carry] lgbm 12개 (11686s)
+    fold 2024 [carry] mlp 8개 (12505s)
+    [carrynf  ] 피처 77개  form 9b601b0e77
+    fold 2024 [carrynf] 피처 완료 (12508s)
+    fold 2024 [carrynf] lgbm 12개 (12838s)
+    fold 2024 [carrynf] mlp 8개 (13634s)
+    [basenf   ] 피처 77개  form 4e06cea812
+    fold 2024 [basenf] 피처 완료 (13637s)
+    fold 2024 [basenf] lgbm 12개 (13966s)
+    fold 2024 [basenf] mlp 8개 (14741s)
+  fold 2024: A 924.5  base 924.5  depth 922.6  depthnan 922.2  dplacebo 922.0  carry 923.9  carrynf 916.5  basenf 916.2
+    앵커 검증: base - A(기록 924.5) = +0.0  OK
+
+====================================================================================================
+█ 판정 — 배포 층 (a=0.75 + delta축 + prior shift, clean 행)
+====================================================================================================
+  팔           fold 2023  fold 2024 Δ vs base (2023) Δ vs base (2024)
+  A               807.2      924.5             +0.0             +0.0
+  base            807.2      924.5             +0.0             +0.0
+  depth           805.8      922.6             -1.4             -1.9
+  depthnan        806.4      922.2             -0.8             -2.3
+  dplacebo        802.2      922.0             -5.1             -2.6
+  carry           807.2      923.9             -0.0             -0.6
+  carrynf         802.8      916.5             -4.4             -8.0
+  basenf          802.2      916.2             -5.0             -8.3
+
+  클러스터 부트스트랩 (투수 복원추출 200회, 기준 = base)
+     depth           -1.4 [  -6.6,  +3.7]      -1.9 [  -7.9,  +4.5]
+     depthnan        -0.8 [  -6.4,  +5.1]      -2.3 [  -8.4,  +4.6]
+     dplacebo        -5.1 [ -10.4,  +0.6]      -2.6 [  -9.2,  +3.8]
+     carry           -0.0 [  -0.7,  +0.6]      -0.6 [  -1.2,  +0.1]
+     carrynf         -4.4 [ -10.8,  +2.0]      -8.0 [ -14.1,  -3.2]
+     basenf          -5.0 [ -11.8,  +1.2]      -8.3 [ -13.4,  -2.6]
+
+  ② 후보 - 위약 (컬럼 하나 더 붙는 효과를 뺀 순수 내용 성분)
+     fold 2023:  depth-dplacebo   +3.6    depthnan-dplacebo   +4.2
+     fold 2024:  depth-dplacebo   +0.6    depthnan-dplacebo   +0.2
+
+  ③ 2x2 — 채움 방식(prior/career) x 플래그(유지/드랍)
+     fold      prior+flag  prior-flag  career+flag  career-flag        주효과(채움)        주효과(플래그)        상호작용
+     2023           807.2       802.2        807.2        802.8           +0.3            +4.7        -0.6
+     2024           924.5       916.2        923.9        916.5           -0.1            +7.9        -0.9
+     상호작용 음수 = 둘이 대체재(같이 쓰면 이득이 겹친다).
+     |상호작용| > |주효과| 면 주효과만 보고 채택하면 안 된다.
+
+  채택 기준: ② (1) depth-base 양 fold 양수 (2) depth-dplacebo 양 fold 양수 (3) 크기비 <=3 (4) 부트스트랩 구간이 0 을 크게 밑돌지 않을 것
+  !! 재학습 축이라 시드 노이즈(std 4~9)가 낀다. |Δ| < 10 은 무승부로 읽는다.
+  !! 부호가 엇갈려도 각 fold 구간을 보고 판단한다 (자동 기각 금지).
+
+총 15059s
