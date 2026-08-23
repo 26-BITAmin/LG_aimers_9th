@@ -28,7 +28,8 @@ import numpy as np
 import pandas as pd
 
 from config import ROOT, TEST_CSV, TRAIN_CSV
-from predict import PROB_CENTER, PROB_SCALE, PROB_SHIFT, PROB_TARGET
+from predict import (PROB_CENTER, PROB_SCALE, PROB_SHIFT, PROB_TARGET,
+                     SEG_SHIFT)
 
 SRC = ROOT / "src"
 SUBMIT = ROOT / "submit"
@@ -146,6 +147,7 @@ def main():
     # 태그·지문·이력이 이 축을 보게 하려면 여기서 얹어야 한다 (describe_tokens 참조).
     meta["prob_shift"] = PROB_SHIFT
     meta["prob_scale"] = PROB_SCALE
+    meta["seg_shift"] = SEG_SHIFT
     # ⚠️ `mlp_variant_weight`는 train.py가 **config 값**을 적어둔 것이다.
     #    artifacts.joblib의 `mlp_weights`를 직접 패치하면(§7.120 `_vw` 축)
     #    meta.json은 옛 값을 그대로 들고 있어 태그가 축 변경을 놓친다 —
@@ -366,6 +368,11 @@ def describe_tokens(meta):
     fa = float(meta.get("fspec_alpha") or 0.0)
     if fa:
         tok["fspec"] = f"fs{fa * 100:.0f}"
+    # 세그먼트 레벨 분해 (MODEL.md §7.123).  D̂ = Δ_R − Δ_F, x1e5 -> sg841.
+    # 끄면(=None/빈dict) 생략 — 옛 태그와 호환된다.
+    sg = meta.get("seg_shift") or {}
+    if sg:
+        tok["seg"] = f"sg{abs(sg['R'] - sg['F']) * 1e5:.0f}"
     # 확률공간 스케일 c (MODEL.md §7.120).  1.05 -> c105.  1.0이면 생략.
     pc = float(meta.get("prob_scale") or 1.0)
     if pc != 1.0:

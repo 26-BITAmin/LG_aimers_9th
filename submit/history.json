@@ -174,5 +174,27 @@
   },
   "fingerprint": "3cae",
   "full_tag": "a75n1h188c125nocalisas30bs30k35slfs15c105lv687"
+ },
+ {
+  "n": 31,
+  "file": "s31_sg841a79e.zip",
+  "tokens": {
+   "alpha": "a75",
+   "noid": "n1",
+   "ctx:hand": "h188",
+   "ctx:count4": "c125",
+   "dropx": "nocal",
+   "init": "is",
+   "asof:gap_success": "as30",
+   "asof:gap_bsuccess": "bs30",
+   "k": "k35",
+   "soft": "sl",
+   "fspec": "fs15",
+   "seg": "sg841",
+   "pscale": "c105",
+   "lv": "lv687"
+  },
+  "fingerprint": "a79e",
+  "full_tag": "a75n1h188c125nocalisas30bs30k35slfs15sg841c105lv687"
  }
 ]
