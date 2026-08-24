@@ -1216,11 +1216,50 @@ fold2024 raw 앙상블 캐시 재사용, MLP_ALPHA=0.75 블렌드로 근사) 결
 이건 raw 블렌드 근사치(ctx/asof/gt 보정 전)라 실제 배포 p_oracle에서는 이미
 더 작아져 있을 수 있음.
 
-**판단**: 방향은 있지만(고확률 쪽 과소신, old RF 파이프라인의 §8 "calibration
-slope>1" 발견과 같은 방향 — 우연이 아닐 수 있음) 크기가 이번 세션 노이즈
-게이트(2σ 6.3~14.5)와 비슷하거나 작음. Phase 1(fit-fold≠eval-fold 정식 검증,
-foldcache 2023 fold 추가 + 최종 확인 시 verify_pipeline_calib.py 재실행,
-~30분~1시간 추가 소요)으로 진행할지는 이 상한 추정을 보고 사용자 판단 대기.
+**판단(1차)**: 방향은 있지만(고확률 쪽 과소신, old RF 파이프라인의 §8 "calibration
+slope>1" 발견과 같은 방향) 크기가 이번 세션 노이즈 게이트(2σ 6.3~14.5)와 비슷하거나
+작음. Phase 1(fit-fold≠eval-fold 정식 검증) 진행 여부는 사용자 판단 대기 →
+"더 정밀하게" 요청으로 재학습 없는 정밀화를 먼저 수행(아래).
+
+### 정밀화 — ctx/asof 실제 보정 반영 + 투수 클러스터 CI (재학습 없음) → 확정 기각
+
+신규 파일 `wonwoo_repro/src/tail_diag_v2.py`. 1차 진단은 raw 앙상블 블렌드만
+봤다(ctx/asof 사후보정 미적용 근사치). 여기서는 `train.py`와 **똑같은 순서로**
+fold 2024 학습 구간에서 ctx(hand/count4)·asof(gap_success/gap_bsuccess)
+아티팩트를 실제로 fit하고(재학습 아님 — GBDT/MLP 안 건드림, groupby 수준 연산이라
+수 초) `logit_adjust`를 검증 구간에 그대로 적용해 실제 배포 p_served에 훨씬
+가까운 근사치를 만들었다. 그리고 naive 행 단위 SE 대신 **투수 클러스터
+부트스트랩**(CLAUDE.md Known Pitfalls: "i.i.d. SE는 10배 이상 낙관적")으로
+꼬리 밴드 gap의 CI를 다시 쟀다.
+
+BSS(oracle): raw 블렌드 838.3 → ctx/asof 보정 후 921.7 (보정 효과 자체는 건재 확인).
+
+| 밴드 | gap(raw, Phase 0) | gap(+ctx/asof 보정) | 부트스트랩 CI | n_pitcher |
+|---|---:|---:|---|---:|
+| top 95-99% | −0.0173 | −0.0088 | [−0.0162, +0.0022] | 71 |
+| top 1% | −0.0124 | −0.0054 | [−0.0308, +0.0235] | **13** |
+| bottom 1% | −0.0080 | −0.0005 | [−0.0209, +0.0183] | 116 |
+
+**두 가지가 동시에 신호를 죽였다.** ① 기존 ctx/asof 축이 이미 tail gap의
+절반 이상을 흡수(hand·count4·gap 축이 "이 투수·이 매치업이면 확률이 더
+높아야 한다"는 정보를 이미 잡고 있었음) ② 투수 클러스터로 리샘플하니 전
+밴드에서 CI가 0을 포함. 특히 top 1% 밴드는 **투수 13명뿐**이 만들고 있었다
+— 확률 상위 percentile이 사실상 "제구 좋은 소수 투수의 반복"이라 naive
+행 단위 SE(Phase 0의 대략적 σ 추정)는 그 클러스터링을 못 잡아 훨씬 유의해
+보였을 뿐이었다.
+
+**확정 기각.** fold 내에서조차 신호가 안 살아있어 fit-fold≠eval-fold(Phase 1,
+foldcache 2023 fold + verify_pipeline_calib.py 재실행)까지 갈 필요 없이 여기서
+종결. 재학습 없음, `predict.py` 등 기존 코드 변경 없음.
+
+### 제안서 전체에 대한 최종 결론
+
+Tier 1~4 전 항목이 기각 또는 기존 채택으로 판정됨 — 이 파이프라인은 제안서가
+가정하는 "아직 calibration을 안 해본 모델"이 아니라 이미 EB 스무딩·ctx/asof
+사후보정·prior-shift·티어 슬로프로 상당히 정교하게 캘리브레이션돼 있는 상태였다.
+제안서의 진단 틀(Murphy decomposition, success/failure-side 분해, quantile
+reliability) 자체는 유효했고 `validation.reliability` 재사용도 됐지만, 이
+프로젝트에서 산출한 결론은 "후처리로 더 짤 게 없다"였다.
 
 λ만 고정 슬로프에서 스윕한 결과는 참고할 값이 있다:
 
