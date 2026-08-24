@@ -54,7 +54,7 @@ def make_prob(S):
     mw = np.array(pr.mlp_w, dtype=float)
     lw = np.full(len(S["zl"]), 1.0 / len(S["zl"]))
 
-    def prob(fspec=None, betamult=1.0, noid=None, wide=None):
+    def prob(fspec=None, betamult=1.0, noid=None, wide=None, alpha=None):
         w = lw.copy()
         if wide is not None:
             isw = np.array(["wide" in n for n in S["lgb_names"]])
@@ -64,7 +64,8 @@ def make_prob(S):
         if noid is not None:
             isn = np.array([x.startswith("noid") for x in S["mem"]])
             m = np.where(isn, noid / isn.sum(), (1 - noid) / (~isn).sum())
-        z = (1 - pr.alpha) * z + pr.alpha * (m @ S["zm"])
+        al = pr.alpha if alpha is None else alpha
+        z = (1 - al) * z + al * (m @ S["zm"])
         fa = pr.fspec_alpha if fspec is None else fspec
         z[S["is_f"]] = (1 - fa) * z[S["is_f"]] + fa * S["zf"]
         p = 1 / (1 + np.exp(-(z + betamult * S["zadj"] + pr.delta)))
@@ -90,6 +91,7 @@ def main():
         ("δ β 공통배율", 1.0, 1e-3, lambda v: prob(betamult=v), (0.0, 2.0)),
         ("MLP noid 몫", noid0, 1e-4, lambda v: prob(noid=v), (0.0, 1.0)),
         ("LGBM wide 몫", wide0, 1e-4, lambda v: prob(wide=v), (0.0, 1.0)),
+        ("MLP_ALPHA", S["pr"].alpha, 1e-4, lambda v: prob(alpha=v), (0.0, 1.0)),
     ]
     print(f"K = {K:,.0f}   더미 245,789행\n")
     print(f"  {'축':<16s}{'배포값':>9s}{'K·A2':>10s}"
@@ -97,7 +99,7 @@ def main():
     for name, x0, h, f, (lo, hi) in axes:
         p0 = f(x0)
         dd = (f(x0 + h) - f(x0 - h)) / (2 * h)
-        A2 = float(np.mean(dd * dd))
+        A2 = float(np.var(dd))
         c = K * A2
         far = max(abs(x0 - lo), abs(hi - x0))
         print(f"  {name:<16s}{x0:>9.4f}{c:>10.1f}"

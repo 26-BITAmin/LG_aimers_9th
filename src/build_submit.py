@@ -28,7 +28,8 @@ import numpy as np
 import pandas as pd
 
 from config import ROOT, TEST_CSV, TRAIN_CSV
-from predict import (CTX_BETA_MULT, FSPEC_ALPHA_OVERRIDE, PROB_CENTER,
+from predict import (CTX_BETA_MULT, FSPEC_ALPHA_OVERRIDE, MLP_ALPHA_OVERRIDE,
+                     PROB_CENTER,
                      PROB_SCALE, PROB_SHIFT, PROB_TARGET, SEG_SHIFT)
 
 SRC = ROOT / "src"
@@ -151,6 +152,8 @@ def main():
     meta["ctx_beta_mult"] = CTX_BETA_MULT
     if FSPEC_ALPHA_OVERRIDE is not None:
         meta["fspec_alpha"] = FSPEC_ALPHA_OVERRIDE   # 배포층 오버라이드가 이긴다
+    if MLP_ALPHA_OVERRIDE is not None:
+        meta["mlp_alpha"] = MLP_ALPHA_OVERRIDE
     # ⚠️ `mlp_variant_weight`는 train.py가 **config 값**을 적어둔 것이다.
     #    artifacts.joblib의 `mlp_weights`를 직접 패치하면(§7.120 `_vw` 축)
     #    meta.json은 옛 값을 그대로 들고 있어 태그가 축 변경을 놓친다 —

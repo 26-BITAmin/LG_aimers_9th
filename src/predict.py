@@ -121,6 +121,10 @@ SEG_SHIFT = None
 #    안 그러면 이미 최적인 레벨 항이 딸려 움직여 측정이 오염된다 (0.3~0.5 BSS 규모).
 CTX_BETA_MULT = 1.0           # 사후 로짓 보정 δ 4축의 β 공통배율 (1.0 = 배포값)
 FSPEC_ALPHA_OVERRIDE = None  # None 이면 아티팩트의 fspec_alpha 를 쓴다
+# §7.134 — `MLP_ALPHA` 는 곡률이 전체 최대(91.2)인데 `α* = 0.74499` 는 혜진이
+# **base 1076.03 스택**에서 잰 값이다 (init_score · _vw · _c · 레벨 · fspec 0.458
+# 전부 그 뒤에 들어왔다). 스택이 바뀌면 두 예측기의 상대 신뢰도도 바뀐다(§7.127).
+MLP_ALPHA_OVERRIDE = None
 
 
 class Predictor:
@@ -134,7 +138,9 @@ class Predictor:
         self.ctx_hits = {}
 
         # MLP 멤버 — torch가 아니라 npz + numpy 순전파다 (mlp_infer.py 참조)
-        self.alpha = float(bundle.get("mlp_alpha") or 0.0)
+        self.alpha = float(MLP_ALPHA_OVERRIDE
+                           if MLP_ALPHA_OVERRIDE is not None
+                           else (bundle.get("mlp_alpha") or 0.0))
         self.mlps = []
         if self.alpha > 0:
             enc = bundle["mlp_enc"]
