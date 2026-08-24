@@ -1804,3 +1804,28 @@ wonwoo_repro 실LB 역사 전체) 최고 기록.** C-1은 차선(+4.73), C-3(결
 **현재 공식 상태(2026-08-25 이후)**: `submit/predict.py`=numemb 버전,
 `submit/model/`=C-2 가중치, 최신 확정 실LB=**1088.3904706297**(s03).
 `src/predict_s02.py`가 이전 확정본(1080.72)의 스냅샷으로 남아 있다.
+
+## LightGBM `objective="regression"`(L2, Brier 직접 최적화) — MLP와 달리 명확히 손해
+
+"새 모델 구조" 브레인스토밍의 남은 항목. MLP의 `loss="mse"`(매우 확실한
+null, std=0.65)와 짝을 이루는 실험 — LightGBM도 대회 지표(Brier=MSE)를
+직접 최적화하면 나을지 확인. 신규 파일 `wonwoo_repro/src/lgb_l2_probe.py`,
+fold 2024, "base" 변형 3시드, `objective="binary"`(배포 기본) vs
+`objective="regression"`.
+
+| seed | binary(배포) | regression(L2) | Δ |
+|---:|---:|---:|---:|
+| 42 | 790.5 | 781.9 | −8.5 |
+| 7 | 784.0 | 783.9 | −0.1 |
+| 2024 | 793.1 | 788.0 | −5.0 |
+
+**mean Δ=−4.6, std=3.44 — 3시드 전부 음수(SE≈2.0, mean/SE≈−2.3).** MLP와
+달리 확실한 손해다. 이유로 그럴듯한 것: MLP의 `loss="mse"`는 여전히
+`sigmoid(z)`에 씌운 뒤 제곱오차를 재는 것이라 확률 제약(0~1)이 구조적으로
+유지되는데, LightGBM의 `regression` objective는 **link function이 아예
+없어서** 트리가 훈련 중에 확률 범위 밖 값을 자유롭게 낼 수 있고 그걸
+추론 시점에야 clip한다 — 이 문제처럼 예측이 좁은 범위(0.35~0.65)에
+몰리는 저해상도 문제에서는 `binary`(logloss, 로짓 링크가 암묵적으로
+범위를 붙잡아줌)가 구조적으로 유리한 것으로 보인다. **기각.** "새 모델
+구조" 계열의 손실함수 레벨 아이디어(MLP mse, LGB L2)는 여기서 소진.
+`config.py`/`train.py` 등 기존 코드 변경 없음.
