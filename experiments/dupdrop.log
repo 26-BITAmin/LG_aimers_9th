@@ -1,0 +1,54 @@
+train (1475092, 49)   a=0.75  init_score=ON  팔 ['base', 'dupsig', 'dropmiss2']
+양성 대조군: §7.133 basenf = -5.0 / -8.3
+분해능 고지: 컬럼 수 변경 조작의 부트스트랩 폭 ±7~9 -> |Δ|<8 은 못 잰다
+
+    [base     ] 피처 78개  변경 없음
+    캐시 적중 histdepth_fold2023_base.npz
+    [dupsig   ] 피처 79개  복제 asof_pitcher_success_rate_dup
+    fold 2023 [dupsig] 피처 완료 (11s)
+    fold 2023 [dupsig] lgbm 12개 (281s)
+    fold 2023 [dupsig] mlp 8개 (906s)
+    [dropmiss2] 피처 76개  드랍 ['miss_batter_asof', 'miss_pitcher_asof']
+    fold 2023 [dropmiss2] 피처 완료 (909s)
+    fold 2023 [dropmiss2] lgbm 12개 (1165s)
+    fold 2023 [dropmiss2] mlp 8개 (1778s)
+  fold 2023: base 807.2  dupsig 807.1  dropmiss2 803.2
+    앵커 검증: base - §7.133 기록(807.2) = +0.03  OK
+    [base     ] 피처 78개  변경 없음
+    캐시 적중 histdepth_fold2024_base.npz
+    [dupsig   ] 피처 79개  복제 asof_pitcher_success_rate_dup
+    fold 2024 [dupsig] 피처 완료 (1789s)
+    fold 2024 [dupsig] lgbm 12개 (2241s)
+    fold 2024 [dupsig] mlp 8개 (3118s)
+    [dropmiss2] 피처 76개  드랍 ['miss_batter_asof', 'miss_pitcher_asof']
+    fold 2024 [dropmiss2] 피처 완료 (3123s)
+    fold 2024 [dropmiss2] lgbm 12개 (3462s)
+    fold 2024 [dropmiss2] mlp 8개 (4304s)
+  fold 2024: base 924.5  dupsig 924.2  dropmiss2 928.4
+    앵커 검증: base - §7.133 기록(924.5) = +0.03  OK
+
+============================================================================================
+█ 판정 — 배포 층 (a=0.75 + delta축 + prior shift, clean 행)
+============================================================================================
+  팔              컬럼  fold 2023  fold 2024 Δ vs base (2023) Δ vs base (2024)
+  base           78      807.2      924.5             +0.0             +0.0
+  dupsig         79      807.1      924.2             -0.1             -0.3
+  dropmiss2      76      803.2      928.4             -4.0             +3.9
+
+  클러스터 부트스트랩 (투수 복원추출 200회, 기준 = base)
+     dupsig           -0.1 [  -5.4,  +6.2]      -0.3 [  -6.5,  +5.2]
+     dropmiss2        -4.0 [  -9.8,  +2.4]      +3.9 [  -1.4, +10.5]
+
+  ★ §7.94 기전 검정 — gain 0 컬럼 제거는 LGBM 에 무개입이어야 한다
+     fold 2023: z_lgb 비트 동일 = True   max|Δz| = 0.000e+00   예측 적중
+     fold 2024: z_lgb 비트 동일 = True   max|Δz| = 0.000e+00   예측 적중
+
+  소거 산술 대조 (하네스가 달라 직접 비교 불가, 방향만)
+     삼중 소거 예측: dropmiss2 = +8.1 / +8.4
+     기전  예측: dropmiss2 ≈ 0 (LGBM 무개입 + MLP null)
+     실측       : -4.0 / +3.9
+
+  채택 기준: (1) 양 fold 양수 (2) 크기비 <=3 (3) 부트스트랩 구간이 0 을 크게 밑돌지 않을 것
+  !! |Δ| < 8 은 분해능 밖 — '효과 없음'이 아니라 '못 잰다'로 읽는다.
+
+총 4479s
