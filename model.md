@@ -1497,6 +1497,50 @@ D(전부 결합)는 베이스라인과 사실상 동률.
 C-1(원인 불명 null)보다 깔끔한 결론. `mlp.py`/`numemb.py`/`config.py` 변경
 없음, 신규 파일만 추가.
 
+### B: 신규 raw 상호작용 피처 후보 — in-sample Resolution 스크리닝, 전부 기각
+
+재학습 없음(`wonwoo_repro/src/feature_candidates_b.py`, 신규). 마진 대비
+"진짜 새로운" resolution이 있는지만 싸게 먼저 본다 — 학습 없이도 판정 가능.
+
+| 후보 | Resolution | 대응 마진 합 |
+|---|---:|---:|
+| career_rate × √experience (곱) | 0.000341 | career_rate 단독 0.000922보다 작음 |
+| career_rate × recent_form (곱) | 0.000095 | career_rate 단독보다 작음 |
+| hand_matchup × career_rate quintile (20셀) | 0.001180 | 마진 합 0.001208 — **합보다 작음** |
+| hand_same × career_rate quintile (10셀) | 0.001096 | (참고용) |
+| count4 × career_rate quintile (20셀) | 0.000943 | career_rate 단독(0.000922)과 거의 같음 — count4 기여 없음 |
+| experience quintile × form quintile (25셀) | 0.000290 | 마진 합 0.353보다 작음 |
+
+**전부 마진의 단순 합을 못 넘는다** — 이번 세션 내내 반복된 "결합축은 단순
+합보다 작거나 같다"(hand×count4, tier×form 희석) 패턴이 여기서도 그대로.
+학습 없이도 판정 가능한 수준이라 MLP ablation까지 안 가고 여기서 기각.
+신규 파일만 추가, 기존 코드 변경 없음.
+
+### A: li/base_state raw 컬럼 제거 — LightGBM ablation, null
+
+`wonwoo_repro/src/lgb_drop_ablation.py`(신규). Resolution 최하위권 두 컬럼을
+실제로 빼고 fold 2024에서 3시드 재학습(FINAL_LGB_PARAMS "base" 변형, soft-label/
+aux 생략한 가벼운 버전, BSS oracle로 비교).
+
+| seed | 전체(78피처) | 제거(76피처) | Δ |
+|---:|---:|---:|---:|
+| 42 | 790.5 | 797.8 | +7.3 |
+| 7 | 784.0 | 787.6 | +3.6 |
+| 2024 | 793.1 | 781.2 | −11.9 |
+
+**mean Δ=−0.3, std=8.29** — 완전히 노이즈. "제거해도 득도 실도 없다"(§7.15
+패턴처럼 홀드아웃에서 반전될 위험도, 반대로 얻을 이득도 없음)는 원래
+평가가 실측으로 그대로 확인됐다. **기각(유지도 제거도 상관없지만, 굳이
+바꿀 이유가 없으니 현행 유지).** `config.py`/`features.py` 변경 없음.
+
+### B/A 종합 — "피처 추가/제외" 브레인스토밍 결론
+
+A(제거)·B(신규 상호작용)·C(구조/임베딩, C-1/C-2) 네 갈래 전부 null 또는
+기각으로 끝남. 이번 세션에서 만든 Resolution 랭킹·Murphy decomposition이
+가리킨 대로 **이 피처셋·이 모델 구조에서 뽑아낼 수 있는 자원은 이미 거의
+다 뽑아낸 상태**라는 결론이 여러 독립적인 실측으로 수렴했다. 다음은 사용자
+요청대로 "완전히 새로운 모델 구조" 쪽 검토로 전환.
+
 ### 제안서 전체에 대한 최종 결론
 
 Tier 1~4 전 항목이 기각 또는 기존 채택으로 판정됨 — 이 파이프라인은 제안서가
