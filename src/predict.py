@@ -133,8 +133,25 @@ SEG_SHIFT = None
 #   no test-set statistic (CLAUDE.md 3.2) -- same shape as SEG_SHIFT.
 #   Rows with a missing value get 0 (train has none, but test may).
 APN_EDGES = (413.0, 997.0, 1843.0, 3323.0)      # season < 2023 quintiles, frozen
-APN_SHIFT = (-0.019836240, -0.005024624, -0.002979314,
-             +0.004057239, +0.005216853)        # logit-space, weighted mean 0
+#
+# X TURNED OFF (7.154).  s38 = 1109.8068231037 vs s37 1110.3461746799 -> -0.5394.
+#
+#   deployed values were:
+#     (-0.019836240, -0.005024624, -0.002979314, +0.004057239, +0.005216853)
+#
+#   the axis collapsed.  gain = S24 * kappa*(2c - kappa) with S24 = 6.11;
+#   inverting the LB point gives c = 0.162 (multiplier 1) .. 0.050 (2.27),
+#   against a fold-to-fold decay of 0.558 and a break-even of kappa/2 = 0.25.
+#   bucket-occupancy drift can explain at most -0.23 of the -0.54, so the rest
+#   is the residual itself vanishing.
+#
+#   7.124 measured c = 0.168 for a completely unrelated level correction.
+#   two for two: level-type residuals decay to ~0.16 by the test season,
+#   ~3x faster than fold-to-fold decay predicts.  that is now the band.
+#
+#   best case left on this axis for 2025 is kappa* = c -> S24*c^2 = +0.16 BSS.
+#   not worth a slot.  do not re-derive this from holdout folds alone.
+APN_SHIFT = None
 
 # ── 상수 스윕용 배포층 노브 (§7.131) ────────────────────────────────
 # §7.130 의 규칙: **앙상블을 고정한 채 상수만 바꾸는 변경은 draw 노이즈가 0** 이라
