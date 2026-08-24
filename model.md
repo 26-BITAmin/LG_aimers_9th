@@ -1252,6 +1252,57 @@ BSS(oracle): raw 블렌드 838.3 → ctx/asof 보정 후 921.7 (보정 효과 �
 foldcache 2023 fold + verify_pipeline_calib.py 재실행)까지 갈 필요 없이 여기서
 종결. 재학습 없음, `predict.py` 등 기존 코드 변경 없음.
 
+### Murphy decomposition + 상황별 Brier 분해 정식 계산 (§4-13, 사용자 재요청)
+
+후처리(§14-23)는 기존 증거로 걸러냈지만 제안서의 진단 파트(Reliability/
+Resolution/Uncertainty, 상황별 Brier 분해) 자체는 숫자로 계산 안 하고 넘어갔다
+— 사용자가 이를 지적. 신규 파일 `wonwoo_repro/src/brier_decomposition.py`
+(재학습 없음, `tail_diag_v2.py`와 같은 방식으로 fold 2024 근사 p_oracle 재구성).
+
+**Murphy decomposition** (10/20-bin × equal/quantile 4가지로 안정성 확인, 제안서 §6.3):
+
+| bins | 방식 | Reliability | Resolution | Uncertainty | BS 재구성 오차 |
+|---|---|---:|---:|---:|---:|
+| 10 | equal | 0.000004 | 0.001609 | 0.249807 | +0.000698 |
+| 10 | quantile | 0.000017 | 0.002253 | 0.249807 | +0.000066 |
+| 20 | equal | 0.000014 | 0.002124 | 0.249807 | +0.000192 |
+| 20 | quantile | 0.000031 | 0.002328 | 0.249807 | +0.000005 |
+
+**Reliability가 사실상 0**(0.00002 안팎)이고 **Resolution은 작지만(0.002 정도)
+Uncertainty(0.25)에 비하면 미미** — 정량적으로 확인: 이미 잘 캘리브레이션돼
+있고(신뢰도 오차 거의 0), 이 문제 자체의 해상도 천장이 낮다("투수 제구력+
+base rate"라는 EDA §7 결론과 정합). equal-width 10빈은 BS 재구성 오차가
+가장 크다(+0.0007) — 예측이 좁은 범위(0.35~0.65 근방)에 몰려있는 이 문제
+특성상 등폭 빈은 조악하고, quantile 빈이 훨씬 정확(오차 0.000005) — 제안서
+참고문헌(Dimitriadis et al. 2020)의 binning 불안정성 경고가 여기서도 실측됨.
+
+**상황별 Brier 분해** (§8-9, §12 — 그룹별 BS + success/failure-side 교차):
+
+| 그룹축 | 그룹간 BS 범위 | 비고 |
+|---|---|---|
+| LI tercile | 0.2474~0.2476 | 사실상 무차이 — `li` pts_res≈13 결론을 그룹 Brier로 재확인 |
+| count4 | 0.2449~0.2483 | 소폭 차이. success/failure-side는 갈림(3ball/full일수록 succ-err↑fail-err↓) |
+| inning 구간 | 0.2474~0.2476 | 무차이. 단 late(7+)는 succ-err 0.272 vs early 0.254로 side만 갈림 |
+| base_state | 0.2466~0.2479 | 좁은 범위, 무차이 수준 |
+| 투수 경험 티어 | 0.2467~0.2476 | rookie가 오히려 그룹 BS 최저(성공측 오차는 최대) |
+| 최근폼(prev1−career) | 0.2474~0.2477 | 무차이. cold/hot 그룹은 side가 크게 갈림(succ-err 0.276 vs 0.253) |
+
+**중요한 해석 — success/failure-side 비대칭은 그 자체로 미스캘리브레이션이
+아니다.** 그룹 내 예측이 그 그룹의 실제 성공률 q와 잘 맞아도(=완벽히
+캘리브레이션돼도), squared error의 수학적 성질상 q≠0.5인 그룹은 항상
+`succ-err=(1-q)²`, `fail-err=q²`로 **자동으로 갈린다**(q<0.5면 succ-err>fail-err).
+count4·inning·최근폼에서 본 side 비대칭은 대부분 이 산술적 효과로 설명되고,
+같은 그룹의 **총 BS가 거의 안 갈린다는 것 자체가 이미 "이 축에 회수할 신뢰도
+오차가 없다"는 뜻**(Murphy decomposition의 Reliability≈0과 정합). 제안서 §11의
+"success/failure 비대칭 → 후처리 방향 결정"이라는 조언은 이 경우 함정이 될 수
+있다 — 그룹 base rate를 안 보고 side error만 보면 이미 최적인데도 "고쳐야 할
+비대칭"으로 오독하기 쉽다.
+
+**결론**: 상황별 분해가 LI/count/inning/base_state/최근폼 전 축에서 그룹간
+BS가 거의 평평함을 재확인 — 이전 "폐기" 판정(li 무가치, ctx축 확장 무효과)이
+개별 lookup pts_res 추정치가 아니라 **지금 배포 파이프라인의 실제 그룹 Brier
+숫자로도** 같은 결론에 도달했다는 뜻. 새 조건부 보정 후보는 없음.
+
 ### 제안서 전체에 대한 최종 결론
 
 Tier 1~4 전 항목이 기각 또는 기존 채택으로 판정됨 — 이 파이프라인은 제안서가
