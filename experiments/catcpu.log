@@ -1,0 +1,11 @@
+fold 2024 앵커 OK 924.5 · LGBM solo 826.9
+X (1292784, 78) 준비 (14s)  — CPU, rsm=0.8, 2시드
+
+  CPU [none] solo    814.4  핸디캡    -12.5  블렌드Δ(w=.30)    +4.4  (224s)
+  CPU [allid] solo    837.2  핸디캡    +10.3  블렌드Δ(w=.30)   +13.7  (748s)
+
+  CPU  allid − none = +22.8
+  GPU  allid − none = +14.9  (catinit, 같은 fold·같은 init)
+
+  판정: CPU 가 크게 음수면 백엔드가 원인 → GPU 결과는 선행 연구와 비교 불가.
+        CPU 도 양수면 파이프라인 변경이 원인 → §7.12 결론이 뒤집힌 것.

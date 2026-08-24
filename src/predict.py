@@ -62,7 +62,7 @@ PROB_SCALE = 1.05
 #    m8(s30)  p̄ = 0.475541112  ->  Δ = 0.006866833   LB 1107.2194255322
 #    m16      p̄ = 0.475456633  ->  Δ = 0.006951312   (§7.128, 멤버 2배)
 #    차이가 8.4e−05 라 잘못 두면 K·(8.4e−05)² ≈ 0.003 BSS 손해 — 작지만 공짜로 맞춘다.
-PROB_SHIFT = 0.006803836  # = PROB_TARGET − p̄.  §7.135 에서 아티팩트 재생성 후 재유도
+PROB_SHIFT = 0.006844836  # = PROB_TARGET − p̄.  §7.146 CatBoost 합류 후 재유도 (+4.1e-5)
 # **체크섬이다 — 운영 상수가 아니다.** `make_dummy_test(art=...)`(재기준화판)
 # 위에서 아핀 변환 후 도달해야 하는 평균이고, `p̄_대리 + PROB_SHIFT` 로 정의된다.
 # build_submit.py가 매 빌드마다 대조해 어긋나면 제출을 막는다 — 재학습으로
@@ -120,6 +120,7 @@ SEG_SHIFT = None
 # ⚠️ 둘 다 예측 평균을 움직이므로 **`PROB_SHIFT` 를 같이 재고정**해야 한다.
 #    안 그러면 이미 최적인 레벨 항이 딸려 움직여 측정이 오염된다 (0.3~0.5 BSS 규모).
 CTX_BETA_MULT = 1.0           # 사후 로짓 보정 δ 4축의 β 공통배율 (1.0 = 배포값)
+CAT_ALPHA_OVERRIDE = None    # None 이면 아티팩트의 cat_alpha 를 쓴다 (§7.142, 배포 0.10)
 FSPEC_ALPHA_OVERRIDE = None  # None 이면 아티팩트의 fspec_alpha 를 쓴다
 # §7.134 — `MLP_ALPHA` 는 곡률이 전체 최대(91.2)인데 `α* = 0.74499` 는 혜진이
 # **base 1076.03 스택**에서 잰 값이다 (init_score · _vw · _c · 레벨 · fspec 0.458
@@ -187,6 +188,32 @@ class Predictor:
             if not self.fspec:
                 self.fspec_alpha = 0.0
 
+        # ── CatBoost 앙상블 멤버 (§7.142) ─────────────────────
+        # catboost 미설치 환경에서도 죽지 않게 α>0 일 때만 import 한다.
+        self.cat_alpha = float(CAT_ALPHA_OVERRIDE
+                               if CAT_ALPHA_OVERRIDE is not None
+                               else (bundle.get("cat_alpha") or 0.0))
+        self.cats = []
+        if self.cat_alpha > 0:
+            from catboost import CatBoostClassifier
+            for tag in bundle.get("cat_members") or []:
+                m = CatBoostClassifier()
+                m.load_model(os.path.join(model_dir, f"cat_{tag}.cbm"))
+                self.cats.append(m)
+            if not self.cats:
+                self.cat_alpha = 0.0
+            elif self.cats[0].feature_names_:
+                # ⚠️ CatBoost 는 **위치**로 피처를 읽는다. 학습 때 컬럼 순서가
+                #    self.cols 와 다르면 에러 없이 성능만 죽는다 (§5의 반복 패턴).
+                got = list(self.cats[0].feature_names_)
+                if got != list(self.cols):
+                    raise ValueError(
+                        f"CatBoost 피처 순서 불일치 — 모델 {len(got)}개 vs "
+                        f"feature_cols {len(self.cols)}개. 첫 불일치: "
+                        + next((f"{i}: {a!r} != {b!r}"
+                                for i, (a, b) in enumerate(zip(got, self.cols))
+                                if a != b), "길이만 다름"))
+
     def predict(self, test_df):
         """test_df의 각 행을 **독립적으로** 예측한다.
 
@@ -252,6 +279,19 @@ class Predictor:
                 zf /= len(self.fspec)
                 z[is_f] = ((1.0 - self.fspec_alpha) * z[is_f]
                            + self.fspec_alpha * zf)
+
+        # ── CatBoost 앙상블 블렌드 (§7.142) ───────────────────
+        # fspec **이후**, δ 보정 **이전**. §7.142 에서 α 를 고른 지점과 같다.
+        # 전 행에 섞는다 (fspec 과 달리 서브그룹 라우팅이 아니다).
+        # 각 멤버는 자기 행만 본다 — test 행 간 정보는 쓰지 않는다.
+        if self.cat_alpha > 0:
+            from catboost import Pool
+            pool = Pool(X)
+            zc = np.zeros(len(X))
+            for m in self.cats:
+                zc += m.predict(pool, prediction_type="RawFormulaVal")
+            zc /= len(self.cats)
+            z = (1.0 - self.cat_alpha) * z + self.cat_alpha * zc
 
         # 사후 로짓 보정 (투수 × 상황 δ) — **블렌드 이후, prior shift 이전**.
         # 이 순서는 검증에서 잰 순서와 같아야 한다 (2 fold에서 β 스윕한 그 지점).

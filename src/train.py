@@ -10,6 +10,7 @@
     BASE와 DELTA는 둘 다 상수이므로 하나로 합쳐 저장한다 (`logit_delta`).
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -30,10 +31,11 @@ import numpy as np
 
 from config import (FSPEC_ALPHA, FSPEC_MAX_ROUNDS, FSPEC_MIN_SEASON,
                     FSPEC_PARAMS, FSPEC_SEEDS,
+                    CAT_ALPHA, CAT_ITERS, CAT_PARAMS, CAT_SEEDS, CAT_VARIANTS,
                     CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
                     MLP_ALPHA, MLP_AUX_LAMBDA, MLP_AUX_MODES, MLP_SEEDS,
                     MLP_VARIANT_WEIGHT, MLP_VARIANTS,
-                    MODEL_DIR, N_ROUNDS,
+                    MODEL_DIR, N_ROUNDS, PREDICT_CLIP_Q,
                     RECENCY_HALF_LIFE, SEED_ENSEMBLE, SMOOTH_K_BATTER,
                     SMOOTH_K_PITCHER, CTX_AXES, CTX_K, CTX_HALF_LIFE, ASOF_AXES, ASOF_STRENGTH, GT_F_BETA, GT_F_DELTA, MIX_AXES, SOFT_LABEL_F, TARGET_COL, TARGET_PRIOR_2025, TRAIN_CSV,
                     TRACKMAN_MODE, USE_INIT_SCORE, USE_MLP, USE_PLAYER_IDS)
@@ -237,6 +239,55 @@ def fspec_ref_logit(model_dir, tags, X_ref):
         txt = (model_dir / f"lgbm_{tag}.txt").read_text(encoding="utf-8")
         z += lgb.Booster(model_str=txt).predict(X_ref, raw_score=True)
     return z / len(tags)
+
+
+def train_catboost(X, y, w, init_tr, X_ref, model_dir, t0=None):
+    """CatBoost 앙상블 멤버 (§7.139~§7.142). 반환: (태그들, X_ref 평균 로짓).
+
+    LGBM 멤버와 **완전히 같은 입력**을 본다 — soften 후 X/y/w 와 init_score.
+    baseline=init_tr 로 시즌 레벨을 넘겨주는 것이 §7.111 을 CatBoost 에 적용한 것이다.
+
+    ⚠️ CPU 고정. GPU 는 4.6배 빠르나 하드웨어 의존이라 코드 검증에서 다른 모델이
+       되고, 실측에서 **CPU 가 더 좋았다** (f2023 핸디캡 GPU −9.1 vs CPU +10.3).
+    """
+    from catboost import CatBoostClassifier, Pool
+    t0 = time.time() if t0 is None else t0
+    pool = Pool(X, y, weight=w, baseline=init_tr)
+    ref = Pool(X_ref)
+    tags, z = [], np.zeros(len(X_ref))
+    for var, over in CAT_VARIANTS.items():
+        for seed in CAT_SEEDS:
+            m = CatBoostClassifier(iterations=CAT_ITERS, random_seed=seed,
+                                   **CAT_PARAMS, **over)
+            m.fit(pool)
+            tag = f"{var}_{seed}"
+            m.save_model(str(model_dir / f"cat_{tag}.cbm"))
+            tags.append(tag)
+            z += m.predict(ref, prediction_type="RawFormulaVal")
+            print(f"  CatBoost {tag}  ({time.time()-t0:.0f}s)")
+            del m
+    return tags, z / len(tags)
+
+
+def cat_ref_logit(model_dir, tags, X_ref):
+    """저장된 CatBoost 멤버로 참조행 로짓만 다시 계산 (--artifacts-only 경로)."""
+    from catboost import CatBoostClassifier, Pool
+    ref = Pool(X_ref)
+    z = np.zeros(len(X_ref))
+    for tag in tags:
+        m = CatBoostClassifier()
+        m.load_model(str(model_dir / f"cat_{tag}.cbm"))
+        z += m.predict(ref, prediction_type="RawFormulaVal")
+        del m
+    return z / len(tags)
+
+
+def blend_cat(raw_ref, z_cat):
+    """전 행에 CatBoost 를 섞는다 — fspec **이후**, δ 보정 **이전**.
+    이 지점이 §7.142 에서 α 를 고른 지점과 같아야 한다."""
+    print(f"  CatBoost 블렌드 α={CAT_ALPHA}: "
+          f"(로짓 상관 {np.corrcoef(raw_ref, z_cat)[0,1]:.3f})")
+    return (1 - CAT_ALPHA) * raw_ref + CAT_ALPHA * z_cat
 
 
 def blend_fspec(df, raw_ref, z_fs, n_train):
@@ -477,9 +528,24 @@ def main():
             raise SystemExit(
                 "FSPEC_ALPHA > 0 인데 저장된 fspec 멤버가 없다 — F전문가는 새 모델이라 "
                 "--artifacts-only 로는 만들 수 없다. 전체 학습을 한 번 돌릴 것.")
+        cat_tags = list(old.get("cat_members") or [])
+        if not cat_tags and CAT_ALPHA > 0:
+            # s36 전례와 같은 상황 — 기존 번들엔 없고 디스크에만 있다.
+            have = {f.stem[4:] for f in MODEL_DIR.glob("cat_*.cbm")}
+            cat_tags = [f"{v}_{sd}" for v in CAT_VARIANTS for sd in CAT_SEEDS
+                        if f"{v}_{sd}" in have]
+            if cat_tags:
+                print(f"--artifacts-only: 디스크에서 CatBoost {len(cat_tags)}개 복원")
+        if CAT_ALPHA > 0 and cat_tags:
+            raw_ref = blend_cat(raw_ref, cat_ref_logit(MODEL_DIR, cat_tags, X_ref))
+        elif CAT_ALPHA > 0:
+            raise SystemExit(
+                "CAT_ALPHA > 0 인데 저장된 CatBoost 멤버가 없다 — 새 모델이라 "
+                "--artifacts-only 로는 만들 수 없다. 전체 학습을 한 번 돌릴 것.")
         return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
                        mlp_tags, mlp_wts, mlp_enc, fhash, t0,
-                       soft_h=old.get("soft_h", {}), fspec_tags=fspec_tags)
+                       soft_h=old.get("soft_h", {}), fspec_tags=fspec_tags,
+                       cat_tags=cat_tags)
 
     # ── soft label (§7.70) — LGBM과 MLP가 **같은** (X, y, w, aux)를 봐야
     #    하므로 보조 라벨을 먼저 복원하고 soften을 한 번만 적용한다.
@@ -514,6 +580,14 @@ def main():
         print(f"  init_score 레벨: {len(np.unique(np.round(init_tr, 6)))}개 구간, "
               f"평균 {init_tr.mean():+.5f}  범위 [{init_tr.min():+.5f}, {init_tr.max():+.5f}]")
 
+    if os.environ.get("LGA_CAT_ONLY"):
+        # CatBoost 멤버만 만들고 끝낸다. LGBM/MLP 는 손대지 않으므로 그 뒤
+        # `--artifacts-only` 로 번들을 재생성하면 된다 (s36 이 쓴 경로).
+        print("LGA_CAT_ONLY: CatBoost 멤버만 학습한다")
+        tags, _ = train_catboost(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
+        print(f"완료 — {len(tags)}개 저장. 이제 --artifacts-only 를 돌릴 것.")
+        return None
+
     members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
 
     # ── MLP 멤버 (로짓 블렌드) ───────────────────────────────
@@ -533,6 +607,12 @@ def main():
         fspec_tags, z_fs, n_fs = train_fspec(df, build_X, X_ref, MODEL_DIR, t0)
         raw_ref = blend_fspec(df, raw_ref, z_fs, n_fs)
 
+    # ── CatBoost 앙상블 (§7.140~§7.142) — fspec **이후**, δ 보정 **이전** ──
+    cat_tags = []
+    if CAT_ALPHA > 0:
+        cat_tags, z_cat = train_catboost(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
+        raw_ref = blend_cat(raw_ref, z_cat)
+
     # ── 사후 로짓 보정도 delta보다 **먼저** 얹는다 ──────────────
     # predict.py의 순서(블렌드 → 보정 → prior shift)와 같아야 한다.
     # `logit_adjust`는 추론·검증과 **같은 함수**다 — 축을 늘려도 여기는 안 고친다.
@@ -542,12 +622,12 @@ def main():
     #    사실상 없다. 조회 키에 season이 안 들어가는 것이 Trackman과의 결정적 차이다.
     return _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
                    mlp_tags, mlp_wts, mlp_enc, fhash, t0, soft_h=soft_h,
-                   fspec_tags=fspec_tags)
+                   fspec_tags=fspec_tags, cat_tags=cat_tags)
 
 
 def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
             mlp_tags, mlp_wts, mlp_enc, fhash, t0, *, soft_h=None,
-            fspec_tags=None):
+            fspec_tags=None, cat_tags=None):
     """블렌드 이후 — 보정 가산 → prior shift → 저장.
 
     전체 학습과 `--artifacts-only`가 **이 함수 하나를 공유한다.** 두 경로가
@@ -568,6 +648,18 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
           f"→ target={TARGET_PRIOR_2025:.4f}")
     print(f"  base={base:+.5f}  delta={delta:+.5f}  → logit_delta={logit_delta:+.5f}")
 
+    # ── 꼬리 하드 클리핑 경계 동결 (기본 꺼짐) ─────────────────────
+    # 추론 시점에 test 분포를 보지 않으려면 경계가 **여기서** 확정돼야 한다.
+    # 참조행(REF_SEASON)의 prior shift **이후** 확률 = 추론이 내놓을 것과 같은 축.
+    clip_lo, clip_hi = None, None
+    if PREDICT_CLIP_Q > 0:
+        p_ref = _sigmoid(raw_ref + logit_delta)
+        clip_lo = float(np.quantile(p_ref, PREDICT_CLIP_Q))
+        clip_hi = float(np.quantile(p_ref, 1 - PREDICT_CLIP_Q))
+        print(f"⚠️  꼬리 클리핑 ON q={PREDICT_CLIP_Q:.4f}  "
+              f"lo={clip_lo:.4f} hi={clip_hi:.4f}  "
+              f"(pclip.py 측정 −1100 BSS. 왜 켰는지 MODEL.md에 적을 것)")
+
     # ── 저장 ────────────────────────────────────────────────
     # β는 art["ctx"] 안에 축별로 들어 있다 — 번들에 따로 두지 않는다 (두 곳에 두면 어긋난다)
     joblib.dump({"artifacts": art, "feature_cols": cols, "logit_delta": logit_delta,
@@ -582,7 +674,12 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
                  # F 전용 전문가 (§7.101). α=0이거나 멤버가 없으면 추론에서 건너뛴다.
                  "fspec_members": list(fspec_tags or []),
                  "fspec_alpha": FSPEC_ALPHA if fspec_tags else 0.0,
-                 "fspec_min_season": FSPEC_MIN_SEASON},
+                 "fspec_min_season": FSPEC_MIN_SEASON,
+                 # CatBoost 앙상블 (§7.142). α=0이거나 멤버가 없으면 추론에서 건너뛴다.
+                 "cat_members": list(cat_tags or []),
+                 "cat_alpha": CAT_ALPHA if cat_tags else 0.0,
+                 # 꼬리 하드 클리핑 경계. None이면 추론에서 건너뛴다.
+                 "clip_q": PREDICT_CLIP_Q, "clip_lo": clip_lo, "clip_hi": clip_hi},
                 MODEL_DIR / "artifacts.joblib", compress=3)
     (MODEL_DIR / "meta.json").write_text(json.dumps({
         "seeds": list(SEED_ENSEMBLE), "variants": list(ENSEMBLE_VARIANTS),
@@ -590,6 +687,11 @@ def _finish(df, art, ctx, asof, mix, cols, base, raw_ref, members,
         "fspec_members": list(fspec_tags or []),
         "fspec_alpha": FSPEC_ALPHA if fspec_tags else 0.0,
         "fspec_min_season": FSPEC_MIN_SEASON,
+        # CatBoost 앙상블 (§7.140~§7.145). 태그·이력이 이 축을 봐야 한다 —
+        # 없으면 α 고정 후 변형/시드만 바꾼 제출이 파일명으로 구분되지 않는다.
+        "cat_members": list(cat_tags or []),
+        "cat_alpha": CAT_ALPHA if cat_tags else 0.0,
+        "cat_iters": CAT_ITERS, "cat_variants": list(CAT_VARIANTS),
         "use_mlp": USE_MLP, "mlp_alpha": MLP_ALPHA if USE_MLP else 0.0,
         "mlp_aux_lambda": MLP_AUX_LAMBDA if USE_MLP else 0.0,
         # ⚠️ 축 목록도 반드시 남긴다. λ만 남기면 헤드 2개짜리와 4개짜리가

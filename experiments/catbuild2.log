@@ -1,0 +1,83 @@
+=== 1. 리키지 정적 검사 ===
+  ✅ groupby/value_counts/rolling/fit/quantile 등 금지 호출 없음
+
+=== 2. src → submit 복사 ===
+  features.py
+  predict.py
+  mlp_infer.py
+  contam.py
+  부스터 23개: ['lgbm_base_1234.txt', 'lgbm_base_2024.txt', 'lgbm_base_31337.txt', 'lgbm_base_42.txt', 'lgbm_base_7.txt', 'lgbm_extra_1234.txt', 'lgbm_extra_2024.txt', 'lgbm_extra_31337.txt', 'lgbm_extra_42.txt', 'lgbm_extra_7.txt', 'lgbm_fspec_2024.txt', 'lgbm_fspec_42.txt', 'lgbm_fspec_7.txt', 'lgbm_lowff_1234.txt', 'lgbm_lowff_2024.txt', 'lgbm_lowff_31337.txt', 'lgbm_lowff_42.txt', 'lgbm_lowff_7.txt', 'lgbm_wide_1234.txt', 'lgbm_wide_2024.txt', 'lgbm_wide_31337.txt', 'lgbm_wide_42.txt', 'lgbm_wide_7.txt']
+  CatBoost 12개 (alpha=0.1)
+  MLP 8개: ['mlp_emb4_1234.npz', 'mlp_emb4_2024.npz', 'mlp_emb4_31337.npz', 'mlp_emb4_42.npz', 'mlp_emb4_7.npz', 'mlp_noid_2024.npz', 'mlp_noid_42.npz', 'mlp_noid_7.npz']  (alpha=0.75)
+
+=== 3. 추론 시간 측정 (245,789행 더미) ===
+  더미: 시즌 진행분 재기준화 적용 (asof n_szn > 0 유지)
+Load model...
+  features=78  logit_delta=-0.04498
+Load test data...
+  test=245789  submission=245789
+Predict...
+  mean=0.4824  min=0.2824  max=0.6931
+Saved: ./output/submission.csv (rows=245789)  elapsed=26.3s
+  ⏱ 29.7s / 600s 한도  (4.9%)
+  submission 검증 OK  mean=0.4824
+  레벨 대조(재기준화 더미)  실측 0.482408  목표 0.482408  어긋남 +0.000000
+
+=== 4. zip 패키징 ===
+  제외: ['pitcher_id_map.csv', 'trackman_pitcher.csv']  (TRACKMAN_MODE=none)
+       2,721  contam.py
+      57,819  features.py
+       6,539  history.json
+       5,669  mlp_infer.py
+   1,724,047  model/artifacts.joblib
+     371,528  model/cat_base_2024.cbm
+     368,112  model/cat_base_42.cbm
+     370,624  model/cat_base_7.cbm
+   1,321,968  model/cat_depthwise_2024.cbm
+   1,346,768  model/cat_depthwise_42.cbm
+   1,337,288  model/cat_depthwise_7.cbm
+     291,952  model/cat_sym_2024.cbm
+     292,112  model/cat_sym_42.cbm
+     292,048  model/cat_sym_7.cbm
+     457,864  model/cat_wide_2024.cbm
+     455,824  model/cat_wide_42.cbm
+     460,296  model/cat_wide_7.cbm
+   1,187,596  model/lgbm_base_1234.txt
+   1,187,387  model/lgbm_base_2024.txt
+   1,186,848  model/lgbm_base_31337.txt
+   1,187,264  model/lgbm_base_42.txt
+   1,187,438  model/lgbm_base_7.txt
+   1,193,555  model/lgbm_extra_1234.txt
+   1,193,556  model/lgbm_extra_2024.txt
+   1,193,991  model/lgbm_extra_31337.txt
+   1,194,052  model/lgbm_extra_42.txt
+   1,194,003  model/lgbm_extra_7.txt
+     124,007  model/lgbm_fspec_2024.txt
+     160,366  model/lgbm_fspec_42.txt
+     153,052  model/lgbm_fspec_7.txt
+   1,185,210  model/lgbm_lowff_1234.txt
+   1,185,233  model/lgbm_lowff_2024.txt
+   1,185,264  model/lgbm_lowff_31337.txt
+   1,185,081  model/lgbm_lowff_42.txt
+   1,185,150  model/lgbm_lowff_7.txt
+   4,530,512  model/lgbm_wide_1234.txt
+   4,535,135  model/lgbm_wide_2024.txt
+   4,531,242  model/lgbm_wide_31337.txt
+   4,527,961  model/lgbm_wide_42.txt
+   4,535,445  model/lgbm_wide_7.txt
+       3,523  model/meta.json
+     148,408  model/mlp_emb4_1234.npz
+     148,408  model/mlp_emb4_2024.npz
+     148,408  model/mlp_emb4_31337.npz
+     148,408  model/mlp_emb4_42.npz
+     148,408  model/mlp_emb4_7.npz
+     117,728  model/mlp_noid_2024.npz
+     117,728  model/mlp_noid_42.npz
+     117,728  model/mlp_noid_7.npz
+      21,275  predict.py
+         115  requirements.txt
+       3,088  script.py
+
+✅ s37_cb10m12lv684e438.zip  (24.1 MB)
+  이력 기록: submit/history.json (s37, 지문 e438)
+  이력 추가: SUBMISSIONS.md (표 105번째 행 뒤)

@@ -1,0 +1,29 @@
+=== 1. 리키지 정적 검사 ===
+  ✅ groupby/value_counts/rolling/fit/quantile 등 금지 호출 없음
+
+=== 2. src → submit 복사 ===
+  features.py
+  predict.py
+  mlp_infer.py
+  contam.py
+  부스터 23개: ['lgbm_base_1234.txt', 'lgbm_base_2024.txt', 'lgbm_base_31337.txt', 'lgbm_base_42.txt', 'lgbm_base_7.txt', 'lgbm_extra_1234.txt', 'lgbm_extra_2024.txt', 'lgbm_extra_31337.txt', 'lgbm_extra_42.txt', 'lgbm_extra_7.txt', 'lgbm_fspec_2024.txt', 'lgbm_fspec_42.txt', 'lgbm_fspec_7.txt', 'lgbm_lowff_1234.txt', 'lgbm_lowff_2024.txt', 'lgbm_lowff_31337.txt', 'lgbm_lowff_42.txt', 'lgbm_lowff_7.txt', 'lgbm_wide_1234.txt', 'lgbm_wide_2024.txt', 'lgbm_wide_31337.txt', 'lgbm_wide_42.txt', 'lgbm_wide_7.txt']
+  CatBoost 12개 (alpha=0.1)
+  MLP 8개: ['mlp_emb4_1234.npz', 'mlp_emb4_2024.npz', 'mlp_emb4_31337.npz', 'mlp_emb4_42.npz', 'mlp_emb4_7.npz', 'mlp_noid_2024.npz', 'mlp_noid_42.npz', 'mlp_noid_7.npz']  (alpha=0.75)
+
+=== 3. 추론 시간 측정 (245,789행 더미) ===
+  더미: 시즌 진행분 재기준화 적용 (asof n_szn > 0 유지)
+Load model...
+  features=78  logit_delta=-0.04498
+Load test data...
+  test=245789  submission=245789
+Predict...
+  mean=0.4824  min=0.2823  max=0.6931
+Saved: ./output/submission.csv (rows=245789)  elapsed=25.5s
+  ⏱ 28.5s / 600s 한도  (4.7%)
+  submission 검증 OK  mean=0.4824
+  레벨 대조(재기준화 더미)  실측 0.482367  목표 0.482408  어긋남 -0.000041
+
+=== 4. zip 패키징 ===
+설정이 직전 제출(s36)과 **완전히 같다**.
+  → 이번에 바꾼 것이 describe_tokens()에 안 들어가 있다.
+  → 같은 설정을 의도적으로 다시 내는 것이면 suffix= 를 줄 것.

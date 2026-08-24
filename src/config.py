@@ -225,6 +225,40 @@ FSPEC_PARAMS = dict(
 )
 FSPEC_MAX_ROUNDS = 3000     # 실제 라운드 수는 학습셋 내부 시간분할 early stopping
 
+# ── CatBoost 앙상블 멤버 (MODEL.md §7.139~§7.142) ─────────────────
+# 사용자 제안에서 나왔다: "CatBoost 도 LGBM 처럼 많이 두고 앙상블하면 되지 않나".
+# 시드 3개짜리는 핸디캡 −39.8 이었고 **4변형 × 3시드 = 12개**에서 −9.1 로 줄었다.
+# 일한 것은 시드가 아니라 변형이다 (변형 간 sd 48.4 vs 시드 sd 8.2).
+#
+# 왜 CatBoost 가 다시 후보가 됐나: §7.14 는 **§7.16(MLP 도입) 이전**이라
+# corr 0.985 는 corr(z_cat, z_lgb) — 트리 대 트리였다. 지금 스택은 MLP 75% 라
+# **corr(z_cat, z_blend) = 0.958** 이다. 저장소 자체 규칙("핸디캡 대비 탈상관
+# 보너스의 비율")대로 다시 재니 이득이 남았다.
+#
+# ⚠️ **CPU 고정**이다. GPU 는 4.6배 빠르지만 하드웨어 의존이라 코드 검증(9/11)에서
+#    재학습하면 다른 모델이 된다 (CPU-GPU corr 0.9957). 게다가 CPU 멤버가 실제로
+#    **더 좋았다** (f2023 핸디캡 GPU −9.1 vs CPU **+10.3**) — GPU 근사가 손해였다.
+#    `rsm` 도 안 쓴다 (GPU 미지원이라 검증을 rsm 없이 했다. 여기서만 켜면 skew).
+#    `thread_count` 도 6 고정 — 검증한 것과 비트 단위로 같아야 한다.
+#
+# α = 0.10 은 **결과를 보기 전에 고정**했다. 양 fold 양수 고원(0.05~0.20)의 낮은 쪽.
+# s35 등가 층 fold2024 Δ = **+2.47 [+0.27, +4.85]** (P=0.98), fold2023 +1.48, 크기비 1.67.
+CAT_ALPHA = 0.10
+CAT_SEEDS = (42, 7, 2024)
+CAT_ITERS = 250             # §7.12 곡선이 150~350 에서 평평. fold 를 보고 고르지 않는다
+CAT_PARAMS = dict(
+    learning_rate=0.03, l2_leaf_reg=30.0, border_count=128,
+    loss_function="Logloss", verbose=0, allow_writing_files=False,
+    task_type="CPU", thread_count=6,
+)
+CAT_VARIANTS = {
+    "base":      dict(grow_policy="Lossguide", max_leaves=31, min_data_in_leaf=2000),
+    "wide":      dict(grow_policy="Lossguide", max_leaves=127, min_data_in_leaf=8000),
+    # ⚠️ SymmetricTree 는 min_data_in_leaf 를 **조용히 무시**한다 (§7.12). 안 준다.
+    "sym":       dict(grow_policy="SymmetricTree", depth=6),
+    "depthwise": dict(grow_policy="Depthwise", depth=8, min_data_in_leaf=2000),
+}
+
 # 최종 학습 트리 수. 홀드아웃이 없어 early stopping을 못 쓰므로 고정값.
 # fold2에서 best_iteration=292였고, 최종은 2024가 추가되지만 hl=0.5라
 # 유효 표본 수는 거의 그대로다 → 소폭만 늘린다.

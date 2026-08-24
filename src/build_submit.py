@@ -27,7 +27,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from config import ROOT, TEST_CSV, TRAIN_CSV
+from config import CAT_ALPHA, ROOT, TEST_CSV, TRAIN_CSV
 from predict import (CTX_BETA_MULT, FSPEC_ALPHA_OVERRIDE, MLP_ALPHA_OVERRIDE,
                      PROB_CENTER,
                      PROB_SCALE, PROB_SHIFT, PROB_TARGET, SEG_SHIFT)
@@ -54,6 +54,7 @@ FORBIDDEN_ATTRS = {"quantile", "describe", "corr", "cov", "mode"}
 
 REQUIREMENTS = """\
 lightgbm==4.6.0
+catboost==1.2.10
 numpy==2.2.6
 pandas==2.3.3
 scipy==1.15.2
@@ -143,6 +144,15 @@ def main():
     if not boosters:
         raise SystemExit("model/lgbm_*.txt 없음. 먼저 src/train.py를 실행할 것.")
     print(f"  부스터 {len(boosters)}개: {[p.name for p in boosters]}")
+    cats = sorted(model_dir.glob("cat_*.cbm"))
+    _bcat = joblib.load(model_dir / "artifacts.joblib").get("cat_members") or []
+    if _bcat and len(cats) != len(_bcat):
+        raise SystemExit(f"CatBoost 멤버 불일치 — 디스크 {len(cats)}개 vs "
+                         f"번들 {len(_bcat)}개. model/ 정리 필요.")
+    if cats:
+        print(f"  CatBoost {len(cats)}개 (alpha={CAT_ALPHA})")
+    elif CAT_ALPHA > 0:
+        raise SystemExit("CAT_ALPHA > 0 인데 model/cat_*.cbm 없음. train.py 재실행.")
     meta = json.loads((model_dir / "meta.json").read_text(encoding="utf-8"))
     # 확률공간 레벨 시프트는 **추론 층 상수**라 train.py가 쓴 meta.json에 없다.
     # 태그·지문·이력이 이 축을 보게 하려면 여기서 얹어야 한다 (describe_tokens 참조).
@@ -177,6 +187,13 @@ def main():
         if cfa is not None and abs(float(cfa) - sfa) > 1e-12:
             print(f"  ⚠️ fspec_alpha 불일치 — meta {cfa} vs 서빙 {sfa}  (서빙값으로 태그)")
         meta["fspec_alpha"] = sfa
+    # CatBoost 도 같은 이유로 **서빙되는 값**에서 읽는다 (§7.132 태그 거짓말 전례).
+    if _b.get("cat_alpha") is not None:
+        cca, sca = meta.get("cat_alpha"), float(_b["cat_alpha"])
+        if cca is not None and abs(float(cca) - sca) > 1e-9:
+            print(f"  ⚠️ cat_alpha 불일치 — meta {cca} vs 서빙 {sca}  (서빙값으로 태그)")
+        meta["cat_alpha"] = sca
+        meta["cat_members"] = list(_b.get("cat_members") or [])
 
     mlps = sorted(model_dir.glob("mlp_*.npz"))
     if meta.get("use_mlp"):
@@ -393,6 +410,13 @@ def describe_tokens(meta):
     fa = float(meta.get("fspec_alpha") or 0.0)
     if fa:
         tok["fspec"] = f"fs{fa * 100:.0f}"
+    # CatBoost 앙상블 (MODEL.md §7.140~§7.145).  α=0.10 · 12멤버 -> cb10m12.
+    # ⚠️ 멤버 수까지 넣는다 — α 를 고정한 채 변형/시드를 바꾸는 실험이
+    #    다음 후보로 잡혀 있어서(R-only 라우팅·변형 재선정), α 만 태그하면
+    #    §7.63·§7.132 가 두 번 당한 "태그가 두 제출을 구분 못 함"이 재현된다.
+    ca = float(meta.get("cat_alpha") or 0.0)
+    if ca:
+        tok["cat"] = f"cb{ca * 100:.0f}m{len(meta.get('cat_members') or [])}"
     # δ β 공통배율 (MODEL.md §7.131).  1.10 -> bm110.  1.0 이면 생략.
     bm = float(meta.get("ctx_beta_mult") or 1.0)
     if bm != 1.0:
