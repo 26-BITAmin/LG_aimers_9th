@@ -1180,6 +1180,48 @@ emb4 설정을 그대로 재사용한 것 — 하이퍼파라미터 재탐색 �
 프로브 결과 기준 — 사용자에게 재튜닝 진행 여부 확인 대기 중). `mlp.py`/
 `numemb.py` 등 기존 코드 변경 없음.
 
+## 사용자 제안서(Brier 분해·후처리) 검토 — Phase 0 진단 (2026-08-23)
+
+사용자가 업로드한 일반론적 대회 방법론 제안서(Murphy decomposition 진단 →
+calibration 후처리, `~/.claude/uploads/.../brier_score_decomposition_postprocessing_proposal.md`)를
+기존 증거와 대조. 상당수가 이미 기각/채택된 것과 겹침:
+
+- 글로벌 isotonic/Platt/기울기 보정 → `EDA.md` §8에서 이미 기각(held-out −13.4/−2.5)
+- LI/Count 조건부 calibration → `li` pts_res≈13(무가치), ctx축 확장(exp57/58) 전부 무효과
+- "그룹별 다른 보정" 자체 → 이미 채택 상태(ctx/asof축, 티어 슬로프 s02)
+- 하드 0/1 클리핑, 전역 shrinkage → 제안서 자체 수학(§15·§32)이 이미 반증하거나
+  기존 EB 스무딩·prior-shift의 조잡한 버전이라 우선순위 낮음
+
+유일하게 이 세션에서 안 해본 축: **모델 출력 확률 자체의 percentile로 조건화한
+tail calibration** — 지금까지 전부 외부 공변량(asof_pitcher_n, asof_batter_n,
+hand, count4) 조건화였지 p 자체 조건화는 처음.
+
+신규 파일 `wonwoo_repro/src/tail_diag.py`(재학습 없음, `experiments/cache/`의
+fold2024 raw 앙상블 캐시 재사용, MLP_ALPHA=0.75 블렌드로 근사) 결과:
+
+- 20-bin quantile reliability: 중간 빈들은 gap ±0.003~0.007로 작지만, **최상위
+  3개 빈(85~100%)이 일관되게 음수**(-0.0047, -0.0059, -0.0128, -0.0163 순 —
+  극단으로 갈수록 커짐, "모델이 고확률 쪽에서 과소평가")
+- success-side MSE 0.2618 vs failure-side MSE 0.2344 — 비대칭. 위 tail 방향과 정합
+  (성공 투구에 확률을 충분히 높게 안 준다)
+- 꼬리 밴드: top 95-99%(n=10,140) gap −0.0173(SE 대비 ~3.5σ), top 1%(n=2,536)
+  gap −0.0124(~1.3σ) — 상위 구간은 실측 성공률이 예측보다 높음(과소신).
+  bottom 1%는 부호가 반대(+와 −가 섞임, n=2,536이라 더 노이지)
+
+**대략적인 상한 추정**: reliability 항의 기여도(Σ(n_k/N)(p_k-o_k)²)로 역산하면
+꼬리 3~4개 빈을 완벽히 고쳐도 ΔScore 상한이 대략 15~20점 수준(제안서 §30 환산식
+사용) — 이번 세션에서 다룬 다른 후보들과 비슷하거나 작은 규모이고, 이건
+**낙관적 상한**(같은 fold에서 잰 gap을 그대로 다 회수한다고 가정, fit-fold≠eval-fold
+비용·과적합 손실 미반영)이라 실제 달성 가능분은 더 작을 가능성이 큼. 게다가
+이건 raw 블렌드 근사치(ctx/asof/gt 보정 전)라 실제 배포 p_oracle에서는 이미
+더 작아져 있을 수 있음.
+
+**판단**: 방향은 있지만(고확률 쪽 과소신, old RF 파이프라인의 §8 "calibration
+slope>1" 발견과 같은 방향 — 우연이 아닐 수 있음) 크기가 이번 세션 노이즈
+게이트(2σ 6.3~14.5)와 비슷하거나 작음. Phase 1(fit-fold≠eval-fold 정식 검증,
+foldcache 2023 fold 추가 + 최종 확인 시 verify_pipeline_calib.py 재실행,
+~30분~1시간 추가 소요)으로 진행할지는 이 상한 추정을 보고 사용자 판단 대기.
+
 λ만 고정 슬로프에서 스윕한 결과는 참고할 값이 있다:
 
 | λ | 2023 | 2024 |
