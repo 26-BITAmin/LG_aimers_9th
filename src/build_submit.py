@@ -28,8 +28,8 @@ import numpy as np
 import pandas as pd
 
 from config import CAT_ALPHA, ROOT, TEST_CSV, TRAIN_CSV
-from predict import (CTX_BETA_MULT, FSPEC_ALPHA_OVERRIDE, MLP_ALPHA_OVERRIDE,
-                     PROB_CENTER,
+from predict import (APN_EDGES, APN_SHIFT, CTX_BETA_MULT, FSPEC_ALPHA_OVERRIDE,
+                     MLP_ALPHA_OVERRIDE, PROB_CENTER,
                      PROB_SCALE, PROB_SHIFT, PROB_TARGET, SEG_SHIFT)
 
 SRC = ROOT / "src"
@@ -159,6 +159,8 @@ def main():
     meta["prob_shift"] = PROB_SHIFT
     meta["prob_scale"] = PROB_SCALE
     meta["seg_shift"] = SEG_SHIFT
+    meta["apn_shift"] = list(APN_SHIFT) if APN_SHIFT else None
+    meta["apn_edges"] = list(APN_EDGES) if APN_SHIFT else None
     meta["ctx_beta_mult"] = CTX_BETA_MULT
     if FSPEC_ALPHA_OVERRIDE is not None:
         meta["fspec_alpha"] = FSPEC_ALPHA_OVERRIDE   # 배포층 오버라이드가 이긴다
@@ -234,8 +236,37 @@ def main():
     # 레벨 시프트가 켜져 있으면 **도달 평균**을 대조한다. PROB_SHIFT는 특정
     # 아티팩트에서 잰 p̄에 묶인 상수라, 재학습하면 조용히 낡는다 — 그 경우
     # 레벨 항이 어긋난 채로 제출된다 (§7.120: 어긋남 0.005가 −10 BSS 규모).
+    # ⚠️ **APN 보정분을 정확히 되돌린 뒤에 대조한다** (§7.152-④ 후속).
+    #
+    # `make_dummy_test` 는 `n' = n_off₂₅ + (n − n_off₂₄)` 로 **전원을 한 살씩**
+    # 늙힌다 — 신규 유입(로스터 회전)이 없다. 그래서 `asof_pitcher_n` 버킷 점유율이
+    # 실제와 크게 다르다. 검증 가능한 유일한 전환(2023→2024)에 같은 변환을 걸어
+    # 실측했다 (`src/occval.py`):
+    #
+    #     최저 버킷   더미 예측 0.0172   실제 0.1075   → **6.2배 빗나간다**
+    #     최고 버킷   더미 예측 0.6702   실제 0.4511
+    #
+    # 실측 점유율은 2022 이후 안정적이다 (.1092 → .0907 → .1075). §s14 가 기록한
+    # "감쇠 모형에 개체 회전을 넣어라"의 재현이고, 그때도 3배 빗나갔다.
+    # → **더미의 버킷 분포에 레벨 상수를 맞추면 안 된다.** APN 항을 정확히 역산해
+    #   빼고, 남은 것을 기존 검사에 그대로 통과시킨다 (검사의 보호 성질 보존:
+    #   재학습으로 p̄ 가 움직이면 여전히 잡힌다).
     if PROB_SHIFT:
-        got = float(out["control_success"].mean())
+        got_raw = float(out["control_success"].mean())
+        pv = out["control_success"].to_numpy(dtype=np.float64)
+        if APN_SHIFT:
+            gg = np.digitize(dummy["asof_pitcher_n"].to_numpy(dtype=np.float64),
+                             np.asarray(APN_EDGES, dtype=np.float64))
+            add = np.asarray(APN_SHIFT, dtype=np.float64)[gg]
+            q = np.clip(pv - PROB_SHIFT, 1e-9, 1 - 1e-9)      # 아핀 직후 확률
+            q0 = 1.0 / (1.0 + np.exp(-(np.log(q / (1 - q)) - add)))   # APN 역산
+            pv = q0 + PROB_SHIFT
+            occ = np.bincount(gg, minlength=len(APN_SHIFT)) / len(gg)
+            print(f"  APN 더미 점유율 {' '.join(f'{x:.4f}' for x in occ)}"
+                  f"  (⚠️ 회전 없음 — 실제와 다르다)")
+            print(f"  APN 이 더미 평균에 준 이동 {got_raw - float(pv.mean()):+.6f}"
+                  f"  → 역산해 제외하고 대조한다")
+        got = float(pv.mean())
         off = got - PROB_TARGET
         print(f"  레벨 대조(재기준화 더미)  실측 {got:.6f}  목표 {PROB_TARGET:.6f}  어긋남 {off:+.6f}")
         if abs(off) > 5e-4:
@@ -431,6 +462,13 @@ def describe_tokens(meta):
     sg = meta.get("seg_shift") or {}
     if sg:
         tok["seg"] = f"sg{abs(sg['R'] - sg['F']) * 1e5:.0f}"
+    # 커리어 단계별 레벨 보정 (MODEL.md §7.151).  |a_1|×1e5 -> ap1984.  끄면 생략.
+    # ⚠️ **κ 가 아니라 계수 자체를 태그한다.** κ 만 넣으면 같은 κ 로 a_g 를 재적합한
+    #    제출(스택이 바뀌면 반드시 그렇게 된다)이 직전과 같은 이름을 받는다 —
+    #    §7.63·§7.132·§7.146 이 세 번 당한 그 실패다.
+    ap = meta.get("apn_shift") or []
+    if ap:
+        tok["apn"] = f"ap{abs(float(ap[0])) * 1e5:.0f}"
     # 확률공간 스케일 c (MODEL.md §7.120).  1.05 -> c105.  1.0이면 생략.
     pc = float(meta.get("prob_scale") or 1.0)
     if pc != 1.0:

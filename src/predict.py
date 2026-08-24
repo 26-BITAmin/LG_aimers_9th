@@ -106,6 +106,36 @@ PROB_TARGET = 0.482407945
 #    최적값을 쓰려면 {"F": +0.005614, "R": +0.007028} 이지만 슬롯 값어치가 없다.
 SEG_SHIFT = None
 
+# --- career-stage level shift (MODEL.md 7.151 / 7.152) ---------------
+# a_g = calibration-in-the-large intercept inside each asof_pitcher_n quintile,
+# fitted on the fold2024 holdout of the s37 stack (= s35 + CatBoost12 a=0.10),
+# centred to weighted mean 0, then shrunk by kappa.
+#
+#   why it exists: the model over-predicts low-career pitchers and
+#   under-predicts veterans. asof_* are career cumulative, so "career value"
+#   and "current form" drift apart; the learner never sees that residual.
+#
+#   kappa = 0.5, pre-registered by the 7.37 band rule BEFORE seeing the sweep
+#   (+-50% band [0.25, 0.75] sits inside the passing region (0, 0.75]).
+#   The measured one-season decay is c = 0.558 (layer-matched, 7.152-2), so
+#   kappa is also ~= the optimal shrink: 98.9% of the ceiling.
+#
+#   break-even is kappa < 2c, i.e. the 2025 residual must stay above 25% of
+#   the 2024 one.  7.124 lost this same class of bet at kappa = 1 (needed 50%,
+#   got 16.8%) -- the margin here is 2.23x, not 0.34x.
+#
+#   holdout: fold2024 (transfer, 2023 coefficients) +5.72
+#            fold2023 (these exact frozen constants) +8.54 [+3.87, +13.58]
+#   placebo (game_dayofweek, k=7) is negative at every kappa in both folds.
+#
+#   legality: each row reads its own asof_pitcher_n, compares it against four
+#   frozen edges and adds one of five frozen scalars. No cross-row lookup,
+#   no test-set statistic (CLAUDE.md 3.2) -- same shape as SEG_SHIFT.
+#   Rows with a missing value get 0 (train has none, but test may).
+APN_EDGES = (413.0, 997.0, 1843.0, 3323.0)      # season < 2023 quintiles, frozen
+APN_SHIFT = (-0.019836240, -0.005024624, -0.002979314,
+             +0.004057239, +0.005216853)        # logit-space, weighted mean 0
+
 # ── 상수 스윕용 배포층 노브 (§7.131) ────────────────────────────────
 # §7.130 의 규칙: **앙상블을 고정한 채 상수만 바꾸는 변경은 draw 노이즈가 0** 이라
 # LB 차이가 그대로 효과다. 멤버 구성을 바꾸는 변경(§7.128)과 성격이 정반대다.
@@ -310,6 +340,19 @@ class Predictor:
         # 두 축은 서로 다른 항을 건드리므로 이득이 가법이다 (실측 오차 0.66%).
         if PROB_SCALE != 1.0:
             p = PROB_CENTER + PROB_SCALE * (p - PROB_CENTER)
+        # 커리어 단계별 레벨 보정 (§7.151). **아핀 변환 이후 · PROB_SHIFT 이전** —
+        # `calsub.py` 가 a_g 를 적합한 지점과 같아야 한다. 로짓 공간에서 더한다
+        # (측정이 logit(p_dep) 위에서 이뤄졌다).
+        self.apn_rate = 0.0
+        if APN_SHIFT and "asof_pitcher_n" in test_df.columns:
+            v = test_df["asof_pitcher_n"].to_numpy(dtype=np.float64)
+            g = np.digitize(v, np.asarray(APN_EDGES, dtype=np.float64))
+            add = np.asarray(APN_SHIFT, dtype=np.float64)[g]
+            add = np.where(np.isnan(v), 0.0, add)      # 미지 행은 보정하지 않는다
+            self.apn_rate = float(np.mean(~np.isnan(v)))
+            pc = np.clip(p, CLIP_EPS, 1 - CLIP_EPS)
+            p = 1.0 / (1.0 + np.exp(-(np.log(pc / (1 - pc)) + add)))
+
         # 레벨 이동. `game_type`이 있으면 세그먼트별 상수를, 없으면 전역 상수를 쓴다.
         # ⚠️ `game_type`은 피처로는 여전히 드랍돼 있다 (§7.71). 여기서 하는 건
         #    **행이 자기 라벨로 상수 하나를 고르는 것**이지 학습기가 레벨차를
