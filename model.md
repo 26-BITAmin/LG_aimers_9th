@@ -1767,3 +1767,40 @@ wonwoo_repro 실LB 역사 전체) 최고 기록.** C-1은 차선(+4.73), C-3(결
 정식 sNN 제출로 승격(SUBMISSIONS.md 정식 번호 배정, `submit/model/` 교체
 또는 `predict_c2.py`→`predict.py` 정식화)할지는 사용자 판단 대기 —
 지금은 `cand_c2.zip`이 검증된 최선 상태로 남아 있다.
+
+## C-2를 정식 s03로 승격 (2026-08-25)
+
+사용자 지시로 C-2를 공식 배포 상태로 정식화. 절차:
+
+1. `src/predict.py`(s02, TIER_SLOPE만 있는 확정본)를 `src/predict_s02.py`로
+   스냅샷(덮어쓰기 금지 규칙 — 이전에 약속한 대로).
+2. `src/predict.py`를 `predict_c2.py` 내용으로 교체(import 한 줄만 다름:
+   `mlp_infer` → `mlp_infer_numemb`).
+3. `src/build_submit.py`의 `COPY_FILES`에 `mlp_infer_numemb.py`/
+   `numemb_apply.py` 추가(공식 배포 zip이 numemb 의존성을 포함하도록).
+   `mlp_infer.py`는 `predict_s02.py`가 계속 참조하므로 안 뺌.
+4. `submit/model/`을 `submit_c2/model/`로 교체(s02는 `s02_8bdc_tiercal.zip`
+   에 model/ 33개 파일 전부 보존돼 있음을 미리 확인 — 안전하게 덮어씀).
+5. `next_zip_path`의 중복 방지 가드 우회 필요 확인: `describe_tokens()`가
+   ctx/asof/mix/gt/contam/soft/fspec/trackman만 추적하고 MLP 내부 설정
+   (numemb, drop_emb, epochs, lr, dropout, wd)은 안 봐서 s01·s02·s03
+   지문이 전부 "8bdc"로 동일 — **s01→s02 전환 때도 있었던 이미 알려진
+   한계**(predict.py만 바뀌면 가드가 못 잡음, CLAUDE.md에 기록됨). 신규
+   파일 `src/promote_s03.py`(build_submit.py의 핵심 절차를 재사용하되
+   `next_zip_path(meta, suffix="numemb")`로 명시적 우회)로 처리.
+6. 결과: `s03_8bdcnumemb.zip`, `submit/history.json`에 n=3 항목 자동 기록,
+   `SUBMISSIONS.md`에 자동 추가된 행(구성 칸에 numemb/drop_emb 정보가
+   describe_tokens() 한계로 빠져 있었음)을 손으로 보정 — numemb 설명과
+   실LB 1088.3904706297 기입.
+
+**호환성 확인**: `verify_pipeline_calib.py` 등 기존 검증 스크립트가
+`predict.py`를 계속 참조하는데, `mlp_infer_numemb.MLPPredictor`가 numemb
+키 유무를 npz에서 자동 감지해(`"numemb_kind" in npz`) 없으면
+`self.ne=None`으로 조용히 no-op 처리하도록 이미 설계해둬서(C-2 배포
+확장 시점부터), **향후 이 스크립트들을 다시 돌려도(예: 새 tier-slope
+재검증) 문제없이 옛 방식대로 동작한다** — 이번 promotion 때문에 새로
+깨지는 검증 경로 없음.
+
+**현재 공식 상태(2026-08-25 이후)**: `submit/predict.py`=numemb 버전,
+`submit/model/`=C-2 가중치, 최신 확정 실LB=**1088.3904706297**(s03).
+`src/predict_s02.py`가 이전 확정본(1080.72)의 스냅샷으로 남아 있다.
