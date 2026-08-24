@@ -1920,3 +1920,25 @@ career + 폼 델타)이 "최근이 더 중요하다"는 신호를 재현 가능�
 안에서 이미 상당 부분 담고 있다는 뜻. **더 짜낼 배포 가능한 여지는
 안 보임 — 여기서 종결.** `config.py`/`features.py` 등 기존 코드 변경 없음,
 신규 파일만 추가.
+
+## "wonwoo가 안 해본 새 접근" 8가지 제시 후 순차 검증 (사용자 요청, 2026-08-25)
+
+이번 세션 전체(MLP 설정 공간의 극단적 비가산성 — C1/C2/C3, "최근성" 신호가
+실재하지만 배포 불가 — EWMA, 앙상블 불일치 미활용 등)를 종합해 wonwoo
+기록에 없는 8개 후보를 제시(①emb4 하이퍼파라미터 체계적 탐색 ②pitcher_id
+임베딩 차원 스윕 ③범주형 임베딩 차원 개별화 ④prev1/3/5경기 decay curve
+파생 ⑤numemb을 career_rate 하나에만 타겟팅 ⑥monotone_constraints
+⑦LGBM 멤버간 불일치를 메타피처로 ⑧학습된 stacking). 우선순위 낮은 것부터
+높은 순으로 하나씩 실측.
+
+### #4(decay curve 파생) + #6(monotone_constraints) — 둘 다 기각
+
+`wonwoo_repro/src/idea4_idea6_probe.py`(신규), fold 2024, LightGBM만, 3시드.
+
+- **#4**: `form_accel`(1/3/5경기 곡률=2차 차분) + `form_decay_ratio`(1→3,
+  3→5 구간 로그비 평균으로 추정한 게임당 감쇠율) 2개 신규 피처 추가.
+  `Δ mean=-3.2, std=2.84`(per-seed [-5.1,+0.9,-5.3]) — 근소 음수, 도움 안 됨.
+- **#6**: `asof_pitcher_success_rate`에 `monotone_constraints=+1`.
+  `Δ mean=+0.1, std=3.09`(per-seed [-0.6,+4.2,-3.3]) — 완전 무효과.
+
+**둘 다 기각.** `config.py`/`features.py` 변경 없음, 신규 파일만 추가.
