@@ -2311,3 +2311,62 @@ proxy에서 본 것보다 훨씬 작다.
 이 세션에서 idea8c에 이어 **두 번째로, "proxy 스크리닝(아무리 다중시드·
 2-fold로 엄밀해도)은 최종 배포 앙상블 스펙으로 반드시 재확인해야 한다"는
 규칙을 스스로 증명한 사례** — 이번에도 실LB를 쓰기 전에 잡아냈다.
+
+### CatBoost 2세대(강화판) — GBDT 단독 강신호가 실배포에서 재앙으로 반전
+
+사용자 지시("CatBoost 좀 더 강화시킨다던지, LGBM을 완전히 대체해본다던지")로
+재시도. `idea10_catboost_variants.py`/`idea10b_...2023.py` — LGB의
+base/wide/extra/lowff 다양화 철학을 CatBoost에 적용해 4변형(cb_base/
+cb_wide=Lossguide/cb_extra=random_strength↑/cb_lowff) x 3시드로 fold2023/
+2024 각각 **GBDT 단독**(MLP 없이 LGB-20 vs CatBoost 앙상블) 비교:
+
+```
+              fold2023(vs LGB132.0)  fold2024(vs LGB795.1)  부호
+cb_base              +8.3                  +0.9            일치
+cb_wide            −121.4                 −44.0            일치(나쁨→기각)
+cb_extra            +40.6                 −12.6            불일치→기각
+cb_lowff            +18.2                  +1.9            일치
+4변형 앙상블         +12.5                  +8.4            일치(양)
+블렌드 최적α         0.65(+17.9)            0.65(+13.0)     **두 fold 독립적으로 같은 α**
+```
+
+cb_wide/cb_extra를 빼고 cb_base+cb_lowff 2변형만 채택(`config.py`
+`CB_VARIANTS`, `train.py` `train_catboost_members`를 LGB식 변형×시드
+구조로 재작성). 사용자 지적으로 `fullfid_cache.py`(신규 — LGB-20+MLP-8을
+fold별 **영구** 캐시, 이전엔 idea8c/verify_cb_alpha가 매번 재학습해
+fold당 30분+ 낭비)을 만들어 재사용하며 `verify_cb_alpha2.py`로 실배포
+(LGB20+MLP8+CatBoost 2변형x5시드=10) 위에서 재확인:
+
+```
+α     fold2023  fold2024
+0.00    810.2     923.5   ← 배포값
+0.15    799.4     928.8
+0.25    776.4     929.9   ← fold2024 same-fold 최적(Δ+6.4)
+0.35    740.9     929.0
+0.50    664.9     924.0
+0.65    562.3     914.7   ← idea10/10b가 **두 fold 독립적으로 수렴**했던 값
+0.75    479.7     906.0
+same-fold 최적: 2023 α=0.00(=CatBoost 안 쓰는 게 최선) / 2024 α=0.25
+```
+
+**fold2023은 α를 늘릴수록 단조감소 — 어떤 양의 α도 이득이 없다.**
+fit-fold≠eval-fold: `fold2024→2023(α=0.25)`: Δ**−33.8**.
+`idea10/10b가 두 fold 모두 독립적으로 수렴했던 "가장 안전해 보이던" α=0.65`
+고정값은 실제로는 fold2023 Δ**−247.9**(재앙), fold2024도 Δ−8.9(음수) —
+**두 fold 모두 마이너스.**
+
+**결론: CB_ALPHA=0 재확정, 이 방향 완전히 종결.** 원인 가설: fold2023은
+학습행이 fold2024보다 적어(976,060 vs 1,221,585) CatBoost 로짓의 스케일/
+분산이 fold2024보다 불안정하고, MLP가 이미 LGB와 상호보완적으로 최적화된
+블렌드(`MLP_ALPHA=0.75`) 위에 로짓 선형블렌드로 CatBoost를 더 얹으면 그
+불안정이 그대로 전체 예측에 전파되는 것으로 보인다(GBDT 단독 비교에서는
+이 상호작용이 전혀 안 보였다 — MLP가 없었으므로).
+
+**이번 세션에서 세 번째로(MLP_ALPHA/idea8c, CatBoost 1세대/verify_cb_alpha,
+이번 2세대) 증명된 규칙: "부분 앙상블(GBDT끼리만, 혹은 좁은 proxy)에서
+아무리 강하고 2-fold 일관된 신호가 나와도, 실배포의 전체 앙상블(MLP까지
+낀)에 얹기 전까지는 그 신호를 신뢰할 수 없다."** 특히 이번 건 "같은 α로
+두 fold가 독립 수렴"이라는, 이 세션에서 나온 가장 설득력 있어 보였던
+교차검증 형태조차 완전히 뒤집혔다는 점에서 가장 강력한 사례.
+`CB_VARIANTS`/`fullfid_cache.py` 등 인프라는 유지(향후 재사용 가능,
+`CB_ALPHA=0`이라 비활성).
