@@ -2172,3 +2172,14 @@ LGB 4변형(base/wide/extra/lowff)×5시드 + MLP 2계열(emb4/noid)×5+3시드�
 이 세션에서 실LB로 확정된 순이득은 C-1(+4.73)/C-2(+7.67)/C-4(+8.57,
 최고)뿐이고, C-3(결합, +1.95로 손해)·C-5(-4.81, 유일한 손실)는 정확히
 "결합/약한 증거로 실LB 직행"이 위험하다는 걸 실증했다.
+
+### C-4를 정식 s04로 승격
+
+`promote_s04.py`(신규, `promote_s03.py` 패턴 재사용) — `submit/model/`을
+`submit_c4/model/`로 교체하고 `predict.py`는 numemb-aware 현재 버전이 아니라
+`predict_s02.py`(C-4는 numemb 안 씀)로 치환. cand_c4.zip과 `predict.py`/
+`mlp_infer.py` sha256 일치 확인 — **이미 실LB로 검증된 조합을 그대로 재현**,
+새 위험 없음. `s04_8bdcpid8.zip` 생성(`next_zip_path`가 s03과 지문이 같아
+`suffix="pid8"`로 우회 — describe_tokens() 한계, 기존에 이미 기록된 것과
+같은 종류). `SUBMISSIONS.md` 04행에 LB=1089.2903220973(cand_c4와 동일)
+기록. **현재 공식 배포본 = s04, 세션 최고 기록.**
