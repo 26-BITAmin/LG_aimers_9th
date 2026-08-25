@@ -2539,3 +2539,69 @@ fold2024의 F쪽 이득(+180.8)이 fold2023보다 작은 것도 이 설명과 �
 
 **세션 결론: 이번 "완전히 새로운 발상" 탐색 4개 후보 전부 기각으로
 마무리.** s04(C-4, 실LB 1089.29)가 현재 세션 최고 기록으로 유지된다.
+
+## wonwoo가 안 해본 "진짜 새 방향" 재탐색 — 전체 model.md(60+ 섹션) 재검토 (2026-08-25)
+
+사용자 지시로 새 피처 탐색은 접고, `model.md` 전체(당시 2541줄, 섹션
+헤더 60개 이상)와 `config.py`/`asofdelta.py`/`mixent.py`/`ctxfit.py`의
+❌/기각/닫혔다 마커를 전부 재확인해 "정말 안 겹치는" 후보만 추렸다.
+
+**재확인으로 확정된 "이미 소진" 목록** (중복 제안 방지용 기록):
+손실함수(MLP `loss="mse"` — 매우 확실한 null std=0.65, LGB `objective=
+"regression"` — 확실한 손해), 계층적 베이즈(방법론적 함정), 행렬분해
+(C-1 결과가 직접 반증), 투수 시퀀스 EWMA(신호는 세션 최대였으나 배포
+불가능 — `control_success` 원재료가 test.csv에 없음), 타자쪽 "투수
+성공사례 거울" 3종(세분화 soft2/gap_bsuccess 티어슬로프/batter_n
+티어슬로프 — 이번에 batter_n 버전 직접 확인해 3전 3패 완성, 아래 참고),
+FM/TabPFN/비트리 계열(wonwoo가 이미 상세 검증 — MLP 1차 −4386, FM 붕괴),
+CatBoost pitcher_id 범주형 함정(wonwoo도 −101로 이미 겪은 문제 — 오늘
+CatBoost 조사에서 독립적으로 재발견한 것과 동일 계열), TabPFN(fold
+크기가 샘플 상한보다 훨씬 큼, 원천적 부적합), 선형모델 3번째 앙상블
+멤버("k=0 선형이 모든 FM보다 낫다"는 wonwoo 자체 진단과 결이 다름).
+
+### 타자 asof_batter_n 티어 슬로프 진단 — null, 3전 3패 완성
+
+투수 tier-slope(s02, 확정 +1.883)와 같은 레시피를 `asof_batter_n`
+티어에 직접 적용(`fullfid_cache` 재사용, 재학습 없음, 순수 진단).
+
+```
+              fold2023   fold2024
+rookie(<200)   0.98        1.11
+low(200-1k)    1.17        0.98
+veteran(1k+)   1.03        1.01
+```
+
+rookie/low 티어가 fold 간 자리를 서로 바꾼다(0.98↔1.11, 1.17↔0.98) —
+투수 tier-slope의 단조로운 두-fold-일치 패턴과 정반대, 순수 노이즈.
+veteran만 안정적이나 효과 크기 1~3%로 무가치. **기각.** "투수쪽 성공
+아이디어의 타자쪽 거울" 시도 3전 3패 완성(soft2, gap_bsuccess 티어슬로프,
+이번 batter_n 티어슬로프).
+
+### MLP `resid=True`/`scale=...` — mlp.py에 구현됐지만 한 번도 실전
+### 검증 안 된 아키텍처 옵션, 스크리닝 결과 둘 다 기각
+
+`mlp.py` DEFAULT에 `resid`(잔차 연결)·`scale`(RealMLP식 대각 스케일링,
+Holzmüller et al. NeurIPS 2024 근거)이 이미 구현돼 있는데 `MLP_VARIANTS`
+어디도 켠 적이 없음을 model.md 전체 grep(0건)으로 확인 — mse_loss_probe/
+CENTER_ASOF와 같은 "구현됐지만 실전 미검증" 패턴. `idea13_resid_scale.py`
+(신규), fold2024, emb4 설정, 5시드, MLP만.
+
+| 변형 | mean | std | Δ(vs 기준선) |
+|---|---:|---:|---:|
+| 기준선(resid=F,scale=N) | 681.8 | 15.76 | — |
+| resid=True | 677.2 | **21.16** | **−4.6** |
+| scale_num(emb=F,wd=T) | 683.0 | 15.65 | +1.3 |
+| scale_embtoo(emb=T,wd=T) | 683.3 | 15.97 | +1.5 |
+
+`resid=True`는 손해일 뿐 아니라 시드간 표준편차가 34% 커져(15.76→21.16)
+**불안정화**까지 겹친다 — `idea1`의 hid=256(용량 확장) 때와 정확히 같은
+패턴("용량/구조를 키우는 확장은 이 파이프라인에서 안 통한다"). `scale`
+두 변형은 완전한 노이즈 수준 null. **셋 다 기각**, `mlp.py`/`config.py`
+변경 없음, 신규 파일만 추가.
+
+### 종합 결론
+
+model.md 전체 재검토 + 이번에 새로 확인한 2건(batter_n 티어슬로프,
+resid/scale)까지 포함해 **"안 겹치면서 유망한" 새 방향은 이 시점에서
+소진된 것으로 판단**한다. s04(C-4, 실LB 1089.29)가 현재 세션 최고
+기록으로 확정 유지된다.
