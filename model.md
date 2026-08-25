@@ -2183,3 +2183,78 @@ LGB 4변형(base/wide/extra/lowff)×5시드 + MLP 2계열(emb4/noid)×5+3시드�
 `suffix="pid8"`로 우회 — describe_tokens() 한계, 기존에 이미 기록된 것과
 같은 종류). `SUBMISSIONS.md` 04행에 LB=1089.2903220973(cand_c4와 동일)
 기록. **현재 공식 배포본 = s04, 세션 최고 기록.**
+
+## CatBoost 재조사 (사용자 제안, 2026-08-25) — wonwoo가 categorical을 안 썼을 가능성
+
+wonwoo가 CatBoost를 기각한 근거(`config.py` 주석): 설정 버그 고친 뒤도
+단독 −26.7, LGB와 corr 0.985 → 탈상관 보너스 +3.5뿐이라 기각. 사용자가
+"categorical feature 활용을 잘 못한 부분이 있을 것"이라고 지적 — 확인해보니
+**맞다.** `features.py`는 `pitcher_id`/`batter_id`/`pitcher_team_id`/
+`batter_team_id`/`base_state`/`hand_matchup`/`count_state`를 전부 LightGBM
+처럼 순수 서수 코드(float)로 만들고, `FINAL_LGB_PARAMS`에도
+`categorical_feature`가 없다 — CatBoost에 `cat_features`를 명시적으로
+알려준 적이 없었다면 CatBoost가 LightGBM과 사실상 같은 정보를 같은 방식으로
+볼 수밖에 없다.
+
+### idea9(1차) — EMB_COLS 7개 전부 네이티브 categorical, fold2024 3시드
+
+`idea9_catboost_native_cat.py`. corr는 0.985→**0.9063**으로 확실히 낮아짐
+(가설의 방향은 맞음). 그런데 CatBoost 단독 BSS(oracle)=655.9, LGB(793.7)
+대비 **−137.8** — wonwoo가 고친 버전(−26.7)보다도 훨씬 나쁨. 블렌드는
+α=0(=LGB단독)이 최적, 보너스 0. 원인: CatBoost `SymmetricTree`는 LGB의
+`min_data_in_leaf=2000`류 리프 크기 제약이 없어(depth=6, 규제 없음) 고카디널리티
+`pitcher_id`(792)/`batter_id`(830) 네이티브 처리가 과적합했을 가능성.
+
+### idea9b — 규제 강화(depth5·l2=50·rsm/subsample 0.8), 그래도 −116.8
+
+`idea9b_catboost_retune.py`, 1시드. 규제를 세게 해도 갭이 거의 안 줄어듦
+(−116.8) — 리프 크기 문제가 아니라 **고카디널리티 ID 자체에 ordered TS를
+거는 것 자체**가 문제라는 뜻. `pitcher_id`/`batter_id`는 애초에
+`features.py`의 `CATEGORICAL_STR`/`CATEGORICAL_INT`에도 없다(project 자체가
+"진짜 범주형"으로 취급한 적 없는 축) — 이미 `asof_success_rate_sm` 등으로
+정보를 뽑아낸 뒤라 여기 또 target-stat을 걸면 중복·노이즈만 커짐.
+
+### idea9c — pitcher_id/batter_id 제외, 진짜 저카디널리티 5개만 네이티브 — 반전
+
+`idea9c_catboost_lowcard_only.py`. `cat_features`를 `pitcher_team_id`/
+`batter_team_id`/`base_state`/`hand_matchup`/`count_state`(카디널리티
+13/13/~5/~16/12)로만 좁히고 `pitcher_id`/`batter_id`는 LGB처럼 그냥 수치로
+남김. fold2024 1시드: **CatBoost 단독 795.2, LGB(790.5)보다 +4.7 — 이겼다.**
+corr=0.9674(0.985보다 낮음, 이 정도로도 탈상동 보너스는 충분). 블렌드 α=0.55에서
+**+15.6**(wonwoo 기각안 +3.5의 4.5배).
+
+### idea9d — 2-fold×3시드 정식 확인 — 이 세션 게이트 전부 통과
+
+`idea9d_catboost_crossfold.py`, 2023/2024 두 fold, LGB 3시드 + CatBoost
+(idea9c 설정) 3시드.
+
+```
+                LGB     CatBoost(Δ)      corr
+fold2023      121.7    140.3(+18.7)    0.9677
+fold2024      793.7    796.0(+2.3)     0.9734
+```
+
+**CatBoost 단독이 두 fold 모두 LGB를 이겼다** (wonwoo의 −26.7과 정반대).
+
+fit-fold≠eval-fold 교차검증(같은 fold에서 α 고르지 않음):
+```
+fold2023에서 찾은 α=0.65 → fold2024 평가: Δ=+11.1
+fold2024에서 찾은 α=0.55 → fold2023 평가: Δ=+25.7
+```
+양방향 전부 양수, 크기비 2.3배(≤3배 통과). 참고로 **아예 fold을 안 보고 고른
+고정 α=0.5**(가장 보수적인 기준)도:
+```
+fold2023: Δ+24.9   fold2024: Δ+11.8
+```
+양쪽 다 양수, 크기비 2.1배 — 이 세션에서 나온 후보 중 **가장 깨끗하게
+검증 게이트(다중시드+2-fold 부호일치+fit-fold≠eval-fold+심지어 고정
+α 참고치까지)를 통과한 신호**. C-4(홀드아웃 약신호 mean+7.0)보다도 이 신호가
+훨씬 강하다.
+
+**다음 단계**: 이건 post-hoc 로짓 보정이 아니라 **완전히 새 모델 계열**
+추가라 스케일이 다르다 — 실배포 편입에는 (a) `train_ensemble`급 CatBoost
+다중시드/변형 학습 루틴, (b) `Predictor`에 CatBoost 블렌드 항 추가(cbm
+모델 로드, `requirements.txt`에 `catboost` 추가 — `competition.md`가 이미
+GBDT 계열 별도 명시 대상으로 catboost를 언급해 둠, 설치시간/추론시간 제한
+안에 들어올 것으로 보임), (c) 리키지 스캐너·더미 추론 시간 재확인이 필요한
+큰 작업이다. 사용자 확인 후 진행.
