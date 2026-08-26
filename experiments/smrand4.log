@@ -1,0 +1,51 @@
+  BOTH2X 재사용
+  UNION 재사용
+  PRE_ANY 재사용
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  RECENT_NEG: 합성 13,357행 (양성비 0.000)  학습 중...
+    lgbm 12개 (553s)
+
+====================================================================================
+하이브리드 (LGBM 에만 증강) — base 935.8   부트스트랩 400회 · 투수 391명
+====================================================================================
+  팔                                      BSS        Δ                 95% 구간    P(Δ>0)
+  pre-2023 F & y=0 (원안)                937.1    +1.36   [  +0.25,   +2.28]     0.990
+  pre-2023 R & y=0 (짝지은 대조)            937.1    +1.33   [  -0.02,   +2.72]     0.973
+  낡음·실패 F+R 합집합 (같은 용량)  <- 둘 다        937.5    +1.73   [  +0.36,   +2.98]     0.993
+  낡음·실패 F+R **2배 용량**       <- 둘 다     937.6    +1.80   [  -0.12,   +3.62]     0.973
+  낡음(<=2022) · 아무 라벨   <- 분해           936.2    +0.43   [  -0.37,   +1.15]     0.863
+  최근(2023+) · 실패만    <- 분해             937.6    +1.85   [  -1.69,   +5.47]     0.823
+
+  총 1334s

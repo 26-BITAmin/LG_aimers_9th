@@ -26,6 +26,7 @@ pre-2023 · R · y=0 · 시즌별 행 수 매칭으로 "F냐 R이냐" 만 빼고
 
 실행:  .venv/Scripts/python.exe -u src/smrand.py 2>&1 | tee experiments/smrand.log
 """
+import os
 import sys
 import time
 from pathlib import Path
@@ -57,7 +58,7 @@ LGB_SEEDS = SEED_ENSEMBLE[:3]
 C = Path(__file__).parent.parent / "experiments" / "cache"
 B_BOOT = 400   # 시간 압박 — B=600/2000 이 일치했으므로 400 으로 줄인다          # §7.162c 에서 B=600 과 2000 이 일치했다 — 1000 이면 충분
 POOL_N = 34109         # pre-2023 F & y=0 과 같은 풀 크기
-ARMS = ("BOTH2X", "UNION", "PRE_ANY", "RECENT_NEG")
+ARMS = ("ALL_NEG",)
 
 
 def make_pool(tr, kind, rng):
@@ -73,6 +74,8 @@ def make_pool(tr, kind, rng):
         # 사용자 질문 — F 와 R 을 **둘 다** 증강한다
         "UNION":  np.flatnonzero((ss <= 2022) & (yy == 0)),      # 낡음 · 실패 (F+R 합집합)
         "BOTH2X": np.flatnonzero((ss <= 2022) & (yy == 0)),      # 같은 풀, **2배 용량**
+        # 2x2 가 "조건은 실패 클래스, recency 는 무효" 로 갈렸다 -> 시점 제한을 푼다
+        "ALL_NEG": np.flatnonzero(yy == 0),                      # **전 시즌 실패 행**
     }[kind]
     m = np.zeros(n, bool)
     pn = POOL_N * (2 if kind in ("UNION", "BOTH2X") else 1)
@@ -204,8 +207,9 @@ def main():
             "PRE_ANY": "낡음(<=2022) · 아무 라벨   <- 분해",
             "RECENT_NEG": "최근(2023+) · 실패만    <- 분해",
             "UNION":  "낡음·실패 F+R 합집합 (같은 용량)  <- 둘 다",
-            "BOTH2X": "낡음·실패 F+R **2배 용량**       <- 둘 다"}
-    for k in ("SMOTE", "PLACEBO", "UNION", "BOTH2X", "PRE_ANY", "RECENT_NEG", "RANDOM23", "RANDOM"):
+            "BOTH2X": "낡음·실패 F+R **2배 용량**       <- 둘 다",
+            "ALL_NEG": "**전 시즌 실패 행** (시점 제한 없음)"}
+    for k in ("UNION", "ALL_NEG", "BOTH2X", "RECENT_NEG", "PLACEBO", "PRE_ANY", "RANDOM23", "RANDOM"):
         if k not in Z:
             continue
         z1 = zf(Z[k])
