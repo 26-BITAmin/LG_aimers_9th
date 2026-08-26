@@ -181,6 +181,12 @@ def main():
             print(f"  ⚠️ mlp_variant_weight 불일치 — config {cfg} vs 서빙 {served}")
             print("     (artifacts.joblib 직접 패치. 태그는 서빙값 기준으로 붙인다)")
         meta["mlp_variant_weight"] = served
+        # ★ **진실원 통합** (§7.167). `nmlp` 태그(describe_tokens)와 SUBMISSIONS.md
+        #   설명 문자열이 `meta["mlp_members"]` 를 읽는데, meta.json 은 재학습 없이는
+        #   안 바뀐다 → `artifacts.joblib` 직접 패치(§7.120 `_vw` 경로)로 멤버를
+        #   바꾸면 태그가 거짓말한다. §7.61·§7.132·§7.146 이 **세 번** 당한 자리라
+        #   인스턴스를 고치지 않고 **출처를 하나로 합친다** (`cat_members` 와 동일 규약).
+        meta["mlp_members"] = list(_mem)
     # 같은 이유로 `fspec_alpha` 도 **서빙되는 값**에서 읽는다 (§7.132).
     # s35 첫 빌드가 아티팩트를 0.4580 으로 패치했는데 meta.json 이 0.15 라
     # 태그가 `fs15` 로 나왔다 — **파일명이 거짓말을 했다.**

@@ -646,7 +646,11 @@ def main():
         # (memory: 간이 재구현은 알려진 수치 재현부터). LGA_MLP_REPRO=0 으로 끈다.
         if os.environ.get("LGA_MLP_REPRO", "1") == "1":
             gv, (gc, _n) = next(iter(MLP_VARIANTS.items()))
-            gs = MLP_SEEDS[0]
+            # §7.167 — `LGA_MLP_REPRO_SEED` 로 대상 시드를 지정할 수 있다.
+            # m16 재사용분(777 등)이 **같은 함수의 draw 인지**를 묻는 데 쓴다:
+            # 해시 동일성은 "파일이 복사돼 왔다"까지만 증명하므로, s32 빌드가 앞
+            # 5개를 재학습 없이 재사용했다면 나머지 5개의 동질성은 미증명이다.
+            gs = int(os.environ.get("LGA_MLP_REPRO_SEED") or MLP_SEEDS[0])
             ref_p = MODEL_DIR / f"mlp_{gv}_{gs}.npz"
             if ref_p.exists():
                 print(f"  재현 관문: {gv}_{gs} 재학습 → 배포 npz 와 대조")
@@ -657,6 +661,16 @@ def main():
                 if bad:
                     dmax = max((float(_np.abs(W_old[k] - W_new[k]).max())
                                 for k in bad if k in W_new), default=float("nan"))
+                    # ★ **판정은 비트가 아니라 예측 차이로 한다** (§7.167 사전 등록).
+                    #   부동소수점 누적으로 비트가 갈리면서 로짓 차이가 1e-7 인
+                    #   경우가 있다. 기준은 max|Δz| / sd(z) 이고 임계는 1%.
+                    z_old = _MP(W_old, enc).logit(X_ref)
+                    z_new = _MP(W_new, enc).logit(X_ref)
+                    dz = float(_np.abs(z_new - z_old).max())
+                    sdz = float(_np.std(z_old))
+                    print(f"  ⚠️ 비트 불일치 (키 {len(bad)}개, max|Δw| {dmax:.3e})")
+                    print(f"     max|Δz| = {dz:.3e} · sd(z) = {sdz:.4f} · "
+                          f"비 = {dz/sdz:.2%}   [임계 1%]")
                     raise SystemExit(
                         f"재현 실패 — {gv}_{gs} 가 배포 npz 와 다르다 "
                         f"(키 {len(bad)}개, max|Δ| {dmax:.3e}).\n"
