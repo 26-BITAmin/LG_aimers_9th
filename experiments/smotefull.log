@@ -1,0 +1,86 @@
+준비 완료 (14s)  fspec 25,686행  δ축 4개 (기여 평균 -0.01328)
+
+  [base]
+    행 1,221,585 → 1,292,784  (합성 0)
+    lgbm 12개 (345s)
+    mlp emb4_42 (487s)
+    mlp emb4_7 (609s)
+    mlp emb4_2024 (729s)
+    mlp emb4_1234 (850s)
+    mlp emb4_31337 (968s)
+    mlp noid_42 (1041s)
+    mlp noid_7 (1116s)
+    mlp noid_2024 (1187s)
+    catboost 12개 (2021s)
+
+  [SMOTE]
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+    행 1,221,585 → 1,306,141  (합성 13,357)
+    lgbm 12개 (2359s)
+    mlp emb4_42 (2471s)
+    mlp emb4_7 (2577s)
+    mlp emb4_2024 (2685s)
+    mlp emb4_1234 (2799s)
+    mlp emb4_31337 (2914s)
+    mlp noid_42 (2987s)
+    mlp noid_7 (3055s)
+    mlp noid_2024 (3125s)
+    catboost 12개 (3988s)
+
+  [PLACEBO]
+    행 1,221,585 → 1,306,141  (합성 13,357)
+    lgbm 12개 (4338s)
+    mlp emb4_42 (4447s)
+    mlp emb4_7 (4558s)
+    mlp emb4_2024 (4682s)
+    mlp emb4_1234 (4809s)
+    mlp emb4_31337 (4939s)
+    mlp noid_42 (5017s)
+    mlp noid_7 (5091s)
+    mlp noid_2024 (5163s)
+    catboost 12개 (6125s)
+
+====================================================================================
+층별 BSS (fold2024) — Δ 는 base 대비
+====================================================================================
+  층                            base        SMOTE          Δ      PLACEBO          Δ
+  ① LGBM만                     826.9        837.4      +10.5        841.4      +14.5
+  ② +MLP(α.75)                842.2        837.7       -4.4        835.2       -7.0
+  ③ +fspec                    848.1        842.4       -5.7        841.1       -7.0
+  ④ +CatBoost                 850.8        846.3       -4.5        844.4       -6.5
+  ⑤ +δ·스케일 (배포)               935.4        929.8       -5.7        928.8       -6.6
+
+  ⑤ 가 배포층이다. ① 에서의 이득이 ⑤ 까지 얼마나 남는지가 이 실험의 답.
+  총 6125s

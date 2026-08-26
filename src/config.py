@@ -661,6 +661,9 @@ SOFT_LABEL_F = True
 #   → 가중평균 1.110.  이건 β 에 대한 **사전분포**지 증거가 아니다.
 #
 # BETA=1.0 이면 lin/logit 어느 모드든 **비트 하나 안 바뀐다** (fit_h 조기 반환).
+AUG_LGB = os.environ.get("AUG_LGB", "0") == "1"   # §7.162c — LGBM 멤버에만 SMOTE 증강
+AUG_RATIO = float(os.environ.get("AUG_RATIO", "0.40"))
+
 SOFT_LABEL_BETA = float(os.environ.get("SOFT_LABEL_BETA", "1.0"))
 SOFT_LABEL_BETA_MODE = os.environ.get("SOFT_LABEL_BETA_MODE", "lin")  # lin|logit|target
 SOFT_LABEL_TARGET_DRIFT = 0.0120   # target 모드 전용. R 의 연간 하향 추세.

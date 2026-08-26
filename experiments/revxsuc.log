@@ -1,0 +1,48 @@
+train (1475092, 49)   a=0.75  init_score=ON  팔 ['base', 'prod', 'placebo']
+
+    fold 2023 [base] 피처 완료 (12s)
+    fold 2023 [base] lgbm 12개 (280s)
+    fold 2023 [base] mlp 8개 (847s)
+    [prod] 피처 79개  revxsuc mean 0.12351 std 0.01709 NaN 0.0257%
+    fold 2023 [prod] 피처 완료 (849s)
+    fold 2023 [prod] lgbm 12개 (1111s)
+    fold 2023 [prod] mlp 8개 (1679s)
+    [placebo] 피처 79개  revxsuc mean 0.11781 std 0.03093 NaN 0.0257%
+    fold 2023 [placebo] 피처 완료 (1681s)
+    fold 2023 [placebo] lgbm 12개 (5194s)
+    fold 2023 [placebo] mlp 8개 (5754s)
+  fold 2023: A 현 배포 807.2  base 807.2  prod 805.8  placebo 805.1
+    앵커 검증: base - A(기록 807.2) = +0.0  OK
+    fold 2024 [base] 피처 완료 (5762s)
+    fold 2024 [base] lgbm 12개 (6145s)
+    fold 2024 [base] mlp 8개 (6902s)
+    [prod] 피처 79개  revxsuc mean 0.12182 std 0.01698 NaN 0.0320%
+    fold 2024 [prod] 피처 완료 (6905s)
+    fold 2024 [prod] lgbm 12개 (7237s)
+    fold 2024 [prod] mlp 8개 (8048s)
+    [placebo] 피처 79개  revxsuc mean 0.11412 std 0.02979 NaN 0.0320%
+    fold 2024 [placebo] 피처 완료 (8052s)
+    fold 2024 [placebo] lgbm 12개 (8368s)
+    fold 2024 [placebo] mlp 8개 (9113s)
+  fold 2024: A 현 배포 924.5  base 924.5  prod 924.6  placebo 924.4
+    앵커 검증: base - A(기록 924.5) = +0.0  OK
+
+============================================================================================
+█ 판정 — 배포 층 (a=0.75 + delta축 + prior shift, clean 행)
+============================================================================================
+  팔             fold 2023  fold 2024 D vs base (2023) D vs base (2024)
+  A 현 배포            807.2      924.5             +0.0             +0.0
+  base              807.2      924.5             +0.0             +0.0
+  prod              805.8      924.6             -1.4             +0.1
+  placebo           805.1      924.4             -2.1             -0.1
+
+  클러스터 부트스트랩 (투수 복원추출 200회, 기준 = base)
+     prod            -1.4 [  -7.2,  +4.2]      +0.1 [  -6.0,  +6.6]
+     placebo         -2.1 [  -8.0,  +4.4]      -0.1 [  -6.1,  +7.1]
+
+  후보 - 위약 (컬럼 하나 더 붙는 효과를 뺀 순수 내용 성분)
+     fold 2023:   +0.7
+     fold 2024:   +0.2
+
+  채택 기준: (1) prod-base 양 fold 양수  (2) prod-placebo 양 fold 양수  (3) 크기비 <=3  (4) 부트스트랩 구간이 0 을 유의하게 밑돌지 않을 것
+  !! 재학습 축이라 시드 노이즈(std 4~9)가 낀다. |D|<10 은 무승부로 읽는다.

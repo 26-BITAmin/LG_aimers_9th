@@ -1,0 +1,99 @@
+Loading train.csv ...
+  (1475092, 49)  (4.4s)
+시즌별 가중치: {2019: 0.001, 2020: 0.0039, 2021: 0.0156, 2022: 0.0625, 2023: 0.25, 2024: 1.0}
+Trackman 모드=none  테이블=None
+보정축 hand: 셀 1,571개  δ std=0.01802  β=1.875
+보정축 count4: 셀 3,105개  δ std=0.01314  β=1.25
+시즌진행분 gap_success: 오프셋 3,531개  mu=-0.00333 sd=0.03491  β=0.03  오염보정=('p', -1.0)
+시즌진행분 gap_bsuccess: 오프셋 3,721개  mu=-0.00503 sd=0.03423  β=0.03  오염보정=('b', -1.0)
+features=78  (drop=['game_type', 'game_month', 'game_dayofweek'], ids=True)  (10.7s)
+init_score 사용(§7.109): base(추론용, 2024 레벨)=-0.05559
+  보조 라벨 복원 99.9%  λ=1.0  축 ['middle', 'reverse'] (2개)
+soft label(§7.70): +71,199행 복제  h = 2019:0.093  2020:0.110  2021:0.243  2022:0.297
+  init_score 레벨: 12개 구간, 평균 +0.06299  범위 [-0.16324, +0.51158]
+D:\projects\LG aimers 야구\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] 지정된 파일을 찾을 수 없습니다
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers 야구\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+LGBM 증강(§7.162c): +13,357행 합성 (pre-2023 F·y=0 풀 34,109행)  → LGBM 만 1,559,648행, MLP/Cat 은 1,546,291행
+  [1/20] base_42 완료  (47s)
+  [2/20] base_7 완료  (78s)
+  [3/20] base_2024 완료  (109s)
+  [4/20] base_1234 완료  (141s)
+  [5/20] base_31337 완료  (172s)
+  [6/20] wide_42 완료  (217s)
+  [7/20] wide_7 완료  (263s)
+  [8/20] wide_2024 완료  (310s)
+  [9/20] wide_1234 완료  (368s)
+  [10/20] wide_31337 완료  (445s)
+  [11/20] extra_42 완료  (488s)
+  [12/20] extra_7 완료  (525s)
+  [13/20] extra_2024 완료  (575s)
+  [14/20] extra_1234 완료  (621s)
+  [15/20] extra_31337 완료  (658s)
+  [16/20] lowff_42 완료  (685s)
+  [17/20] lowff_7 완료  (714s)
+  [18/20] lowff_2024 완료  (741s)
+  [19/20] lowff_1234 완료  (768s)
+  [20/20] lowff_31337 완료  (798s)
+  [mlp 1/8] emb4_42 완료  가중 0.1750  (export skew 3.9e-07)  (981s)
+  [mlp 2/8] emb4_7 완료  가중 0.1750  (export skew 3.6e-07)  (1150s)
+  [mlp 3/8] emb4_2024 완료  가중 0.1750  (export skew 3.6e-07)  (1314s)
+  [mlp 4/8] emb4_1234 완료  가중 0.1750  (export skew 3.0e-07)  (1484s)
+  [mlp 5/8] emb4_31337 완료  가중 0.1750  (export skew 3.9e-07)  (1659s)
+  [mlp 6/8] noid_42 완료  가중 0.0417  (export skew 3.6e-07)  (1741s)
+  [mlp 7/8] noid_7 완료  가중 0.0417  (export skew 3.3e-07)  (1830s)
+  [mlp 8/8] noid_2024 완료  가중 0.0417  (export skew 3.0e-07)  (1913s)
+  블렌드: (1-0.75)·lgbm + 0.75·mlp   (로짓 상관 0.939)
+  F전문가 fspec_42  rounds=84  (1915s)
+  F전문가 fspec_7  rounds=80  (1916s)
+  F전문가 fspec_2024  rounds=64  (1918s)
+  F전문가 블렌드 α=0.458: 학습 55,696행 · 참조행 F 30,010/253,507 (11.8%)
+  CatBoost base_42  (2000s)
+  CatBoost base_7  (2071s)
+  CatBoost base_2024  (2144s)
+  CatBoost wide_42  (2228s)
+  CatBoost wide_7  (2315s)
+  CatBoost wide_2024  (2398s)
+  CatBoost sym_42  (2449s)
+  CatBoost sym_7  (2501s)
+  CatBoost sym_2024  (2561s)
+  CatBoost depthwise_42  (2668s)
+  CatBoost depthwise_7  (2769s)
+  CatBoost depthwise_2024  (2869s)
+  CatBoost 블렌드 α=0.1: (로짓 상관 0.957)
+보정축 참조행 적중 hand 99.9%  count4 100.0%  gap_success 80.1%  gap_bsuccess 90.7%   로짓 기여 평균 -0.01103
+
+prior shift: ref(2024) pred_mean=0.4724 → target=0.4750
+  base=-0.05559  delta=+0.01062  → logit_delta=-0.04497
+
+Saved to D:\projects\LG aimers 야구\submit\model_aug  (total 2869s)

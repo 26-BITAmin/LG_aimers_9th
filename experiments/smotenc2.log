@@ -1,0 +1,88 @@
+재개 캐시 18칸
+
+============================================================================================
+=== fold 2024 ===
+============================================================================================
+  증강 대상 pre-2023 F & y=0 : 34,109행  (y=1 71,199행)
+  base             합성      0  BSS    819.9 +-10.1  F행    499.8  R행   819.1   |+fspec    831.0  F행    589.7  [a5b6e63f] (cache)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  SMOTE r=0.40     합성 13,357  BSS    831.1 +- 3.5  F행    522.3  R행   828.8   |+fspec    841.2  F행    603.8  [d01a391c] (cache)
+  ROS r=0.40       합성 13,357  BSS    821.1 +- 5.2  F행    502.9  R행   820.1   |+fspec    832.1  F행    592.0  [2533a5dc] (cache)
+  NCRAW r=0.40     합성 13,357  BSS    815.8 +- 1.1  F행    480.6  R행   817.0   |+fspec    829.2  F행    588.2  [ac72321e] (cache)
+  PLACEBO r=0.40   합성 13,357  BSS    837.2 +- 4.5  F행    522.1  R행   835.8   |+fspec    847.3  F행    602.7  [29023c6c] (125s)
+  SMOTE r=0.50     합성 37,090  BSS    833.6 +- 1.1  F행    490.3  R행   835.9   |+fspec    847.5  F행    600.6  [1622a42b] (cache)
+  ROS r=0.50       합성 37,090  BSS    817.1 +- 8.0  F행    511.3  R행   814.4   |+fspec    827.7  F행    597.1  [9b9567cb] (cache)
+  NCRAW r=0.50     합성 37,090  BSS    804.3 +- 1.2  F행    414.9  R행   812.7   |+fspec    823.9  F행    571.4  [16cb3dd9] (cache)
+  PLACEBO r=0.50   합성 37,090  BSS    840.4 +- 3.0  F행    537.7  R행   837.3   |+fspec    849.9  F행    613.5  [f5e9a388] (232s)
+  JITTER r=0.40    합성 13,357  BSS    832.3 +- 4.1  F행    473.1  R행   836.8   |+fspec    846.9  F행    588.9  [b44eb8d4] (333s)
+  SMOTENOID r=0.40 합성 13,357  BSS    831.6 +- 4.0  F행    526.0  R행   828.9   |+fspec    841.7  F행    606.5  [7e7cc28b] (416s)
+  SMOTEPOS r=0.40  합성 13,357  BSS    824.5 +- 4.0  F행    511.1  R행   822.9   |+fspec    835.0  F행    595.5  [ff348b34] (507s)
+
+============================================================================================
+=== fold 2023 ===
+============================================================================================
+  증강 대상 pre-2023 F & y=0 : 34,109행  (y=1 71,199행)
+  base             합성      0  BSS    599.0 +- 1.6  F행    338.7  R행   591.3  [5983c6ae] (cache)
+  SMOTE r=0.40     합성 13,357  BSS    622.5 +- 3.0  F행    311.7  R행   620.8  [9d05a0df] (cache)
+  ROS r=0.40       합성 13,357  BSS    597.5 +- 1.2  F행    346.6  R행   588.8  [bb3da28a] (cache)
+  NCRAW r=0.40     합성 13,357  BSS    592.1 +- 5.0  F행    188.7  R행   601.1  [7fdceeb1] (cache)
+  PLACEBO r=0.40   합성 13,357  BSS    609.5 +- 6.1  F행    356.2  R행   601.0  [d436142c] (595s)
+  SMOTE r=0.50     합성 37,090  BSS    565.6 +- 4.3  F행   -227.8  R행   620.0  [65a6de87] (cache)
+  ROS r=0.50       합성 37,090  BSS    596.9 +- 6.1  F행    327.7  R행   590.3  [73a60aaf] (cache)
+  NCRAW r=0.50     합성 37,090  BSS    502.1 +- 3.0  F행   -544.8  R행   586.0  [cadd97bd] (cache)
+  PLACEBO r=0.50   합성 37,090  BSS    598.7 +- 3.3  F행    371.1  R행   587.2  [66b6e84e] (724s)
+  JITTER r=0.40    합성 13,357  BSS    588.3 +- 8.9  F행     61.1  R행   611.7  [fafa16fd] (824s)
+  SMOTENOID r=0.40 합성 13,357  BSS    619.4 +- 5.9  F행    311.2  R행   617.3  [f0191744] (920s)
+  SMOTEPOS r=0.40  합성 13,357  BSS    595.9 +- 9.1  F행    403.2  R행   580.3  [7a21a9bb] (1018s)
+
+============================================================================================
+요약 — Δ 는 base(현 배포) 대비 쌍체 3시드.  ROS 는 'SMOTE 의 보간'을 벗기는 대조군.
+============================================================================================
+  팔                   BSS2024     Δ2024     ±SE    BSS2023     Δ2023     ±SE  부호
+  base                  831.0      +0.0     0.0      599.0      +0.0     0.0     -
+  SMOTE r=0.40          841.2     +10.2     4.0      622.5     +23.6     0.8     O
+  ROS r=0.40            832.1      +1.1     3.6      597.5      -1.4     1.5     X
+  NCRAW r=0.40          829.2      -1.8     6.6      592.1      -6.8     3.2     O
+  PLACEBO r=0.40        847.3     +16.3     4.1      609.5     +10.5     2.6     O
+  SMOTE r=0.50          847.5     +16.5     5.5      565.6     -33.4     1.8     X
+  ROS r=0.50            827.7      -3.3     5.4      596.9      -2.0     4.4     O
+  NCRAW r=0.50          823.9      -7.1     6.1      502.1     -96.9     2.5     O
+  PLACEBO r=0.50        849.9     +18.9     5.2      598.7      -0.3     1.1     X
+  JITTER r=0.40         846.9     +15.9     6.9      588.3     -10.7     5.9     X
+  SMOTENOID r=0.40      841.7     +10.7     3.4      619.4     +20.4     2.5     O
+  SMOTEPOS r=0.40       835.0      +4.0     3.6      595.9      -3.1     4.8     X
+
+  ※ BSS 는 fspec 블렌드 후(fold2024) / 전(fold2023, 앵커 없음).
+  총 1018s

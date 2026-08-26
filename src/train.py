@@ -28,8 +28,9 @@ except Exception:
 import joblib
 import lightgbm as lgb
 import numpy as np
+import pandas as pd
 
-from config import (FSPEC_ALPHA, FSPEC_MAX_ROUNDS, FSPEC_MIN_SEASON,
+from config import (AUG_LGB, AUG_RATIO, FSPEC_ALPHA, FSPEC_MAX_ROUNDS, FSPEC_MIN_SEASON,
                     FSPEC_PARAMS, FSPEC_SEEDS,
                     CAT_ALPHA, CAT_ITERS, CAT_PARAMS, CAT_SEEDS, CAT_VARIANTS,
                     CONTAM_AXES, DROP_FEATURES, ENSEMBLE_VARIANTS, FINAL_LGB_PARAMS,
@@ -76,6 +77,10 @@ ARTIFACTS_ONLY = "--artifacts-only" in sys.argv
 #    "배열을 넣었으니 됐다"가 아니라 **모델을 정하는 것을 다 넣었나**로 물어야 한다.
 _TRAIN_SHAPING = {
     "soft_label_f": SOFT_LABEL_F,
+    # §7.162c — LGBM 만 다른 학습셋을 본다. 피처·참조행렬을 안 바꾸므로 여기
+    # 없으면 `--artifacts-only` 가 낡은 모델을 통과시킨다 (soft_label_f 전례).
+    "aug_lgb": AUG_LGB,
+    "aug_ratio": AUG_RATIO if AUG_LGB else None,
     "recency_half_life": RECENCY_HALF_LIFE,
     "use_init_score": USE_INIT_SCORE,
     "n_rounds": N_ROUNDS,
@@ -697,7 +702,35 @@ def main():
         print(f"완료 — {len(todo)}개 저장. 이제 --artifacts-only 를 돌릴 것.")
         return None
 
-    members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
+    # ── SMOTE 증강을 **LGBM 멤버에만** 준다 (§7.162c) ─────────────────
+    # 같은 조작이 LGBM 917.5→926.0 (+8.5) 인데 MLP 는 917.3→905.2 (−12.1) 다.
+    # 세 학습기 전부에 걸면 배포층 −5.7, LGBM 에만 걸면 **+1.36** [+0.31,+2.34].
+    # 진짜 영가설(아무 행이나)은 −0.51 이라 대상 선택이 실제로 일한다.
+    # ⚠️ MLP·CatBoost 는 아래에서 **원본 X/y/w** 를 그대로 받는다.
+    Xl, yl, wl, il = X, y, w, init_tr
+    if AUG_LGB:
+        from smotenc import n_needed, smote
+        n0 = len(df)
+        s0 = df["season"].to_numpy(dtype=np.int64)
+        g0 = df["game_type"].astype("object").to_numpy().astype(str)
+        y0 = df[TARGET_COL].to_numpy()
+        m0 = (s0 <= 2022) & (g0 == "F") & (y0 == 0)
+        k = n_needed(int(((s0 <= 2022) & (g0 == "F") & (y0 == 1)).sum()),
+                     int(m0.sum()), AUG_RATIO)
+        rng = np.random.default_rng(777)
+        new, sd_ = smote(X.iloc[:n0][m0].to_numpy(dtype=np.float64), k, rng)
+        src = np.flatnonzero(m0)[sd_]
+        Xl = pd.concat([X, pd.DataFrame(new.astype(np.float32), columns=X.columns)],
+                       ignore_index=True)
+        yl = np.concatenate([y, np.zeros(k)])
+        wl = np.concatenate([w, np.asarray(w, dtype=np.float64)[src]])
+        if USE_INIT_SCORE:
+            il = _season_gt_level(np.concatenate([ss_lv, s0[src]]),
+                                  np.concatenate([gt_lv, g0[src]]), yl, wl)
+        print(f"LGBM 증강(§7.162c): +{k:,}행 합성 (pre-2023 F·y=0 풀 {int(m0.sum()):,}행)"
+              f"  → LGBM 만 {len(Xl):,}행, MLP/Cat 은 {len(X):,}행")
+    members, raw_ref = train_ensemble(Xl, yl, wl, il, X_ref, MODEL_DIR, t0)
+    del Xl, yl, wl, il
 
     # ── MLP 멤버 (로짓 블렌드) ───────────────────────────────
     mlp_tags, mlp_wts, mlp_enc = [], [], None

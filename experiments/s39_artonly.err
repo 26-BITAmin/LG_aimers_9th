@@ -1,0 +1,4 @@
+참조 행렬이 달라졌다 → 저장된 모델은 **다른 피처로 학습된 것**이다.
+  저장 d0c049db88dcb4ac  현재 e8e3753aac7fce30
+  build_features 입력(priors/clip/cat_maps/contam/tm)이 바뀌면
+  --artifacts-only 를 쓸 수 없다. 전체 학습을 돌릴 것.

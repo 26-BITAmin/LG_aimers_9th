@@ -1,0 +1,166 @@
+{
+  "seeds": [
+    42,
+    7,
+    2024,
+    1234,
+    31337
+  ],
+  "variants": [
+    "base",
+    "wide",
+    "extra",
+    "lowff"
+  ],
+  "n_members": 20,
+  "n_rounds": 320,
+  "fspec_members": [
+    "fspec_42",
+    "fspec_7",
+    "fspec_2024"
+  ],
+  "fspec_alpha": 0.15,
+  "fspec_min_season": 2023,
+  "use_mlp": true,
+  "mlp_alpha": 0.75,
+  "mlp_aux_lambda": 1.0,
+  "mlp_aux_modes": [
+    "middle",
+    "reverse"
+  ],
+  "contam_axes": [
+    "p",
+    "b"
+  ],
+  "soft_label_f": true,
+  "soft_h": {
+    "2019": 0.09296236077678936,
+    "2020": 0.10973830671316118,
+    "2021": 0.2425861556714081,
+    "2022": 0.296954143730515
+  },
+  "mlp_seeds": [
+    42,
+    7,
+    2024,
+    1234,
+    31337
+  ],
+  "mlp_members": [
+    "emb4_42",
+    "emb4_7",
+    "emb4_2024",
+    "emb4_1234",
+    "emb4_31337",
+    "noid_42",
+    "noid_7",
+    "noid_2024"
+  ],
+  "mlp_variants": {
+    "emb4": [
+      {
+        "epochs": 9,
+        "hid": 128,
+        "lr": 0.002,
+        "dropout": 0.3,
+        "wd": 0.01,
+        "use_id_emb": true,
+        "emb_dim": {
+          "pitcher_id": 4,
+          "batter_id": 4,
+          "pitcher_team_id": 4,
+          "batter_team_id": 4,
+          "base_state": 4,
+          "hand_matchup": 4,
+          "count_state": 4
+        }
+      },
+      5
+    ],
+    "noid": [
+      {
+        "epochs": 6,
+        "hid": 128,
+        "lr": 0.002,
+        "dropout": 0.3,
+        "wd": 0.01,
+        "use_id_emb": false,
+        "emb_dim": {
+          "pitcher_team_id": 4,
+          "batter_team_id": 4,
+          "base_state": 4,
+          "hand_matchup": 4,
+          "count_state": 4
+        }
+      },
+      3
+    ]
+  },
+  "mlp_variant_weight": {
+    "emb4": 0.625,
+    "noid": 0.375
+  },
+  "mlp_weights": [
+    0.175,
+    0.175,
+    0.175,
+    0.175,
+    0.175,
+    0.041666666666666664,
+    0.041666666666666664,
+    0.041666666666666664
+  ],
+  "recency_half_life": 0.5,
+  "use_init_score": true,
+  "use_player_ids": true,
+  "drop_features": [
+    "game_type",
+    "game_month",
+    "game_dayofweek"
+  ],
+  "smooth_k": 200.0,
+  "trackman_mode": "none",
+  "target_prior_2025": 0.475,
+  "ref_season": 2024,
+  "base_logit": -0.05559463401147921,
+  "delta": 0.013730840364587493,
+  "logit_delta": -0.04186379364689172,
+  "n_features": 78,
+  "train_rows": 1475092,
+  "ctx_axes": {
+    "hand": 1.875,
+    "count4": 1.25
+  },
+  "ctx_k": 200.0,
+  "ctx_cells": {
+    "hand": 1571,
+    "count4": 3105
+  },
+  "ctx_half_life": 1.0,
+  "asof_axes": {
+    "gap_success": 0.03,
+    "gap_bsuccess": 0.03
+  },
+  "asof_strength": 35.0,
+  "asof_cells": {
+    "gap_success": 3531,
+    "gap_bsuccess": 3721
+  },
+  "mix_axes": {},
+  "gt_f_delta": -0.0711,
+  "gt_f_beta": 0.0,
+  "lgb_params": {
+    "objective": "binary",
+    "learning_rate": 0.015,
+    "num_leaves": 31,
+    "min_data_in_leaf": 2000,
+    "feature_fraction": 0.8,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "lambda_l2": 30.0,
+    "max_bin": 127,
+    "num_threads": 6,
+    "verbosity": -1
+  },
+  "lightgbm_version": "4.6.0"
+}

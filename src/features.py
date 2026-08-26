@@ -124,7 +124,11 @@ CENTER_SUBSET5 = [
 
 # mode 별 성질. 셋을 따로 두는 이유 — `mu5`(대조군)는 μ 컬럼만 추가하고 값은
 # **안 건드린다.** 그래서 priors 를 0 으로 만들면 안 된다 (값이 여전히 .5 대역).
-_SUBSET5_MODES = ("lag5", "lag5mu", "mu5", "mu5dead", "lag5sq")   # 5개만 대상
+_SUBSET5_MODES = ("lag5", "lag5mu", "mu5", "mu5dead", "lag5sq",
+                  "pow5_2", "pow5_3")                   # 5개만 대상
+# §7.151 — 중심화 **없이** 원시 rate 를 p 제곱한다. p 는 하나의 노브다:
+#   p=1 이 현 배포 → 용량-반응으로 읽는다 (단일 지점이 노이즈 대역이면 해석 불가).
+_POW5 = {"pow5_2": 2, "pow5_3": 3}
 _MU_FEATURE_MODES = ("lag5mu", "mu5", "mu5dead")        # μ 형태 컬럼 5개를 추가
 _ZERO_PRIOR_MODES = ("zero", "zero_scale", "zero_off", "lag", "lag5", "lag5mu",
                      "lag5sq")
@@ -285,10 +289,19 @@ def _center_apply(g, art, ac, col, raw):
     mode = ac.get("mode", "base")
     if mode in ("mu5", "mu5dead"):
         return raw                            # 값은 그대로 — μ 컬럼만 따로 나간다
+    if mode in _POW5:
+        # §7.151 — **중심화 없이** 원시 rate 를 p 제곱한다 (사용자 제안).
+        # rate 는 [0,1] 이라 p 제곱이 강단조 = 정보 손실 없음(부호 접힘도 없다.
+        # x³ 은 실수 전체에서 강단조라 중심화값에 걸어도 안전한 형태이기도 하다).
+        # 그래도 무연산이 아니다 — §7.150 이 확인했듯 변환은 `_smooth` 앞에 걸려
+        # `_sm`·`form_*`·`matchup_*` 로 번지고 거기서 단조성이 깨진다.
+        # 실측 corr(v, v²): success .985 / reverse .919 (꼬리가 [0,1] 전체라 휜다).
+        # ⚠️ priors 도 같은 지수로 올려야 한다 — 아래 fit_artifacts 참조.
+        return np.power(raw, _POW5[mode]).astype(np.float32)
     if mode in ("lag", "lag5", "lag5mu", "lag5sq"):
         v = raw - _lookup_group(g, ac["lag"][col], ac["lag_fb"][col], ac["global"][col])
         if mode == "lag5sq":
-            # §7.121 — **부호 있는 제곱** `sign(c)·c²` (사용자 수정안).
+            # §7.150 — **부호 있는 제곱** `sign(c)·c²` (사용자 수정안).
             # 단순 제곱은 부호를 접어 정보를 버리는데, 부호를 도로 붙이면 **강단조**라
             # 정보 손실이 없다. 그 대신:
             #   · 트리에는 **무연산**이다 (분할이 `x ≤ t` 라 순서만 보면 된다).
@@ -611,6 +624,13 @@ def fit_artifacts(train_df, weights=None, k_pitcher=200.0, k_batter=200.0, tm_ta
         if mode in _ZERO_PRIOR_MODES:
             for c in cols:
                 art["priors"][c] = 0.0
+        # §7.151 — 거듭제곱 팔은 **상수도 같은 지수로 올린다.** 안 하면 스무딩이
+        #   v^p 를 원래 prior(.526) 쪽으로 당기는데 v² 의 중심은 .28, v³ 은 .15 라
+        #   저표본 행만 크게 끌려간다 — §7.115 결함① 과 같은 함정이다.
+        #   MLP nan_plan·form_* 의 NaN 채움값도 이 한 줄을 따라온다.
+        elif mode in _POW5:
+            for c in cols:
+                art["priors"][c] = float(art["priors"][c]) ** _POW5[mode]
 
     return art
 
