@@ -67,3 +67,5 @@ experiments/cache/
 
 # build_submit.py 산출물 (원본은 src/contam.py)
 submit/contam.py
+t1work/
+t1work_*/

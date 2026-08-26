@@ -1,0 +1,70 @@
+train 1,221,585 / valid 253,507  (14s)
+ì¼ë°˜LGBM ì…ë ¥ (1221585, 78)  (19s)
+  [A_base] í–‰ 1,221,585 â†’ 1,292,784 (í•©ì„± 0)
+    base 3ì‹œë“œ (168s)
+    wide 3ì‹œë“œ (374s)
+    extra 3ì‹œë“œ (505s)
+    lowff 3ì‹œë“œ (596s)
+D:\projects\LG aimers ¾ß±¸\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ÁöÁ¤µÈ ÆÄÀÏÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers ¾ß±¸\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  [B_aug] í–‰ 1,221,585 â†’ 1,306,141 (í•©ì„± 13,357)
+    base 3ì‹œë“œ (749s)
+    wide 3ì‹œë“œ (1016s)
+    extra 3ì‹œë“œ (1166s)
+    lowff 3ì‹œë“œ (1263s)
+[LightGBM] [Fatal] Could not open D:\projects\LG aimers ì•¼êµ¬\t1work_A_base\model\general_lgb_base_42.txt
+Traceback (most recent call last):
+  File "D:\projects\LG aimers ¾ß±¸\src\t1gen.py", line 182, in <module>
+    main()
+    ~~~~^^
+  File "D:\projects\LG aimers ¾ß±¸\src\t1gen.py", line 145, in main
+    pr = Predictor(model_dir=str(ROOT / f"t1work_{arm}" / "model"))
+  File "D:\projects\LG aimers ¾ß±¸\t1work_A_base\predict.py", line 47, in __init__
+    self.general.append(lgb.Booster(
+                        ~~~~~~~~~~~^
+        model_file=os.path.join(model_dir, f"general_lgb_{variant}_{seed}.txt")))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\LG aimers ¾ß±¸\.venv\Lib\site-packages\lightgbm\basic.py", line 3697, in __init__
+    _safe_call(
+    ~~~~~~~~~~^
+        _LIB.LGBM_BoosterCreateFromModelfile(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        )
+        ^
+    )
+    ^
+  File "D:\projects\LG aimers ¾ß±¸\.venv\Lib\site-packages\lightgbm\basic.py", line 313, in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+lightgbm.basic.LightGBMError: Could not open D:\projects\LG aimers ¾ß±¸\t1work_A_base\model\general_lgb_base_42.txt
