@@ -83,8 +83,12 @@ _TRAIN_SHAPING = {
     "variants": {k: dict(v) for k, v in ENSEMBLE_VARIANTS.items()},
     "lgb": dict(FINAL_LGB_PARAMS),
     "use_mlp": USE_MLP,
-    "mlp_variants": {k: (dict(c), n) for k, (c, n) in MLP_VARIANTS.items()},
-    "mlp_seeds": list(MLP_SEEDS),
+    # ⚠️ **로스터(시드 목록·멤버 수)는 넣지 않는다** (s39 §7.165). 멤버 하나를
+    #    결정하는 것은 (X, y, w, aux, cfg, seed) 이고 cfg 는 여기 들어간다.
+    #    어떤 멤버들을 섞을지는 번들 구성이라 ARTIFACTS_ONLY 의 로스터 재구성이
+    #    npz 존재 검사와 함께 처리한다. 재추첨(수확 제출)마다 해시가 바뀌면
+    #    관문이 "늘 마이그레이션되는 문"이 되어 보호 기능을 잃는다.
+    "mlp_variants": {k: dict(c) for k, (c, _n) in MLP_VARIANTS.items()},
     "mlp_aux_lambda": MLP_AUX_LAMBDA,
     "mlp_aux_modes": list(MLP_AUX_MODES),
     "use_player_ids": USE_PLAYER_IDS,
@@ -515,6 +519,27 @@ def main():
         print("--artifacts-only: 참조 행렬 해시 일치 → 저장된 모델 재사용")
         members, mlp_tags = old["members"], old["mlp_members"]
         mlp_wts, mlp_enc = old["mlp_weights"], old["mlp_enc"]
+        # config 의 MLP 로스터가 번들과 다르면 (LGA_MLP_ONLY 로 멤버를 늘린 직후 —
+        # s39 §7.161b) **config + 디스크** 기준으로 재구성한다. CatBoost 의 디스크
+        # 복원(아래)과 같은 규약. 가중은 train_mlp_members 와 같은 식으로 편다.
+        exp_tags = [f"{v}_{s}" for v, (_c, n) in MLP_VARIANTS.items()
+                    for s in MLP_SEEDS[:n]]
+        if USE_MLP and list(mlp_tags) != exp_tags:
+            missing = [t for t in exp_tags
+                       if not (MODEL_DIR / f"mlp_{t}.npz").exists()]
+            if missing:
+                raise SystemExit(
+                    f"config 는 MLP {len(exp_tags)}멤버인데 디스크에 없다: {missing}\n"
+                    "  → LGA_MLP_ONLY=1 로 먼저 학습할 것.")
+            vw = {v: MLP_VARIANT_WEIGHT.get(v, 1.0) for v in MLP_VARIANTS}
+            tot = sum(vw.values())
+            nsd = {v: n for v, (_c, n) in MLP_VARIANTS.items()}
+            mlp_wts = [vw[t.rsplit("_", 1)[0]] / tot / nsd[t.rsplit("_", 1)[0]]
+                       for t in exp_tags]
+            print(f"  MLP 로스터 재구성: 번들 {len(mlp_tags)}개 → config {len(exp_tags)}개"
+                  f"  (가중 합 {sum(mlp_wts):.6f})")
+            mlp_tags = exp_tags
+            old["mlp_members"], old["mlp_weights"] = mlp_tags, mlp_wts
         raw_ref, z_mlp_ref = load_members(MODEL_DIR, old, X_ref, art)
         if USE_MLP:
             print(f"  블렌드: (1-{MLP_ALPHA})·lgbm + {MLP_ALPHA}·mlp   "
@@ -586,6 +611,76 @@ def main():
         print("LGA_CAT_ONLY: CatBoost 멤버만 학습한다")
         tags, _ = train_catboost(X, y, w, init_tr, X_ref, MODEL_DIR, t0)
         print(f"완료 — {len(tags)}개 저장. 이제 --artifacts-only 를 돌릴 것.")
+        return None
+
+    if os.environ.get("LGA_MLP_ONLY"):
+        # §7.161b s39 — MLP 시드 확장. **디스크에 없는 멤버만** 학습한다 (기존 npz 는
+        # 불변). LGA_CAT_ONLY 와 같은 계약: 끝나면 --artifacts-only 로 번들 재생성.
+        # 이 블록은 train_mlp_members 와 같은 (X, y, w, aux, X_ref) — soften 후 — 를 본다.
+        print("LGA_MLP_ONLY: 디스크에 없는 MLP 멤버만 학습한다")
+        import numpy as _np
+
+        import mlp as _mlp
+        from mlp_infer import MLPPredictor as _MP
+        enc = _mlp.fit_encoder(X, art)
+        A, C = _mlp.encode_apply(X, enc)
+        A_ref, C_ref = _mlp.encode_apply(X_ref, enc)
+
+        def _fit_one(vname, cfg, seed):
+            m, _ = _mlp.train_mlp(A, C, y, w, A_ref, C_ref, enc["sizes"], seed=seed,
+                                  verbose=False, y_aux=aux,
+                                  **dict(cfg, aux=MLP_AUX_LAMBDA))
+            W = _mlp.export_weights(m)
+            z_np = _MP(W, enc).logit(X_ref)
+            # ⚠️ NaN 은 `d > 1e-4` 비교를 **통과**한다 (NaN 비교는 False) — 따로 막는다.
+            if not _np.isfinite(z_np).all():
+                raise RuntimeError(f"MLP 로짓에 NaN/inf ({vname}_{seed})")
+            d = float(_np.abs(z_np - _mlp.infer(m, A_ref, C_ref)).max())
+            if d > 1e-4:
+                raise RuntimeError(f"MLP export skew ({vname}_{seed}): {d:.3e}")
+            return W
+
+        # ── 재현 관문 — 기존 멤버 하나를 이 환경에서 다시 학습해 비트 대조한다.
+        # m16 재사용의 해시 동일성은 "파일이 복사돼 왔다"까지만 증명한다. 새 멤버가
+        # 같은 분포의 draw 이려면 **지금의 torch/numpy 가 그 함수를 재현해야** 한다
+        # (memory: 간이 재구현은 알려진 수치 재현부터). LGA_MLP_REPRO=0 으로 끈다.
+        if os.environ.get("LGA_MLP_REPRO", "1") == "1":
+            gv, (gc, _n) = next(iter(MLP_VARIANTS.items()))
+            gs = MLP_SEEDS[0]
+            ref_p = MODEL_DIR / f"mlp_{gv}_{gs}.npz"
+            if ref_p.exists():
+                print(f"  재현 관문: {gv}_{gs} 재학습 → 배포 npz 와 대조")
+                W_new = _fit_one(gv, gc, gs)
+                W_old = dict(_np.load(ref_p))
+                bad = [k for k in W_old
+                       if not _np.array_equal(W_old[k], W_new.get(k))]
+                if bad:
+                    dmax = max((float(_np.abs(W_old[k] - W_new[k]).max())
+                                for k in bad if k in W_new), default=float("nan"))
+                    raise SystemExit(
+                        f"재현 실패 — {gv}_{gs} 가 배포 npz 와 다르다 "
+                        f"(키 {len(bad)}개, max|Δ| {dmax:.3e}).\n"
+                        "  torch/numpy 버전이 학습 당시와 다를 가능성. 새 멤버가\n"
+                        "  같은 분포의 draw 라는 전제가 깨지므로 중단한다.")
+                print(f"  ✅ 재현 관문 통과 — 전 텐서 비트 동일  ({time.time()-t0:.0f}s)")
+
+        todo = [(v, cfg, s) for v, (cfg, n) in MLP_VARIANTS.items()
+                for s in MLP_SEEDS[:n]
+                if not (MODEL_DIR / f"mlp_{v}_{s}.npz").exists()]
+        print(f"  학습 대상 {len(todo)}개: {[f'{v}_{s}' for v, _c, s in todo]}")
+        for i, (vname, cfg, seed) in enumerate(todo, 1):
+            W = _fit_one(vname, cfg, seed)
+            # tmp → rename. 저장 도중 프로세스가 죽으면 손상 파일이 "완료"로
+            # 오인된다 (이 블록의 재개 로직이 존재 여부만 본다).
+            # ⚠️ 경로가 아니라 **파일 핸들**로 넘긴다 — savez 는 .npz 로 안 끝나는
+            #    경로에 확장자를 덧붙여 tmp.replace 가 못 찾게 된다.
+            tmp = MODEL_DIR / f"mlp_{vname}_{seed}.npz.tmp"
+            with open(tmp, "wb") as _f:
+                _np.savez(_f, **W)
+            tmp.replace(MODEL_DIR / f"mlp_{vname}_{seed}.npz")
+            print(f"  [mlp-only {i}/{len(todo)}] {vname}_{seed} 저장"
+                  f"  ({time.time()-t0:.0f}s)")
+        print(f"완료 — {len(todo)}개 저장. 이제 --artifacts-only 를 돌릴 것.")
         return None
 
     members, raw_ref = train_ensemble(X, y, w, init_tr, X_ref, MODEL_DIR, t0)

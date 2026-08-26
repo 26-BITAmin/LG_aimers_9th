@@ -97,7 +97,33 @@ def _device():
 DEFAULT = dict(hid=256, epochs=25, lr=2e-3, dropout=0.10, wd=1e-4,
                emb_dim=EMB_DIM, use_id_emb=True, drop_emb=(), loss="bce",
                depth=2, resid=False, numemb=None, scale=None, aux=None,
-               act="gelu")
+               act="gelu", tabm=None, node=None, grande=None)
+
+# `node` — NODE (Popov et al., ICLR 2020, arXiv:1909.06312). 미분가능 oblivious 트리.
+#   None                                 끄기 (기본. 기존 경로와 **비트 단위로 같다**)
+#   {"m": 64, "depth": 4, "gate": ...}   `nodenet.build` 로 넘어간다
+# 몸통(`self.net`)을 **통째로 대체한다** — hid/act/resid/dropout 은 이 경로에서
+# 아무 일도 안 한다. `depth` 는 MLP 층수가 아니라 **트리 깊이**를 뜻하므로
+# cfg 안에 따로 담는다 (바깥 `depth` 와 이름이 겹치지 않게).
+# ⚠️ tabm 과 동시 사용 불가 — 둘 다 몸통을 갈아끼운다.
+#
+# `grande` — GRANDE (Marton et al., ICLR 2024, arXiv:2309.17130). 경사 학습 하드 트리.
+#   None                                         끄기 (기본, 비트 단위 동일)
+#   {"E": 32, "depth": 4, "weighted": True}      `grandenet.build` 로 넘어간다
+# node 와 같은 자리·같은 제약이다. 셋 중 **하나만** 켤 수 있다.
+
+# `tabm` — TabM (Gorishniy et al., ICLR 2025, arXiv:2410.24210). 파라미터 효율 딥앙상블.
+#   None                              끄기 (기본. 기존 경로와 **비트 단위로 같다**)
+#   {"k": 32, "r_init": "sign"}       공유 몸통 + 멤버별 입력 어댑터 r_i + 멤버별 헤드
+#                                     (= 원논문 TabM_mini. r_init 은 make_adapters 참조)
+# 층마다 r_i·s_i 를 두는 full BatchEnsemble 은 아직 없다 — mini 가 원논문 권장이고
+# 파라미터 논증도 mini 기준이라 거기부터 잰다.
+# ⚠️ 왜 이 후보가 §7.25/§7.26 의 용량 법칙에 **걸리지 않는가**:
+#    hid=128·depth=2·d≈73 에서 독립 1멤버 ≈ 34k 파라미터인데 mini k=32 는
+#    공유 26k + 32×(d+h+1) ≈ 33k — **32멤버가 1멤버 값**이다. 이 저장소에서
+#    처음으로 "앙상블 폭↑ · 파라미터↓" 인 변경이다.
+# ⚠️ forward 는 **(B, k) 를 돌려준다** (멤버별 로짓). 손실은 멤버마다 걸고 평균하며,
+#    `infer` 는 (N, k) 를 그대로 돌려주므로 호출자가 축약을 고른다 (로짓평균 vs 확률평균).
 
 
 def fold_data(df, valid_season):
@@ -154,6 +180,89 @@ def encode(Xtr, Xva, art):
     A, Ctr = encode_apply(Xtr, enc)
     B, Cva = encode_apply(Xva, enc)
     return A, Ctr, B, Cva, enc["num_cols"], enc["sizes"]
+
+
+
+def make_adapters(net, d, h, k, tm, nn, torch, n_aux=0):
+    """TabM-mini 의 멤버별 파라미터를 `net` 에 붙인다 (Gorishniy et al., ICLR 2025).
+
+    공유되는 것: 임베딩 테이블, 몸통 Linear/BatchNorm 전부.
+    멤버마다 따로인 것: 입력 어댑터 `r_in` (k, d) 와 출력 헤드 `head_w` (k, h) · `head_b` (k,).
+
+    호출 후 `net` 이 반드시 갖고 있어야 하는 것 (tabm_forward 의 계약):
+        net.r_in    nn.Parameter (k, d)
+        net.head_w  nn.Parameter (k, h)
+        net.head_b  nn.Parameter (k,)
+
+    파라미터 예산 (hid=128, depth=2, d≈73, k=32):
+        공유 몸통 26,113  +  r_in 2,336  +  헤드 4,128  =  32,577
+        비교: 독립 emb4 1멤버 ≈ 34,000 · 배포 8멤버 ≈ 272,000
+
+    ── ★ 사용자 결정 지점 ─────────────────────────────────────────────
+    `r_in` 의 **초기화**가 이 모델의 유일한 실질 노브다. 그리고 이 저장소의 두
+    법칙이 정확히 여기서 맞선다:
+
+        §7.25·§7.26  용량을 늘리면 진다        → 멤버를 붙여 놔라 (r ≈ 1)
+        §7.27·§7.120 멤버 다양성은 LB 로 값어치가 확정됐다 (+1.85)
+                                              → 멤버를 벌려 놔라 (r 이 서로 달라야)
+
+    `head_w`/`head_b` 는 `nn.Linear(h, 1)` 와 같은 규약으로 초기화하면 된다
+    (`U(-1/sqrt(h), +1/sqrt(h))`) — 거기엔 고를 게 없다. 고를 것은 `r_in` 뿐이다.
+
+    후보 (`tm["r_init"]`):
+        "sign"   torch.randint 로 ±1.  원논문 TabM_mini 기본값. 멤버가 입력 부호를
+                 서로 다르게 보므로 초기 다양성이 최대다. BN 뒤 표준화 입력이라
+                 부호 뒤집기가 정보를 안 잃는다.
+        "ones"   전부 1.0.  멤버가 몸통을 완전히 공유하고 다양성이 헤드에만 남는다
+                 → 사실상 "멀티헤드 MLP". 가장 강한 정규화, 가장 낮은 탈상관.
+        "normal" N(1, sigma), sigma = tm.get("r_sigma", 0.5).  둘 사이의 연속 다이얼.
+
+    ⚠️ 시드는 이미 `torch.manual_seed(seed)` 로 잡혀 있다. 여기서 새 Generator 를
+       만들지 마라 — 만들면 arm 간 쌍체 비교가 깨진다.
+    ⚠️ 어떤 분기를 타든 **k×d 개의 값을 정확히 한 번** 뽑아야 한다. RNG 소비량이
+       분기마다 다르면 head_w 초기값이 달라져 r_init 대조가 오염된다
+       (§7.41 의 aux 헤드 생성 순서 사고와 같은 종류).
+
+    TODO(사용자): 아래 세 분기를 채운다. 각 분기는 (k, d) 텐서 하나를 만든다.
+    """
+    mode = tm.get("r_init", "sign")
+    hid = h
+
+    # --- 여기부터 ------------------------------------------------------
+    if mode == "sign":
+        # 원논문 TabM_mini 기본값. 멤버마다 입력 **부호**를 다르게 본다.
+        # BN 뒤 표준화 입력이라 부호 뒤집기가 정보를 안 잃고, 곱셈 어댑터가
+        # ±1 이면 몸통 입장에서 크기는 같고 방향만 갈린다 — 다양성을 얻되
+        # 유효 입력 스케일을 안 건드린다 (§7.25 의 wide256 가 죽은 이유와 반대).
+        r = torch.randint(0, 2, (k, d)).mul_(2).sub_(1)
+    elif mode == "ones":
+        # 몸통 완전 공유 — 다양성은 헤드에만. 사실상 멀티헤드 MLP.
+        # ⚠️ 이 분기만 RNG 를 안 쓴다 → head_w 초기값이 다른 분기와 갈린다.
+        #    r_init 끼리 비교할 때는 그 교란을 감안하고 읽어야 한다.
+        r = torch.ones(k, d)
+    elif mode == "normal":
+        # 둘 사이 연속 다이얼. sigma→0 이면 ones, 크면 sign 쪽으로 간다.
+        r = torch.empty(k, d).normal_(1.0, float(tm.get("r_sigma", 0.5)))
+    else:
+        raise ValueError(f"모르는 r_init: {mode}")
+    # --- 여기까지 ------------------------------------------------------
+
+    if r is None:
+        raise NotImplementedError(
+            f"make_adapters 의 r_init='{mode}' 분기가 비어 있다 (src/mlp.py)")
+    if tuple(r.shape) != (k, d):
+        raise ValueError(f"r_in 모양이 {tuple(r.shape)} — (k, d)=({k}, {d}) 여야 한다")
+
+    net.r_in = nn.Parameter(r.float())
+    bound = hid ** -0.5
+    net.head_w = nn.Parameter(torch.empty(k, hid).uniform_(-bound, bound))
+    net.head_b = nn.Parameter(torch.empty(k).uniform_(-bound, bound))
+    # 보조 헤드도 **멤버별**이어야 한다. 공유 헤드 하나를 쓰면 k 개 멤버가
+    # 하나의 보조 예측을 강제로 나눠 가져 멤버 다양성을 보조 경로로 지우게 된다.
+    net.aux_w = net.aux_b = None
+    if n_aux:
+        net.aux_w = nn.Parameter(torch.empty(k, hid, n_aux).uniform_(-bound, bound))
+        net.aux_b = nn.Parameter(torch.empty(k, n_aux).uniform_(-bound, bound))
 
 
 def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
@@ -255,6 +364,30 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
             # 갈리는 것은 보조 헤드 자신의 초기값과 거기서 흘러드는 경사뿐이다.
             # 보조 축 개수를 비교하는 실험이 **초기화 차이가 아니라 학습 신호 차이**를
             # 재게 되므로 유리하다. (측정: 1에폭 뒤 max|Δz| 9.3e-05)
+            # ── NODE / GRANDE 몸통 ──────────────────────────────────────
+            # ⚠️ **`self.aux` 보다 앞이다.** 뒤에 두면 aux 를 켤 때 그 Linear 가
+            #    RNG 를 먼저 먹어 몸통 초기값이 통째로 달라지고, 2×2 가 재는 것이
+            #    "aux 효과" 가 아니라 "aux 효과 + 다른 초기값" 이 된다 (§7.162 가
+            #    승격시킨 규칙을 지키려면 이 순서여야 한다). MLP 트렁크가 aux 보다
+            #    앞에서 만들어지는 것과 같은 이유고, 원래 주석이 그걸 적어뒀다.
+            # ⚠️ node/grande=None 이면 **아무것도 안 만든다** → 기존 MLP 경로의
+            #    RNG 소비 순서가 그대로다. 이미 캐시된 aux OFF 실행도 유효하다
+            #    (몸통과 이 지점 사이에 RNG 를 먹는 것이 없다).
+            self.nd = c["node"]
+            self.gr = c["grande"]
+            # ⚠️ `self.tm` 은 아직 없다 — TabM 블록이 이 아래다. cfg 를 직접 본다.
+            if sum(x is not None
+                   for x in (c["tabm"], self.nd, self.gr)) > 1:
+                raise ValueError("tabm / node / grande 는 전부 몸통을 대체한다 — "
+                                 "하나만 켤 수 있다")
+            na = n_aux if c["aux"] else 0
+            if self.nd is not None:
+                import nodenet
+                self.node = nodenet.build(d, self.nd, n_aux=na)
+            if self.gr is not None:
+                import grandenet
+                self.grande = grandenet.build(d, self.gr, n_aux=na)
+
             self.aux = nn.Linear(h, n_aux) if c["aux"] else None
 
             # ⚠️ 스케일링 층은 **맨 마지막에** 만든다. torch.ones는 RNG를 소비하지
@@ -266,6 +399,21 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
                 self.snum = nn.Parameter(torch.ones(n_num))
                 if c["scale"].get("emb"):
                     self.semb = nn.Parameter(torch.ones(len(ecols)))
+
+            # ⚠️ TabM 어댑터는 **가장 마지막**이다. tabm=None 이면 아무것도 만들지
+            #    않으므로 위 Linear/Embedding 의 RNG 소비 순서가 그대로다
+            #    (= 기존 경로 비트 동일성). scale 층과 같은 규칙.
+            self.tm = c["tabm"]
+            if self.tm is not None:
+                self.k = int(self.tm["k"])
+                make_adapters(self, d, h, self.k, self.tm, nn, torch,
+                              n_aux=(n_aux if c["aux"] else 0))
+
+            # ⚠️ NODE 몸통은 TabM 어댑터보다도 뒤다. 같은 규칙 — node=None 이면
+            #    파라미터를 하나도 안 만들므로 위쪽 RNG 소비 순서가 그대로다.
+            #    `self.net` 은 만들어진 채로 놔둔다 (지우면 export_weights 가
+            #    하드코딩한 인덱스 규약이 깨진다). forward 가 안 쓰므로 경사가
+            #    0 이고, AdamW 의 decoupled decay 만 걸린다 — 출력에 무관하다.
 
         def numemb_apply(self, x):
             """`numemb.apply_np`의 torch 판. **두 구현이 같아야 한다** —
@@ -292,11 +440,57 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
             e = [emb(cc[:, self.keep[i]]) for i, emb in enumerate(self.emb)]
             if self.semb is not None:
                 e = [ei * self.semb[i] for i, ei in enumerate(e)]
-            t = self.net[:-1](torch.cat([x] + e, 1))     # 공유 몸통
+            u = torch.cat([x] + e, 1)
+            if self.tm is not None:
+                return self.tabm_forward(u)
+            if self.nd is not None:
+                return self.node(u)                     # NODE — 몸통 통째 대체
+            if self.gr is not None:
+                return self.grande(u)                   # GRANDE — 같은 자리
+            t = self.net[:-1](u)                        # 공유 몸통
             return self.net[-1](t).squeeze(1)
+
+        def tabm_forward(self, u, want_aux=False):
+            """(B, d) -> (B, k) 멤버별 로짓.
+
+            BatchNorm 은 **(B*k) 로 펼쳐서** 공유한다 (BatchEnsemble 원논문 규약).
+            멤버끼리 통계를 나눠 쓰므로 정규화가 한 겹 더 걸리는데, 이 문제의
+            실패 모드가 일관되게 과적합이라 그 방향이 맞다.
+            """
+            b, d = u.shape
+            xk = u.unsqueeze(1) * self.r_in              # (B, k, d)
+            t = self.net[:-1](xk.reshape(b * self.k, d)) # (B*k, h)
+            t = t.reshape(b, self.k, -1)
+            z = (t * self.head_w).sum(-1) + self.head_b        # (B, k)
+            if not want_aux:
+                return z
+            if self.aux_w is None:
+                raise RuntimeError("aux 헤드가 없다 — cfg['aux'] 가 꺼진 채로 만들었다")
+            za = torch.einsum("bkh,khn->bkn", t, self.aux_w) + self.aux_b
+            return z, za                                       # (B, k), (B, k, n_aux)
 
         def forward_aux(self, x, cc):
             """(주 로짓, 보조 로짓 2개). 학습에서만 쓴다."""
+            if self.nd is not None or self.gr is not None:
+                # 보조 잎(`R_aux` / `leaf_aux`)이 **같은 잎 마스크**를 공유한다 —
+                # 그게 다중과제의 요점이다. 마스크를 따로 만들면 표현 공유가 없고,
+                # GBDT 다중분류가 진 이유가 정확히 그것이었다 (§7.40).
+                body = self.node if self.nd is not None else self.grande
+                x = self.numemb_apply(x)
+                if self.snum is not None:
+                    x = x * self.snum
+                e = [emb(cc[:, self.keep[i]]) for i, emb in enumerate(self.emb)]
+                if self.semb is not None:
+                    e = [ei * self.semb[i] for i, ei in enumerate(e)]
+                return body(torch.cat([x] + e, 1), want_aux=True)
+            if self.tm is not None:
+                x = self.numemb_apply(x)
+                if self.snum is not None:
+                    x = x * self.snum
+                e = [emb(cc[:, self.keep[i]]) for i, emb in enumerate(self.emb)]
+                if self.semb is not None:
+                    e = [ei * self.semb[i] for i, ei in enumerate(e)]
+                return self.tabm_forward(torch.cat([x] + e, 1), want_aux=True)
             x = self.numemb_apply(x)
             if self.snum is not None:
                 x = x * self.snum
@@ -366,11 +560,28 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
             off = 0.0 if toff is None else toff[idx]
             if lam and taux is not None:
                 z_, za_ = m.forward_aux(tA[idx], tC[idx])
-                l = (lossf(z_ + off, ty[idx]) * tw[idx]).mean()
-                # 보조 헤드에는 offset 을 안 붙인다 — 다른 과제고 자기 레벨을 갖는다
-                l = l + lam * (auxf(za_, taux[idx]).mean(1) * tw[idx]).mean()
+                if z_.dim() == 2:                       # TabM — 멤버마다 걸고 평균
+                    off2 = off if isinstance(off, float) else off[:, None]
+                    l = (lossf(z_ + off2, ty[idx].unsqueeze(1).expand_as(z_)
+                               ).mean(1) * tw[idx]).mean()
+                    ta = taux[idx].unsqueeze(1).expand(-1, z_.shape[1], -1)
+                    l = l + lam * (auxf(za_, ta).mean((1, 2)) * tw[idx]).mean()
+                else:
+                    l = (lossf(z_ + off, ty[idx]) * tw[idx]).mean()
+                    # 보조 헤드에는 offset 을 안 붙인다 — 다른 과제고 자기 레벨을 갖는다
+                    l = l + lam * (auxf(za_, taux[idx]).mean(1) * tw[idx]).mean()
             else:
-                l = (lossf(m(tA[idx], tC[idx]) + off, ty[idx]) * tw[idx]).mean()
+                zz = m(tA[idx], tC[idx])
+                if zz.dim() == 2:
+                    # TabM — 멤버마다 같은 타깃에 손실을 걸고 평균한다 (원논문 규약).
+                    # 멤버 로짓을 먼저 평균하면 안 된다: 그러면 k 개가 하나의
+                    # 과잉파라미터 모델이 되어 다양성이 학습 신호에서 사라진다.
+                    off2 = off if isinstance(off, float) else off[:, None]
+                    # BCEWithLogitsLoss 는 브로드캐스팅을 안 받는다 — 타깃을 (B, k) 로 펌다.
+                    yy = ty[idx].unsqueeze(1).expand_as(zz)
+                    l = (lossf(zz + off2, yy).mean(1) * tw[idx]).mean()
+                else:
+                    l = (lossf(zz + off, ty[idx]) * tw[idx]).mean()
             l.backward()
             opt.step()
             sched.step()
@@ -378,7 +589,8 @@ def train_mlp(A, Ctr, y, w, B, Cva, sizes, seed=SEED, verbose=True, yva=None,
         z = infer(m, B, Cva)
         curve.append(z)
         if verbose:
-            s = "" if yva is None else f"  validBSS={score(z, yva):>8.1f}"
+            s = ("" if yva is None
+                 else f"  validBSS={score(z.mean(1) if z.ndim == 2 else z, yva):>8.1f}")
             print(f"    ep{ep+1:>2d}  loss={tot/n:.5f}  ({time.time()-t0:.0f}s){s}")
     return m, curve
 
@@ -400,6 +612,10 @@ def export_weights(m):
     for i, e in enumerate(m.emb):
         out[f"emb{i}"] = e.weight.detach().cpu().numpy().astype(np.float32)
 
+    if getattr(m, "tm", None) is not None:
+        raise NotImplementedError(
+            "TabM 가중치 export 는 아직 없다. 채택되면 mlp_infer.MLPPredictor 에 "
+            "r_in/head_w/head_b 를 얹고 numpy 대조(§7.26 의 0.000e+00)를 먼저 한다.")
     # net = [Linear, BN, GELU, Dropout, Linear, BN, GELU, Dropout, Linear]
     #
     # ⚠️ 인덱스가 하드코딩돼 있다. depth≠2 나 resid=True 면 이 인덱스가 **다른 층**을
