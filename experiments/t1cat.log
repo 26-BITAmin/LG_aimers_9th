@@ -1,0 +1,18 @@
+catboost 1.2.10  (제출 requirements 는 1.2.10)
+[18s] 무증강 1,546,291행 · 피처 78  (합성 0)
+[100s]   base_42        완료 (0.4 MB)
+[175s]   base_7         완료 (0.4 MB)
+[244s]   base_2024      완료 (0.4 MB)
+[323s]   wide_42        완료 (0.5 MB)
+[404s]   wide_7         완료 (0.5 MB)
+[481s]   wide_2024      완료 (0.5 MB)
+[530s]   sym_42         완료 (0.3 MB)
+[581s]   sym_7          완료 (0.3 MB)
+[631s]   sym_2024       완료 (0.3 MB)
+[735s]   depthwise_42   완료 (1.3 MB)
+[828s]   depthwise_7    완료 (1.3 MB)
+[933s]   depthwise_2024 완료 (1.3 MB)
+  멤버 12개 · α=0.1
+
+s43_cat12.zip  36.6 MB  (원본 69개 + cat 13개)
+총 939s
