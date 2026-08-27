@@ -1,0 +1,86 @@
+﻿피처 (1221585, 78)  (8s)
+python.exe : D:\projects\LG aimers 야구\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning
+: Could not find the number of physical cores for the following reason:
+At line:1 char:302
++ ... tch {} } }; & "D:\projects\LG aimers 야구\.venv\Scripts\python.exe" -u  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\projects\LG ...llowing reason::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[WinError 2] 지정된 파일을 찾을 수 없습니다
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number
+ of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers 야구\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count
+_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess
+.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess
+.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess
+.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  [CAP2] 행 1,221,585 → 1,306,141 (dup 71,199 · SMOTE 13,357)  leaves x2.0
+    base nl=62 (175s)
+    wide nl=254 (370s)
+    extra nl=62 (543s)
+    lowff nl=62 (665s)
+  [CAPH] 행 1,221,585 → 1,306,141 (dup 71,199 · SMOTE 13,357)  leaves x0.5
+    base nl=16 (798s)
+    wide nl=64 (984s)
+    extra nl=16 (1126s)
+    lowff nl=16 (1238s)
+  [HL035] 행 1,221,585 → 1,306,141 (dup 71,199 · SMOTE 13,357)  hl=0.35
+    base (1381s)
+    wide (1579s)
+    extra (1723s)
+    lowff (1829s)
+  [HL100] 행 1,221,585 → 1,306,141 (dup 71,199 · SMOTE 13,357)  hl=1.0
+    base (1985s)
+    wide (2202s)
+    extra (2351s)
+    lowff (2463s)
+  배관 ⓒ OK — base 대비 최대|Δp|: CAP2 0.00342 CAPH 0.00352 HL035 0.00407 HL100 0.00774
+
+============================================================================================
+§7.181 노브 재감사 (④류 소급) · 코어 LGBM 20 · fold2024 · ⚠️ fold 하나뿐 · B=1000
+============================================================================================
+  팔                                    BSS   Δ vs s41                 95% 구간   P(Δ>0)
+  base = s41                        1524.1   (배관 ⓐ OK — 기지수 1524.1)
+  CAP2   num_leaves x2              1525.8      +1.72   [  +0.69,   +2.78]    1.000  ← 후보(P≥.9)
+  CAPH   num_leaves x0.5            1522.2      -1.90   [  -3.23,   -0.60]    0.000
+  HL035  half_life 0.35             1523.6      -0.45   [  -1.73,   +0.88]    0.252
+  HL100  half_life 1.0              1523.6      -0.46   [  -3.53,   +2.30]    0.363
+
+  F행 / R행 / 예측 std 분해
+    base   F   1641.0   R   1466.1   std(p) 0.0510
+    CAP2   F   1642.8   R   1467.8   std(p) 0.0511
+    CAPH   F   1638.3   R   1464.3   std(p) 0.0508
+    HL035  F   1641.0   R   1465.7   std(p) 0.0511
+    HL100  F   1640.1   R   1465.6   std(p) 0.0508
+
+  총 3209s

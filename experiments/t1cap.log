@@ -1,0 +1,56 @@
+﻿python.exe : D:\projects\LG aimers 야구\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning
+: Could not find the number of physical cores for the following reason:
+At line:1 char:302
++ ... tch {} } }; & "D:\projects\LG aimers 야구\.venv\Scripts\python.exe" -u  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\projects\LG ...llowing reason::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[WinError 2] 지정된 파일을 찾을 수 없습니다
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number
+ of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers 야구\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count
+_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess
+.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess
+.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess
+.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+[12s] 학습 1,475,092 → 1,559,648 (SMOTE 13,357)
+[202s]   base nl=62 5시드
+[465s]   wide nl=254 5시드
+[660s]   extra nl=62 5시드
+[801s]   lowff nl=62 5시드
+[905s] 프록시 2024 253,507행  max|Δp|=0.00492  평균|Δp|=0.00078  Δmean=+0.000025986  (레벨 비용 0.000점)
+  PROB_SHIFT 0.005765149 → 0.005739163  (챔피언 파싱값 기준)
+  패치 후 Δmean = -0.000000000092  ✅
+
+s45_cap2.zip  44.4 MB  (파일 82개 · 교체 21개 = 코어 20 + predict.py)
+총 961s

@@ -1,0 +1,67 @@
+피처 (1221585, 78) · 신인 풀 8,997 · 비신인 풀 30,638  (7s)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  [RK_dose] 씨앗 8,997 → 합성 13,357 (1.48배)  행 1,221,585 → 1,306,141
+    base (140s)
+    wide (344s)
+    extra (476s)
+    lowff (565s)
+  [RK_rate] 씨앗 8,997 → 합성 3,509 (0.39배)  행 1,221,585 → 1,296,293
+    base (689s)
+    wide (859s)
+    extra (981s)
+    lowff (1069s)
+  [NRK] 씨앗 30,638 → 합성 13,357 (0.44배)  행 1,221,585 → 1,306,141
+    base (1201s)
+    wide (1416s)
+    extra (1545s)
+    lowff (1634s)
+  배관 OK — base 대비 최대|Δp|: RK_dose 0.03568 RK_rate 0.01318 NRK 0.01279
+
+==========================================================================================
+s41 의 증강 **표적 교체** · 코어 LGBM 20 · fold2024 · ⚠️ fold 하나뿐
+==========================================================================================
+  팔                                            BSS   Δ vs s41                 95% 구간   P(Δ>0)
+  base = s41 (pre-2023 F 전체, 0.39배)         1524.1
+  ①a 신인 2019제외 · 13,357 (1.48배) ← 후보        1523.2      -0.88   [  -4.23,   +2.49]    0.310
+  ①b 신인 2019제외 ·  3,509 (0.39배) 배율맞춤        1523.5      -0.54   [  -1.94,   +0.82]    0.247
+  ②  비신인       · 13,357 (0.44배) [대조]        1522.4      -1.65   [  -4.09,   +0.61]    0.077
+
+  F행 / R행 분해
+    base       F   1641.0   R   1466.1
+    RK_dose    F   1644.0   R   1464.8
+    RK_rate    F   1644.0   R   1465.0
+    NRK        F   1634.7   R   1466.1
+
+  총 1877s

@@ -1,0 +1,77 @@
+피처 (1221585, 78)  (7s)
+  r 학습 풀(R) 781,705행 · 양성률 0.2764 · 적용 대상(pre-2023 F·y=1) 71,199행
+  카운트 테이블 r: 0.211~0.332 (1.58배) · corr(TBL, MDL)=0.409
+  h[TBL]  mean 0.1963  std 0.0905  q05 0.0840  q95 0.3229
+  h[MDL]  mean 0.1963  std 0.0975  q05 0.0683  q95 0.3535
+  h[PLB]  mean 0.1963  std 0.0975  q05 0.0683  q95 0.3535
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  배관 ⓐ OK — 상수 h 에서 soften 경로와 y·w·init 일치 (dup 71,199)  (31s)
+  [TBL] 행 1,221,585 → 1,306,141
+    base (160s)
+    wide (341s)
+    extra (463s)
+    lowff (551s)
+  [MDL] 행 1,221,585 → 1,306,141
+    base (675s)
+    wide (859s)
+    extra (991s)
+    lowff (1078s)
+  [PLB] 행 1,221,585 → 1,306,141
+    base (1203s)
+    wide (1397s)
+    extra (1538s)
+    lowff (1626s)
+  배관 ⓓ OK — base 대비 최대|Δp|: TBL 0.00186 MDL 0.00251 PLB 0.00109
+
+============================================================================================
+soft label h 행 단위화 (noise swap) · 코어 LGBM 20 · fold2024 · ⚠️ fold 하나뿐
+============================================================================================
+  팔                                        BSS   Δ vs s41                 95% 구간   P(Δ>0)
+  base = s41 (h 시즌 상수)                  1524.1
+  TBL  h∝카운트 테이블 (12셀)                  1524.0      -0.08   [  -0.53,   +0.39]    0.340
+  MDL  h∝LGBM r(x) (78피처)               1523.7      -0.43   [  -0.95,   +0.17]    0.072
+  PLB  MDL 시즌내 셔플 [위약]                  1523.9      -0.21   [  -0.57,   +0.14]    0.138
+
+  위약 차감 (쌍체, 같은 부트스트랩 draw)
+    Δ(TBL−PLB)   +0.13   [  -0.33,   +0.52]   P(>0)=0.720
+    Δ(MDL−PLB)   -0.22   [  -0.78,   +0.38]   P(>0)=0.212
+
+  F행 / R행 분해
+    base   F   1641.0   R   1466.1
+    TBL    F   1641.5   R   1465.9
+    MDL    F   1642.4   R   1465.4
+    PLB    F   1640.7   R   1465.9
+
+  총 1872s
