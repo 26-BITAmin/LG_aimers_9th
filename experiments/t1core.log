@@ -1,0 +1,59 @@
+코어가 기대하는 피처 78개  (0s)
+학습 피처 (1221585, 78)  (11s)
+  [C_base] 행 1,221,585 → 1,292,784 (합성 0)
+    base 5시드 (190s)
+    wide 5시드 (456s)
+    extra 5시드 (615s)
+    lowff 5시드 (732s)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  [D_aug] 행 1,221,585 → 1,306,141 (합성 13,357)
+    base 5시드 (900s)
+    wide 5시드 (1160s)
+    extra 5시드 (1333s)
+    lowff 5시드 (1446s)
+  C_base 예측 mean=0.4810  (1498s)
+  D_aug 예측 mean=0.4810  (1555s)
+  배관 OK — 두 팔 최대 예측차 0.003211
+
+================================================================================
+T1 **코어 LGBM 20** 증강 · fold2024  ⚠️ 절대값 무의미(in-sample), 차이만
+================================================================================
+  C 증강 없음   BSS    1522.8
+  D 증강        BSS    1524.1
+  Δ(D−C)            +1.29   95% [+0.48, +2.09]   P(Δ>0)=0.998
+  R행 1464.9 → 1466.1   F행 1638.6 → 1641.0
+  (참고: 일반 LGBM 12(8.8%) 는 +0.24 [−0.27,+0.75] 였다 — 여기는 22.5%)
+
+  총 1627s

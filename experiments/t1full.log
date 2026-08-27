@@ -1,0 +1,68 @@
+학습 행 1,475,092 (T1 meta: 1,475,092)  일치=True
+
+재현① soft_h (전 시즌 추정)
+    2019  우리 0.092962360777  T1 0.092962360777  |Δ|=0.00e+00
+    2020  우리 0.109738306713  T1 0.109738306713  |Δ|=0.00e+00
+    2021  우리 0.242586155671  T1 0.242586155671  |Δ|=0.00e+00
+    2022  우리 0.296954143731  T1 0.296954143731  |Δ|=0.00e+00
+    → ✅ 일치 (파이프라인 동일)
+
+재현② 피처 (1475092, 78) · 순서 일치 ✅  (12s)
+  [E_full_base] 행 1,475,092 → 1,546,291 (합성 0)
+    base 5시드 (216s)
+    wide 5시드 (536s)
+    extra 5시드 (730s)
+    lowff 5시드 (860s)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  [F_full_aug] 행 1,475,092 → 1,559,648 (합성 13,357)
+    base 5시드 (1052s)
+    wide 5시드 (1333s)
+    extra 5시드 (1543s)
+    lowff 5시드 (1677s)
+  T1_orig 예측 mean=0.48179 std=0.05228  (1729s)
+  E_full_base 예측 mean=0.48179 std=0.05228  (1782s)
+  F_full_aug 예측 mean=0.48179 std=0.05231  (1834s)
+
+==============================================================================
+재현③ — T1 출하본 대비 예측 상관 (점수가 아니라 재현도로 판정한다)
+==============================================================================
+  E_full_base    corr 1.000000  평균|Δp| 0.00000  최대|Δp| 0.00000
+  F_full_aug     corr 0.999978  평균|Δp| 0.00027  최대|Δp| 0.00181
+  (증강 팔 vs 무증강 팔  corr 0.999978 — 1.0 이면 증강이 안 걸린 것)
+
+  판정: corr ≥ 0.999 면 코어 재현 성공 → 교체 위험 ≈ 0,
+        LB 변화가 곧 증강분(+1.29 홀드아웃)이 된다.
+
+  총 1834s
