@@ -1,0 +1,106 @@
+  fold 2023: n=245,525  s29층 807.2 → +cat10+스케일 812.6
+  fold 2024: n=253,507  s29층 924.5 → +cat10+스케일 929.9
+
+================================================================================================
+=== fold 2023 ===
+  학습 976,060행 (복원 99.9%) → 검증 245,525행  (9s)
+  5클래스 분포  성공 0.5394  몰림만 0.1075  반대만 0.1831  몰림+반대 0.0343  벗어남 0.1357
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  GMM K=4 (BIC, 적합 투수 267명/502명, 점유 [0.3  0.09 0.5  0.11])
+
+  ── 단독 BSS oracle (shift→ȳ=0.5000) ──
+  A0_셀만              +94.9   corr(z, z_dep) 0.305
+  A1_이진             +336.6   corr(z, z_dep) 0.740
+  A2_5cls_투수만       +420.4   corr(z, z_dep) 0.736
+  A3_5cls_주모델       +344.4   corr(z, z_dep) 0.738
+  A4_GMM풀링          +326.3   corr(z, z_dep) 0.737
+  PLB_정체순열          -147.7   corr(z, z_dep) 0.162
+
+  ── A3 스윕 (행=hl, 열=S_P; S_B=S_P×3.3) ──
+               100       300       800
+  hl=0.5     +284.3    +369.2    +402.0
+  hl=1.0     +266.1    +344.4    +381.7
+  hl=2.0     +222.4    +301.9    +345.3
+
+  ── 배포 등가층 블렌드 (기준 812.6) ──
+  α                  0.02     0.05     0.10     0.15
+  A2_5cls_투수만       -0.79    -2.50    -6.78   -12.86
+  A3_5cls_주모델       -2.25    -6.16   -14.12   -23.89
+  A4_GMM풀링          -2.22    -6.11   -14.13   -24.07
+  PLB_정체순열          +0.88    +0.69    -3.67   -13.10
+  A2_5cls_투수만    Δ(α=0.05)   -2.50 [ -8.41,  +2.47]  분산비용  0.89  → LB예측 c=.16 -1.15 / c=.93 -2.39
+  A3_5cls_주모델    Δ(α=0.05)   -6.16 [-11.55,  -1.40]  분산비용  0.90  → LB예측 c=.16 -1.74 / c=.93 -5.79
+  A4_GMM풀링       Δ(α=0.05)   -6.11 [-11.63,  -1.17]  분산비용  0.95  → LB예측 c=.16 -1.78 / c=.93 -5.75
+  PLB_정체순열       Δ(α=0.05)   +0.69 [ -5.48,  +7.09]  분산비용  2.52  → LB예측 c=.16 -2.00 / c=.93 +0.46
+
+================================================================================================
+=== fold 2024 ===
+  학습 1,221,585행 (복원 99.9%) → 검증 253,507행  (24s)
+  5클래스 분포  성공 0.5315  몰림만 0.1098  반대만 0.1909  몰림+반대 0.0343  벗어남 0.1336
+  GMM K=4 (BIC, 적합 투수 300명/606명, 점유 [0.08 0.36 0.39 0.17])
+
+  ── 단독 BSS oracle (shift→ȳ=0.4861) ──
+  A0_셀만             +129.3   corr(z, z_dep) 0.377
+  A1_이진             +444.8   corr(z, z_dep) 0.697
+  A2_5cls_투수만       +446.1   corr(z, z_dep) 0.704
+  A3_5cls_주모델       +457.9   corr(z, z_dep) 0.696
+  A4_GMM풀링          +449.8   corr(z, z_dep) 0.698
+  PLB_정체순열          -405.6   corr(z, z_dep) 0.114
+
+  ── A3 스윕 (행=hl, 열=S_P; S_B=S_P×3.3) ──
+               100       300       800
+  hl=0.5     +453.8    +497.3    +490.9
+  hl=1.0     +422.1    +457.9    +457.5
+  hl=2.0     +359.1    +395.9    +404.0
+
+  ── 배포 등가층 블렌드 (기준 929.9) ──
+  α                  0.02     0.05     0.10     0.15
+  A2_5cls_투수만       -0.58    -2.14    -6.57   -13.29
+  A3_5cls_주모델       -0.10    -0.96    -4.26    -9.93
+  A4_GMM풀링          -0.16    -1.11    -4.60   -10.47
+  PLB_정체순열          -1.39    -5.37   -17.08   -35.18
+  A2_5cls_투수만    Δ(α=0.05)   -2.14 [ -6.09,  +1.78]  분산비용  1.14  → LB예측 c=.16 -1.30 / c=.93 -2.07
+  A3_5cls_주모델    Δ(α=0.05)   -0.96 [ -4.79,  +2.79]  분산비용  1.17  → LB예측 c=.16 -1.14 / c=.93 -0.97
+  A4_GMM풀링       Δ(α=0.05)   -1.11 [ -5.05,  +2.76]  분산비용  1.18  → LB예측 c=.16 -1.17 / c=.93 -1.12
+  PLB_정체순열       Δ(α=0.05)   -5.37 [-11.68,  +0.89]  분산비용  3.15  → LB예측 c=.16 -3.51 / c=.93 -5.21
+
+================================================================================================
+판정 (사전 등록: knnmember 와 동일 — ⓐ 공통 양수 α 폭≥2 ⓑ 위약은 그 구간 없음)
+  A2_5cls_투수만: 공통 양수 0칸 → 기각
+  A3_5cls_주모델: 공통 양수 0칸 → 기각
+  A4_GMM풀링: 공통 양수 0칸 → 기각
+  위약 공통 양수 0칸 → OK
+
+  총 42s

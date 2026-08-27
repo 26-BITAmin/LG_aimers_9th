@@ -1,0 +1,59 @@
+  캐시 적중: fold2023_5488ef1b18.npz
+  캐시 적중: fold2024_5488ef1b18.npz
+
+=== fold 2023 ===
+  투영 (976060, 16) → 질의 (245525, 16)  ȳ_w=0.5302  (13s)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  kNN 질의 완료  (126s)
+  블렌드 기준 645.1   kNN 단독 -365.9 (위약 단독 -781.8)   corr(z_knn, z_b) 0.424
+  α           0.02      0.05      0.10      0.15
+  kNN        -0.74     -3.36    -11.75    -25.17
+  위약         -2.47     -8.16    -22.96    -44.42
+  쌍체 Δ(α=0.05) -3.36  [-9.48, +2.32]  P 0.133
+
+=== fold 2024 ===
+  투영 (1221585, 16) → 질의 (253507, 16)  ȳ_w=0.5075  (136s)
+  kNN 질의 완료  (277s)
+  블렌드 기준 838.3   kNN 단독 -193.8 (위약 단독 -795.7)   corr(z_knn, z_b) 0.489
+  α           0.02      0.05      0.10      0.15
+  kNN        -2.41     -7.41    -19.50    -36.28
+  위약         -3.85    -11.82    -30.96    -57.45
+  쌍체 Δ(α=0.05) -7.41  [-12.03, -2.67]  P 0.002
+
+==========================================================================================
+판정  ⓐ 공통 양수 α 폭≥2: 미달 (0칸)   ⓑ 위약 구간 없음: 통과 (0칸)   ⓒ 쌍체 P≥.9 양 fold: 미달 (0.133/0.002)
+→ 기각 — 인스턴스 상관의 행 유사도 형태도 실측 폐쇄 (TabReD 와 일치)
+
+  총 280s

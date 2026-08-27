@@ -23,7 +23,13 @@ F/R 분산(+1.8/+1.7), std(p) 불변 — §7.18 "재튜닝 9전 9패"의 T1 계�
     ⓒ 프록시 2024 전 행: max|Δp| > 0 (코어 실제 교체) · 패치 후 평균차 < 1e-9
 
 실행:  .venv/Scripts/python.exe -u src/t1cap.py > experiments/t1cap.log 2>&1
+
+§7.183a 일반화 — 환경변수로 다른 빌드를 만든다 (기본값 = s45 빌드 그대로):
+    CAP_MULT=4 CAP_L2=10 CAP_BASE=s45_cap2.zip CAP_OUT=s46_c4l10.zip \
+    CAP_REF=S45REF CAP_NEW=C4L10F CAP_TAG=46  →  s46_c4l10 (×4·λ10, §7.183a argmax 칸)
+    ❌ LB 1119.0384 (−0.4511) — 챔피언 s45 유지, 용량 축 종결 (§7.183a 실측)
 """
+import os
 import re
 import shutil
 import subprocess
@@ -53,11 +59,13 @@ from t1core import SEEDS, VARIANTS, WORKER, build, t1_features
 CRLF = chr(13) + chr(10)
 LF = chr(10)
 REF_SEASON = 2024
-BASE_ZIP = ROOT / "s43_cat12.zip"            # 현 챔피언 1118.4706009389
-OUT = ROOT / "s45_cap2.zip"
-REF_DIR = ASCII / "S43REF"                   # 챔피언 압축 해제본 (프록시 기준)
-NEW_DIR = ASCII / "CAP2F"                    # 신규 팔 (챔피언 + 코어 교체)
-LEAF_MULT = 2.0
+BASE_ZIP = ROOT / os.environ.get("CAP_BASE", "s43_cat12.zip")
+OUT = ROOT / os.environ.get("CAP_OUT", "s45_cap2.zip")
+REF_DIR = ASCII / os.environ.get("CAP_REF", "S43REF")   # 기준 zip 해제본 (프록시 기준)
+NEW_DIR = ASCII / os.environ.get("CAP_NEW", "CAP2F")    # 신규 팔 (기준 + 코어 교체)
+LEAF_MULT = float(os.environ.get("CAP_MULT", "2.0"))
+CAP_L2 = float(os.environ["CAP_L2"]) if os.environ.get("CAP_L2") else None
+TAG = os.environ.get("CAP_TAG", "")          # npz 캐시 접두 (빌드끼리 캐시 분리)
 
 
 def leaf2(v):
@@ -75,7 +83,7 @@ def extract(zp, dst):
 
 def proxy(dname, out_npz):
     """2024 전 행을 해당 디렉터리의 Predictor 로 예측 (t1core WORKER 재사용)."""
-    f = ROOT / "experiments" / "cache" / out_npz
+    f = ROOT / "experiments" / "cache" / f"t1cap{TAG}_{out_npz}"
     if not f.exists():
         wk = ROOT / "experiments" / "cache" / "_t1cap_worker.py"
         wk.write_text(WORKER.replace("{csv}", str(TRAIN_CSV).replace("\\", "/")),
@@ -113,6 +121,8 @@ def main():
             # ⚠️ wide 는 자체 num_leaves 를 가진다 — 키워드 인자로 주면 중복 TypeError
             p = dict(FINAL_LGB_PARAMS, **ENSEMBLE_VARIANTS[v])
             p["num_leaves"] = leaf2(v)
+            if CAP_L2 is not None:
+                p["lambda_l2"] = CAP_L2      # extra 는 원래 10 → CAP_L2=10 이면 불변
             for sd in SEEDS:
                 p2 = dict(p, seed=sd, bagging_seed=sd,
                           feature_fraction_seed=sd, data_random_seed=sd)
@@ -122,13 +132,14 @@ def main():
                 (NEW_DIR / "model" / f"lgbm_{v}_{sd}.txt").write_text(
                     b.model_to_string(), encoding="utf-8", newline="\n")
                 del b
-            print(f"[{time.time()-t0:.0f}s]   {v} nl={p['num_leaves']} {len(SEEDS)}시드")
+            print(f"[{time.time()-t0:.0f}s]   {v} nl={p['num_leaves']} "
+                  f"l2={p.get('lambda_l2')} {len(SEEDS)}시드")
         del X2, y2, w2, init
         (NEW_DIR / "_cap2_done").write_text("ok", encoding="utf-8")
 
     # ── 2. 프록시 평균 정렬 → PROB_SHIFT 재보정 ─────────────────────
-    p_ref = proxy("S43REF", "t1cap_ref.npz")
-    p_new = proxy("CAP2F", "t1cap_new.npz")
+    p_ref = proxy(REF_DIR.name, "ref.npz")
+    p_new = proxy(NEW_DIR.name, "new.npz")
     dmax = float(np.abs(p_new - p_ref).max())
     dmean = float(p_new.mean() - p_ref.mean())
     assert dmax > 0, "코어 교체가 반영되지 않았다"
@@ -148,8 +159,8 @@ def main():
     print(f"  PROB_SHIFT {shift_old:.9f} → {shift_new:.9f}  (챔피언 파싱값 기준)")
 
     # 패치 검증 — 캐시 무효화 후 재예측
-    (ROOT / "experiments" / "cache" / "t1cap_new2.npz").unlink(missing_ok=True)
-    p_new2 = proxy("CAP2F", "t1cap_new2.npz")
+    (ROOT / "experiments" / "cache" / f"t1cap{TAG}_new2.npz").unlink(missing_ok=True)
+    p_new2 = proxy(NEW_DIR.name, "new2.npz")
     d2 = float(p_new2.mean() - p_ref.mean())
     print(f"  패치 후 Δmean = {d2:+.12f}  {'✅' if abs(d2) < 1e-9 else '⚠️ 1e-9 초과'}")
     assert abs(d2) < 1e-7, "평균 정렬 실패"

@@ -1,0 +1,63 @@
+피처 (1221585, 78)  (8s)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  행 1,221,585 → 1,306,141 (dup 71,199 · SMOTE 13,357)
+    [DART320] base nl=62 r=320 (533s)
+    [DART320] wide nl=254 r=320 (1197s)
+    [DART320] extra nl=62 r=320 (1723s)
+    [DART320] lowff nl=62 r=320 (2179s)
+    [DART640] base nl=62 r=640 (3769s)
+    [DART640] wide nl=254 r=640 (5876s)
+    [DART640] extra nl=62 r=640 (7463s)
+    [DART640] lowff nl=62 r=640 (8849s)
+  배관 ⓒ OK — CAP2 대비 최대|Δp|: DART320 0.01797 DART640 0.01050
+
+============================================================================================
+§7.186 DART 재감사 · 코어 20 (leaves x2) · fold2024 · ⚠️ fold 하나뿐 · B=1000
+============================================================================================
+  팔                                BSS   Δ vs CAP2                 95% 구간   P(Δ>0)
+  CAP2 (배포 코어)                  1525.8   (배관 ⓐ OK — §7.181 앵커 1525.8)
+  DART320                       1519.4       -6.36   [ -12.46,   +0.21]    0.029
+  DART640                       1523.5       -2.27   [  -5.89,   +1.53]    0.089
+  BLEND .8·CAP2+.2·DART640      1525.7       -0.11   [  -0.83,   +0.64]    0.350
+
+  F행 / R행 / 예측 std 분해
+    CAP2     F   1642.8   R   1467.8   std(p) 0.0511
+    DART320  F   1638.3   R   1461.5   std(p) 0.0479
+    DART640  F   1640.6   R   1465.7   std(p) 0.0494
+    BLEND    F   1642.5   R   1467.7   std(p) 0.0508
+
+→ 전 팔 미달 — DART 는 이 레짐에서 이득 없음. 축 폐쇄.
+
+  총 9394s
