@@ -1,0 +1,67 @@
+학습 피처 (1221585, 78)  (8s)
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  [SHALLOW] 풀 4,395 · s41합성 13,357 + 추가합성 8,790 → 행 1,221,585 → 1,314,931
+    base (180s)
+    wide (393s)
+    extra (536s)
+    lowff (699s)
+  [DEEP] 풀 9,144 · s41합성 13,357 + 추가합성 8,790 → 행 1,221,585 → 1,314,931
+    base (973s)
+    wide (1285s)
+    extra (1423s)
+    lowff (1516s)
+  [RAND] 풀 1,221,585 · s41합성 13,357 + 추가합성 8,790 → 행 1,221,585 → 1,314,931
+    base (2385s)
+    wide (2574s)
+    extra (2711s)
+    lowff (2800s)
+  배관 OK — base 대비 최대|Δp|: SHALLOW 0.02233 DEEP 0.02352 RAND 0.00167
+
+====================================================================================
+s41(=base) 위에 추가 증강 8,790행 · fold2024 · ⚠️ fold 하나뿐
+====================================================================================
+  팔                                    BSS Δ vs base                 95% 구간   P(Δ>0)
+  base = s41 등가                     1524.1
+  ① 얕음 F·n<500·2023·실패  ← 후보        1522.4     -1.71   [  -7.12,   +3.63]    0.253
+  ② 깊음 F·n≥500·2023·실패  [대조]        1519.0     -5.13   [  -9.03,   -1.50]    0.003
+  ③ 무작위 아무 행           [영가설]        1523.5     -0.63   [  -1.18,   -0.13]    0.005
+
+  F행 / R행 분해
+    D_aug        F   1641.0   R   1466.1
+    SHALLOW      F   1647.1   R   1465.6
+    DEEP         F   1626.0   R   1464.8
+    RAND         F   1640.6   R   1465.4
+
+  총 3065s
