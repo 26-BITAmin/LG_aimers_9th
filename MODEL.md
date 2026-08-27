@@ -13373,10 +13373,18 @@ p = PROB_CENTER + PROB_SCALE * (p - PROB_CENTER) + PROB_SHIFT
 | --- | --- |
 | 혜진 LGBM 20 재학습 | **학습 코드 미공유.** 공유본의 `code/training/` 에는 `train_compact_context_full.py` · `train_hyejin_fspec_c.py` 둘뿐 |
 | T1 홀드아웃 검증 | **불가.** 혜진 스택이 2019~2024 전부 학습 → fold2024 가 in-sample (§7.171 §4) |
-| **일반 LGBM 12 만 교체** (R 라우팅 10%) | 파일은 있다 — `general_lgb_{base,extra,lowff,wide}_{3시드}`, 변형 이름이 우리 `ENSEMBLE_VARIANTS` 와 동일. **그러나** `features.py` 가 다르고(34,060B vs 우리 57,819B) `general_lgb_encoder.pkl` 로 **자체 피처 파이프라인**을 쓴다. 그 학습 코드도 미공유 |
+| **일반 LGBM 12 만 교체** (R 라우팅 10%) | ✅ **가능하다.** 파일도 있고(`general_lgb_{base,extra,lowff,wide}_{3시드}`) **학습 코드도 있다** — `code/validation/evaluate_multilgbm_init_blend.py` (VARIANTS base/wide/extra/lowff · SEEDS 42/7/2024 · 320라운드 · `encode_frames` 가 `general_lgb_encoder` 와 동일). ⚠️ 파일명이 `evaluate_*` 라 처음에 검증 전용으로 오독했다 — **폴더 이름으로 내용을 단정하지 말 것.** §7.173 이 역추적으로 재학습한 설정이 이 스크립트와 일치했다 |
 
 → **증강 축은 T1 위에서 실행 불가.** 팀에 LGBM 학습 코드를 요청하거나, T1 스택을
-직접 재구성해야 열린다. 그때를 위해 배율(1.4×)과 최적 대상(실패 클래스, recency 무효)은
+직접 재구성해야 열린다.
+
+> ⚠️ **정정 (§7.174 이후).** 위 표의 "일반 LGBM 학습 코드 미공유" 는 **틀렸다.**
+> `code/validation/evaluate_multilgbm_init_blend.py` 가 바로 그 학습 코드다.
+> 파일명이 `evaluate_*` 이고 `validation/` 아래 있어서 열어보지 않고 검증 전용으로
+> 단정했다. **여전히 없는 것은 혜진 코어(LGBM 20 + MLP 8) 학습 코드뿐**이고,
+> 그 이유도 코드에 적혀 있다 — `CORE_COMPONENTS` 가 혜진 로컬의
+> `outputs/validation/...` 디렉터리를 **읽어온다**(학습하지 않는다).
+> 공유본 전 스크립트를 훑어도 5시드(20개) 학습은 없다. 전부 3시드(12개)다. 그때를 위해 배율(1.4×)과 최적 대상(실패 클래스, recency 무효)은
 여기 남겨둔다.
 
 #### ③ 다음은 §7.171 §4 의 LB 슬롯이다
