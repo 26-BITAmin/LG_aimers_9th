@@ -1,0 +1,63 @@
+  fold 2023: n=245,525  s29층 807.2 → +cat10+스케일 812.6
+  fold 2023 층별 BSS  L 612.3  M 638.4  B 812.6 (§7.190 앵커 812.6)
+  fold 2024: n=253,507  s29층 924.5 → +cat10+스케일 929.9
+  fold 2024 층별 BSS  L 826.9  M 826.4  B 929.9 (§7.190 앵커 929.9)
+산술 70피처 · 쌍 2,415 × 2연산 · 층 ('L', 'M', 'B')  (9s)
+[L] 프로브 완료 — 단독 S≥2 3개 (max 2.19) · 위약 max 3.15 · 99% 2.36  (118s)
+[M] 프로브 완료 — 단독 S≥2 3개 (max 2.36) · 위약 max 2.96 · 99% 2.32  (230s)
+[B] 프로브 완료 — 단독 S≥2 0개 (max 1.66) · 위약 max 2.41 · 99% 1.79  (351s)
+
+================================================================================================================
+층별 집계 (S = 부호일치·min|t|)  — B 층은 §7.190 재계산 앵커
+================================================================================================================
+  층  op       S≥2   S≥3   S≥4    maxS    위약max    위약S≥2%
+  L  PROD      14     0     0    2.81     3.15      1.8%
+  L  DIFF      99     4     0    3.48     3.15      1.8%
+  M  PROD      10     0     0    2.36     2.96      1.8%
+  M  DIFF      75     2     0    3.24     2.96      1.8%
+  B  PROD       2     0     0    2.01     2.41      0.3%
+  B  DIFF      14     0     0    2.95     2.41      0.3%
+
+L(LGBM 단독) 층 상위 25 — 게이트: ① S_L≥4 ② >위약max(3.15) ③ >両부모
+  op   a                                   b                                      tL23   tL24   S_L   S_M   S_B   Sa   Sb  게이트
+  DIFF count_diff                          hand_same                              3.49   3.48  3.48  2.06  0.52 0.70 2.09  
+  DIFF count_diff                          asof_pitcher_prev5_game_middle_rate    3.57   3.39  3.39  2.29  1.53 0.70 2.19  
+  DIFF count_diff                          asof_pitcher_prev3_game_middle_rate    3.48   3.35  3.35  2.05  1.58 0.70 2.15  
+  DIFF asof_batter_middle_rate_sm          asof_pitcher_prev5_game_success_rate  -3.47  -3.13  3.13  3.24  1.29 0.00 1.98  
+  DIFF count_diff                          asof_pitcher_prev1_game_middle_rate    3.27   3.00  3.00  1.45  0.94 0.70 1.44  
+  DIFF hand_same                           asof_pitcher_success_rate             -3.97  -2.96  2.96  2.73  1.20 2.09 1.77  
+  DIFF strikes_before                      asof_pitcher_prev5_game_middle_rate    2.88   3.18  2.88  2.12  2.04 0.00 2.19  
+  DIFF asof_batter_middle_rate             asof_pitcher_prev5_game_success_rate  -3.02  -2.88  2.88  2.65  1.04 0.00 1.98  
+  DIFF count_diff                          form_mid_p1_minus_career               2.92   2.87  2.87  1.17  0.64 0.70 1.14  
+  DIFF asof_batter_middle_rate_sm          asof_pitcher_prev3_game_success_rate  -3.16  -2.82  2.82  2.91  0.96 0.00 1.51  
+  PROD pitcher_hand                        batter_hand                           -2.92  -2.81  2.81  2.01  0.00 0.00 0.00  
+  DIFF asof_pitcher_success_rate           asof_pitcher_prev3_game_middle_rate    3.81   2.80  2.80  3.05  2.00 1.77 2.15  
+  DIFF asof_pitcher_success_rate           asof_pitcher_prev5_game_middle_rate    4.03   2.80  2.80  3.00  1.89 1.77 2.19  
+  DIFF outs_before                         asof_pitcher_prev5_game_middle_rate    3.93   2.74  2.74  1.74  0.90 1.70 2.19  
+  DIFF strikes_before                      asof_pitcher_prev3_game_middle_rate    2.68   3.14  2.68  1.85  1.73 0.00 2.15  
+  DIFF outs_before                         asof_pitcher_prev3_game_middle_rate    3.82   2.67  2.67  1.74  0.97 1.70 2.15  
+  DIFF outs_before                         hand_same                              3.93   2.66  2.66  1.31  0.00 1.70 2.09  
+  DIFF asof_pitcher_success_rate           form_mid_p1_minus_career               3.45   2.65  2.65  2.34  1.52 1.77 1.14  
+  DIFF is_first_pitch                      asof_pitcher_prev5_game_success_rate  -3.57  -2.64  2.64  1.87  0.30 0.19 1.98  
+  DIFF strikes_before                      hand_same                              2.56   3.22  2.56  1.93  0.95 0.00 2.09  
+  DIFF count_diff                          asof_pitcher_ball_rate                 2.96   2.56  2.56  0.80  0.78 0.70 0.99  
+  DIFF hand_same                           asof_pitcher_prev5_game_success_rate  -5.06  -2.56  2.56  2.25  0.00 2.09 1.98  
+  DIFF asof_batter_middle_rate             asof_pitcher_prev3_game_success_rate  -2.68  -2.54  2.54  2.28  0.53 0.00 1.51  
+  DIFF asof_pitcher_prev5_game_success_rateasof_pitcher_prev3_game_middle_rate    4.23   2.50  2.50  2.54  0.15 1.98 2.15  
+  DIFF is_full_count                       asof_pitcher_success_rate             -2.69  -2.49  2.49  2.11  1.51 0.90 1.77  
+
+단독 70 층별 대조 (S_L 상위 10)
+  피처                                        S_L    S_M    S_B
+  asof_pitcher_prev5_game_middle_rate      2.19   2.31   0.91
+  asof_pitcher_prev3_game_middle_rate      2.15   2.36   1.02
+  hand_same                                2.09   1.71   0.00
+  asof_pitcher_prev5_game_success_rate     1.98   1.84   0.00
+  asof_pitcher_success_rate                1.77   2.01   1.66
+  outs_before                              1.70   0.00   0.22
+  asof_pitcher_prev3_game_success_rate     1.51   1.34   0.00
+  asof_pitcher_middle_rate                 1.47   1.44   1.21
+  asof_pitcher_prev1_game_middle_rate      1.44   1.03   0.01
+  asof_pitcher_reverse_rate                1.30   0.92   0.82
+
+판정 (사전 등록): L 층 게이트 ①②③ 통과 0개 → 층 분해로도 전멸 — §7.190 폐쇄 확정
+총 351s
