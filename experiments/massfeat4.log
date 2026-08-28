@@ -1,0 +1,80 @@
+
+fold 2023  배포층 앵커 OK 812.6  ·  캐시 cat solo 622.6
+    X (1047259, 78) 준비 (16s)
+    fold 2023 [MASS base/42] (102s)
+    fold 2023 [MASS base/7] (192s)
+    fold 2023 [MASS base/2024] (270s)
+    fold 2023 [MASS wide/42] (358s)
+    fold 2023 [MASS wide/7] (446s)
+    fold 2023 [MASS wide/2024] (531s)
+    fold 2023 [MASS sym/42] (581s)
+    fold 2023 [MASS sym/7] (629s)
+    fold 2023 [MASS sym/2024] (676s)
+    fold 2023 [MASS depthwise/42] (783s)
+    fold 2023 [MASS depthwise/7] (891s)
+    fold 2023 [MASS depthwise/2024] (1006s)
+    fold 2023 [PLB base/42] (1087s)
+    fold 2023 [PLB base/7] (1161s)
+    fold 2023 [PLB base/2024] (1239s)
+    fold 2023 [PLB wide/42] (1332s)
+    fold 2023 [PLB wide/7] (1424s)
+    fold 2023 [PLB wide/2024] (1513s)
+    fold 2023 [PLB sym/42] (1562s)
+    fold 2023 [PLB sym/7] (1611s)
+    fold 2023 [PLB sym/2024] (1660s)
+    fold 2023 [PLB depthwise/42] (1771s)
+    fold 2023 [PLB depthwise/7] (1884s)
+    fold 2023 [PLB depthwise/2024] (2006s)
+    mf_ 중요도(PredictionValuesChange 평균) MASS {'mf_cd_hs': 3.313496507198002, 'mf_cd_p5m': 0.7664381552167527, 'mf_bm_p5s': 0.9667261291745618}  PLB {'mf_cd_hs': 0.7436600238193943, 'mf_cd_p5m': 0.7388462413514286, 'mf_bm_p5s': 0.7935762904760143}
+    cat solo: 캐시   622.6  MASS   619.9  PLB   620.9   corr(MASS,캐시) 0.9926   corr(MASS,PLB) 0.9925
+    ① cat 단독 Δ(MASS−PLB)    -1.03  [ -10.58,   +8.38]  P 0.420
+    ② 배포층 Δ(MASS−PLB) — w 격자 (판정은 w=0.1)
+      w 0.05  Δ   +0.12  [  -0.32,   +0.57]  P 0.694
+      w 0.10  Δ   +0.22  [  -0.66,   +1.12]  P 0.680 ← 사전 고정 w
+      w 0.15  Δ   +0.31  [  -1.02,   +1.66]  P 0.662
+      w 0.20  Δ   +0.38  [  -1.39,   +2.18]  P 0.651
+      w 0.30  Δ   +0.46  [  -2.18,   +3.18]  P 0.630
+
+fold 2024  배포층 앵커 OK 929.9  ·  캐시 cat solo 823.3
+    X (1292784, 78) 준비 (2020s)
+    fold 2024 [MASS base/42] (2120s)
+    fold 2024 [MASS base/7] (2217s)
+    fold 2024 [MASS base/2024] (2323s)
+    fold 2024 [MASS wide/42] (2478s)
+    fold 2024 [MASS wide/7] (2615s)
+    fold 2024 [MASS wide/2024] (2774s)
+    fold 2024 [MASS sym/42] (2856s)
+    fold 2024 [MASS sym/7] (2947s)
+    fold 2024 [MASS sym/2024] (3030s)
+    fold 2024 [MASS depthwise/42] (3221s)
+    fold 2024 [MASS depthwise/7] (3424s)
+    fold 2024 [MASS depthwise/2024] (3629s)
+    fold 2024 [PLB base/42] (3779s)
+    fold 2024 [PLB base/7] (3921s)
+    fold 2024 [PLB base/2024] (4054s)
+    fold 2024 [PLB wide/42] (4208s)
+    fold 2024 [PLB wide/7] (4364s)
+    fold 2024 [PLB wide/2024] (4491s)
+    fold 2024 [PLB sym/42] (4564s)
+    fold 2024 [PLB sym/7] (4637s)
+    fold 2024 [PLB sym/2024] (4708s)
+    fold 2024 [PLB depthwise/42] (4874s)
+    fold 2024 [PLB depthwise/7] (5041s)
+    fold 2024 [PLB depthwise/2024] (5210s)
+    mf_ 중요도(PredictionValuesChange 평균) MASS {'mf_cd_hs': 2.808919346389493, 'mf_cd_p5m': 0.9720568618213665, 'mf_bm_p5s': 1.7409784714592453}  PLB {'mf_cd_hs': 0.35472848918685834, 'mf_cd_p5m': 0.7274957280162333, 'mf_bm_p5s': 0.8948869762789364}
+    cat solo: 캐시   823.3  MASS   816.3  PLB   821.3   corr(MASS,캐시) 0.9946   corr(MASS,PLB) 0.9943
+    ① cat 단독 Δ(MASS−PLB)    -5.06  [ -13.17,   +2.72]  P 0.104
+    ② 배포층 Δ(MASS−PLB) — w 격자 (판정은 w=0.1)
+      w 0.05  Δ   -0.23  [  -0.62,   +0.16]  P 0.119
+      w 0.10  Δ   -0.46  [  -1.24,   +0.32]  P 0.116 ← 사전 고정 w
+      w 0.15  Δ   -0.70  [  -1.87,   +0.47]  P 0.113
+      w 0.20  Δ   -0.95  [  -2.51,   +0.61]  P 0.112
+      w 0.30  Δ   -1.46  [  -3.80,   +0.86]  P 0.108
+
+================================================================================================
+판정 (사전 등록: 배포층 Δ(MASS−PLB), w=0.1 고정, 양 fold 양수 & P≥0.9)
+  fold2023: 양수 · P 0.680
+  fold2024: 음수 · P 0.116
+→ 미달 — CatBoost 채널 폐쇄. §7.190 4중 완결 (프로브·층분해·LGBM·CatBoost)
+
+  총 5214s
