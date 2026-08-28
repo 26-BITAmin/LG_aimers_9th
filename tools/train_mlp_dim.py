@@ -59,15 +59,23 @@ def main():
     ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args()
 
-    sys.path.insert(0, a.work)
     os.makedirs(a.out, exist_ok=True)
-
-    import mlp
-    import modelabel
-    import soften
-    from data import recency_weight
-    from features import build_features
-    from mlp_infer import encode_apply
+    # ⚠️ 이 모듈들은 저장소에 없다 — `--work` 에 조립해 둔 것들이다 (정적 분석 불가).
+    #    원우 `src/` (mlp · modelabel · soften · data) + 출하 zip (features · mlp_infer).
+    need = ["mlp.py", "modelabel.py", "soften.py", "data.py", "features.py", "mlp_infer.py"]
+    miss = [n for n in need if not os.path.exists(os.path.join(a.work, n))]
+    if miss:
+        raise SystemExit(f"[중단] --work 에 모듈이 없다: {miss}\n"
+                         f"  원우 src/*.py 를 복사한 뒤 features.py · contam.py · mlp_infer.py 를\n"
+                         f"  제출 zip 것으로 덮어써야 한다 (배포와 같은 피처 경로).")
+    sys.path.insert(0, a.work)
+    import importlib
+    mlp = importlib.import_module("mlp")
+    modelabel = importlib.import_module("modelabel")
+    soften = importlib.import_module("soften")
+    recency_weight = importlib.import_module("data").recency_weight
+    build_features = importlib.import_module("features").build_features
+    encode_apply = importlib.import_module("mlp_infer").encode_apply
 
     mlp.THREADS = a.threads
 

@@ -36,8 +36,26 @@ import joblib
 import numpy as np
 import pandas as pd
 
-SP = os.path.dirname(os.path.abspath(__file__))
 TRAIN_CSV = "/Users/hyejin/Aimers_9th/data/train.csv"
+
+def load_from_zip(zip_dir, names):
+    """제출 zip 을 푼 디렉터리에서 모듈을 가져온다.
+
+    ⚠️ `features` · `mlp_infer` 는 **이 저장소에 없다.** 배포 시점의 스냅숏이라
+       제출 zip 안에만 존재하고, 그래서 정적 분석기가 못 찾는다 (실행은 된다).
+       배포와 **같은 코드로** 피처·인코딩을 해야 비교가 성립하므로 일부러 이렇게 둔다
+       (원우 §7.175 `t1core.py` 의 방침 — "T1 자신의 features.py + artifacts.joblib").
+    """
+    need = ["features.py", "mlp_infer.py", os.path.join("model", "artifacts.joblib")]
+    missing = [n for n in need if not os.path.exists(os.path.join(zip_dir, n))]
+    if missing:
+        raise SystemExit(
+            f"[중단] --zip-dir 가 풀어 둔 제출 zip 이 아니다: {zip_dir}\n"
+            f"  없는 파일: {missing}\n"
+            f"  예) mkdir -p /tmp/z && cd /tmp/z && unzip -oq outputs/hj02_base.zip")
+    sys.path.insert(0, zip_dir)
+    import importlib
+    return [importlib.import_module(n) for n in names]
 
 
 def gelu(x):
@@ -51,12 +69,11 @@ def main():
     ap.add_argument("--mask-frac", type=float, default=0.20, help="미지값 처리할 투수 비율")
     ap.add_argument("--tau", type=float, default=1.0, help="유사도 softmax 온도")
     ap.add_argument("--topk", type=int, default=25, help="가중평균에 쓸 이웃 수")
-    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--seeds", default="0", help="쉼표 구분. 마스킹 시드 목록")
     a = ap.parse_args()
 
-    sys.path.insert(0, a.zip_dir)
-    from features import build_features
-    from mlp_infer import EMB_COLS, encode_apply
+    feat, mi = load_from_zip(a.zip_dir, ["features", "mlp_infer"])
+    build_features, EMB_COLS, encode_apply = feat.build_features, mi.EMB_COLS, mi.encode_apply
 
     bundle = joblib.load(os.path.join(a.zip_dir, "model", "artifacts.joblib"))
     enc = bundle["mlp_enc"]
@@ -91,69 +108,67 @@ def main():
     seen = cnt > 0
     prof[seen] /= cnt[seen, None]
 
-    # ── 마스킹: 투수의 일부를 미지값 처리 ────────────────────────
-    rng = np.random.RandomState(a.seed)
-    known = np.flatnonzero(seen)
-    known = known[known != 0]
-    masked = set(rng.choice(known, int(len(known) * a.mask_frac), replace=False).tolist())
-    is_masked = np.array([i in masked for i in p_idx])
-    print(f"  마스킹 투수 {len(masked)}/{len(known)}명 -> 행 {is_masked.sum():,} ({is_masked.mean():.2%})")
-
-    # 마스킹된 투수는 이웃 후보에서도 제외한다 (누출 방지)
-    cand = np.array([i for i in known if i not in masked])
-    cprof = prof[cand]
-
-    # ── 유사도 가중평균 (마스킹 행 각각에 대해) ──────────────────
-    rows = np.flatnonzero(is_masked)
-    q = A[rows][:, prof_cols].astype(np.float64)
-    W = np.zeros((len(rows), len(cand)))
-    for i in range(0, len(rows), 4096):
-        j = min(i + 4096, len(rows))
-        d2 = ((q[i:j, None, :] - cprof[None, :, :]) ** 2).sum(-1)
-        kth = np.partition(d2, a.topk, axis=1)[:, a.topk][:, None]
-        d2 = np.where(d2 <= kth, d2, np.inf)
-        w = np.exp(-(d2 - d2.min(1, keepdims=True)) / a.tau)
-        W[i:j] = w / w.sum(1, keepdims=True)
-
-    # ── 세 팔의 emb4 앙상블 로짓 ─────────────────────────────────
+    # ── 시드별 마스킹 → 채점 (마스킹 행만 순전파한다) ──────────
     import glob
     files = sorted(glob.glob(os.path.join(a.zip_dir, "model", "mlp_emb4_*.npz")))
-    res = {}
-    for arm in ("UNK", "MEAN", "COLD", "TRUE"):
-        z = np.zeros(len(X))
-        for f in files:
-            npz = np.load(f)
-            Wm = [npz[f"W{i}"] for i in range(3)]
-            bm = [npz[f"b{i}"] for i in range(3)]
-            ecols = [str(c) for c in npz["ecols"]]
-            embs = [npz[f"emb{i}"] for i in range(len(ecols))]
-            pe = EMB_COLS.index("pitcher_id")
-            Cm = C.copy()
-            if arm == "UNK":
-                Cm[rows, pe] = 0
-            E = [e[Cm[:, EMB_COLS.index(c)]] for e, c in zip(embs, ecols)]
-            pi = ecols.index("pitcher_id")
-            if arm == "COLD":
-                E[pi][rows] = W @ embs[pi][cand]
-            elif arm == "MEAN":
-                E[pi][rows] = embs[pi][cand].mean(0)
-            h = np.concatenate([A] + E, axis=1)
-            h = gelu(h @ Wm[0] + bm[0])
-            h = gelu(h @ Wm[1] + bm[1])
-            z += (h @ Wm[2] + bm[2]).ravel()
-        res[arm] = z / len(files)
+    nets = []
+    for f in files:
+        z = np.load(f)
+        nets.append(dict(W=[z[f"W{i}"] for i in range(3)], b=[z[f"b{i}"] for i in range(3)],
+                         ecols=[str(c) for c in z["ecols"]],
+                         emb=[z[f"emb{i}"] for i in range(len(z["ecols"]))]))
+    known_all = np.flatnonzero(seen); known_all = known_all[known_all != 0]
 
-    print(f"\n마스킹 행 {is_masked.sum():,} 개에서의 Brier (낮을수록 좋다)")
-    print(f"{'팔':<6}{'Brier':>12}{'vs UNK':>12}")
-    base = None
-    for arm in ("UNK", "MEAN", "COLD", "TRUE"):
-        p = 1.0 / (1.0 + np.exp(-res[arm][rows]))
-        br = float(((p - y[rows]) ** 2).mean())
-        if base is None:
-            base = br
-        print(f"{arm:<6}{br:>12.6f}{(base - br) * 1e5:>+12.2f}")
-    print("\n(vs UNK 는 Brier 차이 x 1e5 — 대회 점수와 같은 축척)")
-    print("판정은 UNK vs COLD. TRUE 는 in-sample 이라 상한 참고용이다.")
+    print(f"\n{'시드':>4} {'마스킹행':>9} {'UNK':>10} {'MEAN':>9} {'COLD':>9} {'TRUE':>9}")
+    res = {k: [] for k in ("MEAN", "COLD", "TRUE")}
+    for sd in [int(x) for x in a.seeds.split(",")]:
+        rng = np.random.RandomState(sd)
+        masked = set(rng.choice(known_all, int(len(known_all) * a.mask_frac), replace=False).tolist())
+        rows = np.flatnonzero(np.array([i in masked for i in p_idx]))
+        cand = np.array([i for i in known_all if i not in masked])
+        cprof = prof[cand]
+
+        q = A[rows][:, prof_cols].astype(np.float64)
+        Wt = np.zeros((len(rows), len(cand)))
+        for i in range(0, len(rows), 4096):
+            j = min(i + 4096, len(rows))
+            d2 = ((q[i:j, None, :] - cprof[None, :, :]) ** 2).sum(-1)
+            kth = np.partition(d2, a.topk, axis=1)[:, a.topk][:, None]
+            d2 = np.where(d2 <= kth, d2, np.inf)
+            wgt = np.exp(-(d2 - d2.min(1, keepdims=True)) / a.tau)
+            Wt[i:j] = wgt / wgt.sum(1, keepdims=True)
+
+        Asub, Csub, ysub = A[rows], C[rows], y[rows]
+        br = {}
+        for arm in ("UNK", "MEAN", "COLD", "TRUE"):
+            z = np.zeros(len(rows))
+            for nt in nets:
+                pe = nt["ecols"].index("pitcher_id")
+                E = [nt["emb"][m][Csub[:, EMB_COLS.index(c)]] for m, c in enumerate(nt["ecols"])]
+                if arm == "UNK":
+                    E[pe] = np.repeat(nt["emb"][pe][0][None, :], len(rows), 0)
+                elif arm == "MEAN":
+                    E[pe] = np.repeat(nt["emb"][pe][cand].mean(0)[None, :], len(rows), 0)
+                elif arm == "COLD":
+                    E[pe] = Wt @ nt["emb"][pe][cand]
+                h = np.concatenate([Asub] + E, axis=1)
+                h = gelu(h @ nt["W"][0] + nt["b"][0])
+                h = gelu(h @ nt["W"][1] + nt["b"][1])
+                z += (h @ nt["W"][2] + nt["b"][2]).ravel()
+            pr = 1.0 / (1.0 + np.exp(-z / len(nets)))
+            br[arm] = float(((pr - ysub) ** 2).mean())
+        for k in res:
+            res[k].append((br["UNK"] - br[k]) * 1e5)
+        print("%4d %9d %10.6f %+9.2f %+9.2f %+9.2f"
+              % (sd, len(rows), br["UNK"], res["MEAN"][-1], res["COLD"][-1], res["TRUE"][-1]))
+
+    print(f"\n{len(res['MEAN'])}시드 요약 (Brier차 x 1e5, UNK 대비)")
+    print("%-6s %8s %8s %8s %8s %6s" % ("팔", "평균", "std", "SE", "t", "양수"))
+    for k in ("MEAN", "COLD", "TRUE"):
+        v = np.array(res[k]); se = v.std(ddof=1) / np.sqrt(len(v))
+        print("%-6s %+8.2f %8.2f %8.2f %8.2f %4d/%d"
+              % (k, v.mean(), v.std(ddof=1), se, v.mean() / se, (v > 0).sum(), len(v)))
+    return
 
 
 if __name__ == "__main__":
