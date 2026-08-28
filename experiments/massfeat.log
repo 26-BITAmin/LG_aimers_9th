@@ -1,0 +1,47 @@
+  fold 2023: n=245,525  s29층 807.2 → +cat10+스케일 812.6
+  fold 2024: n=253,507  s29층 924.5 → +cat10+스케일 929.9
+산술 피처 70개 → 쌍 2,415 × 2연산 = 4,830 후보  (n: 245,525 / 253,507)  (9s)
+단독 70 재확인 — S≥2: 0개 (§7.180 의 0개와 정합해야 한다. max S = 1.66)
+PROD 프로브 완료 (43s)
+DIFF 프로브 완료 (77s)
+위약 뱅크 1000 — S max 2.41 · 99% 1.79 · S≥2 3개  (104s)
+
+==============================================================================================================
+상위 30 (S = 부호일치 · min|t|)   게이트: ① S≥4  ② S>위약max(2.41)  ③ S>両부모S
+==============================================================================================================
+  op   a                                     b                                         t23    t24     S    Sa    Sb  게이트
+  DIFF asof_batter_n                         asof_pitcher_middle_rate                 3.58   2.95  2.95  1.59  1.21  
+  DIFF asof_batter_n                         asof_pitcher_middle_rate_sm              3.95   2.48  2.48  1.59  1.51  
+  DIFF asof_pitcher_success_rate             asof_pitcher_middle_rate_sm              2.38   2.36  2.36  1.66  1.51  
+  DIFF asof_batter_n                         miss_prev_game                           3.41   2.36  2.36  1.59  1.18  
+  DIFF asof_pitcher_success_rate             fail_middle_share                        2.76   2.32  2.32  1.66  0.29  
+  DIFF home_win_expectancy                   asof_batter_n                           -2.29  -2.34  2.29  0.00  1.59  
+  DIFF asof_batter_n                         asof_batter_middle_rate_sm               2.26   2.96  2.26  1.59  0.00  
+  DIFF asof_pitcher_offspeed_rate            asof_pitcher_offspeed_rate_sm            2.30   2.15  2.15  0.00  0.00  
+  DIFF strikes_before                        asof_pitcher_prev5_game_middle_rate      2.04   2.14  2.04  0.00  0.91  
+  DIFF miss_prev_game                        matchup_success_edge                    -2.09  -2.03  2.03  1.18  0.92  
+  PROD asof_pitcher_n                        asof_pitcher_success_rate               -2.55  -2.01  2.01  0.99  1.66  
+  PROD asof_pitcher_pitchmix_n               asof_pitcher_success_rate               -2.55  -2.01  2.01  0.99  1.66  
+  DIFF asof_batter_n                         form_p3_minus_p5                         3.40   2.00  2.00  1.59  0.81  
+  DIFF asof_pitcher_pitchmix_n               asof_pitcher_prev5_game_middle_rate      2.09   2.00  2.00  0.99  0.91  
+  DIFF asof_pitcher_n                        asof_pitcher_prev5_game_middle_rate      2.09   2.00  2.00  0.99  0.91  
+  DIFF asof_pitcher_success_rate             asof_pitcher_prev3_game_middle_rate      3.22   2.00  2.00  1.66  1.02  
+  DIFF asof_pitcher_success_rate             form_p1_minus_p5                         2.00   2.35  2.00  1.66  0.95  
+  DIFF asof_pitcher_success_rate             asof_pitcher_middle_rate                 1.98   2.53  1.98  1.66  1.21  
+  DIFF asof_pitcher_success_rate             asof_pitcher_success_rate_sm             2.44   1.97  1.97  1.66  0.62  
+  DIFF asof_pitcher_offspeed_rate            asof_pitcher_prev5_game_middle_rate      1.96   2.37  1.96  0.00  0.91  
+  DIFF asof_batter_n                         asof_pitcher_reverse_rate                2.47   1.95  1.95  1.59  0.82  
+  DIFF asof_batter_n                         asof_pitcher_prev3_game_middle_rate      4.30   1.95  1.95  1.59  1.02  
+  DIFF asof_pitcher_pitchmix_n               asof_pitcher_prev3_game_middle_rate      1.94   2.11  1.94  0.99  1.02  
+  DIFF asof_pitcher_n                        asof_pitcher_prev3_game_middle_rate      1.94   2.11  1.94  0.99  1.02  
+  DIFF asof_pitcher_n                        asof_pitcher_middle_rate_sm              1.91   2.30  1.91  0.99  1.51  
+  DIFF asof_pitcher_pitchmix_n               asof_pitcher_middle_rate_sm              1.91   2.30  1.91  0.99  1.51  
+  DIFF asof_pitcher_success_rate             asof_pitcher_prev5_game_middle_rate      3.48   1.89  1.89  1.66  0.91  
+  DIFF asof_batter_n                         form_p1_minus_p5                         3.45   1.88  1.88  1.59  0.95  
+  DIFF is_first_pitch                        asof_batter_n                           -3.20  -1.88  1.88  0.18  1.59  
+  DIFF asof_batter_n                         asof_pitcher_prev5_game_middle_rate      4.54   1.87  1.87  1.59  0.91  
+  PROD: S≥2 2개 · S≥3 0개 · S≥4 0개   (4,830 중 위약 뱅크 S≥2 비율 0.3% → 기대 7개/연산)
+  DIFF: S≥2 14개 · S≥3 0개 · S≥4 0개   (4,830 중 위약 뱅크 S≥2 비율 0.3% → 기대 7개/연산)
+
+판정 (사전 등록): 게이트 ①②③ 동시 통과 0개 → 대량 피처(쌍 조합) 축 폐쇄 — §7.190 기록
+총 104s
