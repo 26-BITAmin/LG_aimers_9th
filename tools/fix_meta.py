@@ -113,7 +113,8 @@ def main():
     bad = 0
     for k in sorted(t):
         o = old.get(k, "(없음)")
-        if k == "mlp_emb_dim":
+        if k == "mlp_emb_dim" and "mlp_emb_dim" not in old:
+            # 옛 스키마 폴백 — 재작성본은 mlp_emb_dim 을 직접 갖는다
             o = {v: c[0]["emb_dim"] if isinstance(c, list) else c
                  for v, c in (old.get("mlp_variants") or {}).items()}
         same = json.dumps(o, sort_keys=True, default=str) == json.dumps(t[k], sort_keys=True, default=str)
