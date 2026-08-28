@@ -43,3 +43,9 @@ catboost_info/
 !/submit/model/pitcher_lookup.csv
 !/submit/model/ctx_hand.csv
 !/submit/model/ctx_count4.csv
+
+# ── T1(팀 SOTA) 기반 작업 공간 — git-untracked 로컬 샌드박스 (2026-08-28)
+# wonwoo_repro/ 와 같은 성격. 용량이 크고(GB) 재생성 가능하지만
+# t1eval/_keep/ 은 재학습 5시간짜리라 실수로 지우지 말 것.
+wonwoo_sota/
+T1/
