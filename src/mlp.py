@@ -606,6 +606,8 @@ def export_weights(m):
     numpy 쪽은 `h @ W + b` 형태(W가 (in, out))이고 torch Linear는 (out, in)이므로
     전치한다. 이렇게 하면 추론 코드에 BatchNorm이 아예 없다.
     """
+    import torch.nn as nn          # 층 타입 검사용 (지연 임포트 — 모듈 규약 유지)
+
     # 어떤 임베딩 컬럼을 쓰는 모델인지 함께 저장한다 — 변형마다 다르다
     # (`use_id_emb=False`면 투수/타자 임베딩이 없어 5개뿐이다).
     out = {"ecols": np.array(m.ecols)}
@@ -616,19 +618,29 @@ def export_weights(m):
         raise NotImplementedError(
             "TabM 가중치 export 는 아직 없다. 채택되면 mlp_infer.MLPPredictor 에 "
             "r_in/head_w/head_b 를 얹고 numpy 대조(§7.26 의 0.000e+00)를 먼저 한다.")
-    # net = [Linear, BN, GELU, Dropout, Linear, BN, GELU, Dropout, Linear]
+    # net = block(0) + block(1..depth-1) + head       block = [Linear, BN, GELU, Dropout]
+    #   depth 2 → 인덱스 0..8 (블록 2개 + 헤드).  depth d → 4d + 1 개.
     #
-    # ⚠️ 인덱스가 하드코딩돼 있다. depth≠2 나 resid=True 면 이 인덱스가 **다른 층**을
-    #    가리킨다 — depth=3이면 net[8]이 헤드가 아니라 셋째 블록의 Linear라서
-    #    **에러 없이 틀린 가중치**가 나간다. 조용히 틀리느니 여기서 죽는다.
-    assert len(m.net) == 9, (
-        f"export_weights는 depth=2·resid=False 전용이다 (net 길이 {len(m.net)}). "
-        "다른 구조를 배포하려면 여기와 mlp_infer.MLPPredictor를 같이 일반화할 것.")
+    # §7.217 에서 **임의 깊이(plain)** 로 일반화했다. 예전에는 `len(net)==9` assert 로
+    # depth 2 만 받았다 — depth 4 plain 이 β 스윕 생존자로 올라와서(§7.217 ⑤) 그 벽을
+    # 뚫어야 했다. depth 2 는 n_blk=2 라 W0/W1(은닉) + W2(헤드) 로 **예전과 같은 키·값**이
+    # 나온다 (배포물 비트 동일성 유지).
+    # ⚠️ `resid=True` 는 블록이 `Res(Sequential(...))` **하나**로 묶여 인덱스 규칙이
+    #    통째로 다르다. 그 경로는 아직 없다 — 조용히 틀리느니 여기서 죽는다.
+    assert not any(type(mod).__name__ == "Res" for mod in m.net), (
+        "export_weights 는 resid=False 전용이다. 잔차 팔을 배포하려면 여기와 "
+        "mlp_infer.MLPPredictor 에 Res 경로를 같이 넣고 numpy-torch 대조를 먼저 할 것.")
     assert getattr(m, "ne", None) is None, (
         "수치 임베딩(numemb)이 붙은 모델은 아직 배포 경로가 없다. "
         "채택하려면 numemb.apply_np를 mlp_infer 순전파 앞에 넣고 경계를 npz에 담을 것.")
-    for j, (li, bi) in enumerate(((0, 1), (4, 5))):
-        lin, bn = m.net[li], m.net[bi]
+    n_blk, rem = divmod(len(m.net) - 1, 4)
+    assert rem == 0 and n_blk >= 1, (
+        f"예상치 못한 net 길이 {len(m.net)} — 블록 4개 단위 + 헤드 1개가 아니다.")
+    for j in range(n_blk):
+        lin, bn = m.net[4 * j], m.net[4 * j + 1]
+        assert isinstance(lin, nn.Linear) and isinstance(bn, nn.BatchNorm1d), (
+            f"블록 {j} 구성이 [Linear, BatchNorm1d, ...] 이 아니다: "
+            f"{type(lin).__name__}, {type(bn).__name__}")
         W = lin.weight.detach().cpu().numpy()
         b = lin.bias.detach().cpu().numpy()
         s = bn.weight.detach().cpu().numpy() / np.sqrt(
@@ -637,8 +649,10 @@ def export_weights(m):
         out[f"b{j}"] = ((b - bn.running_mean.detach().cpu().numpy()) * s
                         + bn.bias.detach().cpu().numpy()).astype(np.float32)
 
-    out["W2"] = m.net[8].weight.detach().cpu().numpy().T.astype(np.float32)
-    out["b2"] = m.net[8].bias.detach().cpu().numpy().astype(np.float32)
+    head = m.net[4 * n_blk]
+    assert isinstance(head, nn.Linear) and head.out_features == 1, "헤드가 아니다"
+    out[f"W{n_blk}"] = head.weight.detach().cpu().numpy().T.astype(np.float32)
+    out[f"b{n_blk}"] = head.bias.detach().cpu().numpy().astype(np.float32)
 
     # ── 스케일링 층을 접어 넣는다 → 추론 코드(mlp_infer)는 한 줄도 안 바뀐다 ──
     # W0는 (입력, 출력) 배치이고 입력 순서는 [수치 n_num개 | ecols 순 임베딩 블록]이다

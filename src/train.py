@@ -643,6 +643,10 @@ def main():
             d = float(_np.abs(z_np - _mlp.infer(m, A_ref, C_ref)).max())
             if d > 1e-4:
                 raise RuntimeError(f"MLP export skew ({vname}_{seed}): {d:.3e}")
+            # §7.217b — 값을 **찍는다.** 임의 깊이로 일반화한 뒤로는 이 대조가
+            # "export_weights + MLPPredictor 가 torch 를 재현하는가" 의 유일한 증거다.
+            # 임계만 통과시키고 숫자를 안 남기면 회귀를 못 본다.
+            print(f"    numpy-torch 대조 {vname}_{seed}: max|Δz| = {d:.3e}  [임계 1e-4]")
             return W
 
         # ── 재현 관문 — 기존 멤버 하나를 이 환경에서 다시 학습해 비트 대조한다.

@@ -44,6 +44,7 @@ except Exception:
     pass
 
 import joblib
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -75,6 +76,10 @@ def derive(model_dir):
     mw = list(b.get("mlp_weights") or [])
     if mm:
         out["mlp_members"] = mm
+        # ⚠️ 개수도 적는다. §7.217c 에서 풀을 8 → 13 으로 늘렸는데 `n_mlp_members` 가
+        #    8 로 남아 있었고 **감사가 통과했다** — `derive()` 가 그 키를 안 내보내면
+        #    감사는 그 키를 아예 안 본다. 이 도구의 감사는 화이트리스트다.
+        out["n_mlp_members"] = len(mm)
     if mm and mw and len(mm) == len(mw):
         vw = {}
         for tag, w in zip(mm, mw):
@@ -84,6 +89,26 @@ def derive(model_dir):
         assert abs(s - 1.0) < 1e-9, f"mlp 가중 합이 1이 아니다: {s}"
         out["mlp_variant_weight"] = {k: round(v, 12) for k, v in vw.items()}
         out["mlp_weights"] = [float(v) for v in mw]
+
+    # ── MLP 임베딩 폭 — **진실은 npz 텐서 shape 이다** (번들에 없다) ────
+    #    §7.202 가 *"meta.json 이 emb_dim 4 로 거짓말"* 이라 적은 그 자리다. 폭은
+    #    빌드 시점의 `config.MLP_VARIANTS` 에서 찍히므로 npz 를 갈아끼우면 조용히
+    #    어긋난다 — 실제로 §7.218 의 `hj11_ourmlp8` 에서 `batter_id` 가 npz 8 /
+    #    meta 4 로 갈렸고 이 도구가 **못 잡았다.** 그래서 번들이 아니라 텐서에서 읽는다.
+    emb, seen = {}, {}
+    for tag in mm:
+        p = model_dir / f"mlp_{tag}.npz"
+        if not p.exists():
+            continue
+        with np.load(p) as z:
+            ec = [str(c) for c in z["ecols"]]
+            d = {c: int(z[f"emb{i}"].shape[1]) for i, c in enumerate(ec)}
+        v = _variant_of(tag)
+        # 같은 변형의 멤버끼리 폭이 다르면 그 자체가 사고다 (섞인 빌드)
+        assert seen.setdefault(v, d) == d, f"{v} 멤버끼리 emb_dim 이 다르다: {tag}"
+        emb[v] = d
+    if emb:
+        out["mlp_emb_dim"] = {k: dict(sorted(v.items())) for k, v in sorted(emb.items())}
 
     # ── fspec ──────────────────────────────────────────
     #    ⚠️ α=0 이면 `predict.py` 가 로드조차 안 한다. 멤버 목록은 남기되

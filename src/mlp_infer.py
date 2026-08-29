@@ -76,8 +76,15 @@ class MLPPredictor:
     """npz에 담긴 가중치로 순전파. 반환값은 **로짓**이다."""
 
     def __init__(self, npz, enc):
-        self.W = [npz[f"W{i}"] for i in range(3)]
-        self.b = [npz[f"b{i}"] for i in range(3)]
+        # 층 수는 **npz 가 정한다** (§7.217). 예전에는 3으로 하드코딩돼 있어
+        # depth 2 전용이었다. depth d plain 이면 은닉 W0..W{d-1} + 헤드 W{d} 다.
+        # depth 2 npz 는 키가 W0/W1/W2 라 이 루프가 **예전과 같은 값**을 만든다.
+        n = 0
+        while f"W{n}" in npz:
+            n += 1
+        assert n >= 2, f"가중치 층이 {n}개다 (은닉 1개 + 헤드 1개가 최소)"
+        self.W = [npz[f"W{i}"] for i in range(n)]
+        self.b = [npz[f"b{i}"] for i in range(n)]
         # ⚠️ 멤버마다 임베딩 컬럼이 다르다 (`use_id_emb=False`면 투수/타자 임베딩이 없다).
         #    EMB_COLS 전체를 가정하면 KeyError가 나거나 — 더 나쁘게는 —
         #    다른 컬럼의 인덱스를 엉뚱한 임베딩 테이블에 넣는다.
@@ -112,7 +119,7 @@ class MLPPredictor:
                 C = np.pad(C, ((0, batch - k), (0, 0)))
             h = np.concatenate(
                 [A] + [e[C[:, self.eidx[m]]] for m, e in enumerate(self.emb)], axis=1)
-            h = _gelu(h @ self.W[0] + self.b[0])
-            h = _gelu(h @ self.W[1] + self.b[1])
-            out[i:j] = (h @ self.W[2] + self.b[2]).ravel()[:k]
+            for Wi, bi in zip(self.W[:-1], self.b[:-1]):
+                h = _gelu(h @ Wi + bi)
+            out[i:j] = (h @ self.W[-1] + self.b[-1]).ravel()[:k]
         return out

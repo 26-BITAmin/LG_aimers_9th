@@ -1,0 +1,52 @@
+============================================================================================
+hj10_ourmlp4.zip   <- hj05_r047f330.zip   멤버 dim 4
+  emb0(793, 8) emb1(831, 4) W0(103, 128)
+============================================================================================
+  PROB_SHIFT -0.000110738
+  추론 1/3 교체 전 (= 챔피언) ...
+  추론 2/3 교체 후 (레벨 미보정) ...
+  corr(챔피언, 새것) 0.998796 · 평균|dp| 0.00565956 · max|dp| 0.0214749
+  Var(p) 0.00278026 -> 0.00282101 · dmean -0.00565208079
+  PROB_SHIFT -> 0.005541343
+  추론 3/3 재보정 검증 ...
+  재보정 후 dmean +2.12e-10  OK
+  변경 격리  6/82: ['mlp_emb4_1234.npz', 'mlp_emb4_2024.npz', 'mlp_emb4_31337.npz', 'mlp_emb4_42.npz', 'mlp_emb4_7.npz', 'predict.py']
+  출력 D:\projects\LG aimers 야구\hj10_ourmlp4.zip
+  SHA-256 f93a506125ac90c6ff23f494a0e047800401a39cb104cd99fc403c5ebdcbb0c1
+============================================================================================
+hj11_ourmlp8.zip   <- hj05_r047f330.zip   멤버 dim 8
+  emb0(793, 8) emb1(831, 8) W0(107, 128)
+============================================================================================
+  PROB_SHIFT -0.000110738
+  추론 1/3 교체 전 (= 챔피언) ...
+  추론 2/3 교체 후 (레벨 미보정) ...
+  corr(챔피언, 새것) 0.996392 · 평균|dp| 0.00614679 · max|dp| 0.0286679
+  Var(p) 0.00278026 -> 0.00283643 · dmean -0.00571406477
+  PROB_SHIFT -> 0.005603327
+  추론 3/3 재보정 검증 ...
+  재보정 후 dmean +2.33e-10  OK
+  변경 격리  6/82: ['mlp_emb4_1234.npz', 'mlp_emb4_2024.npz', 'mlp_emb4_31337.npz', 'mlp_emb4_42.npz', 'mlp_emb4_7.npz', 'predict.py']
+  출력 D:\projects\LG aimers 야구\hj11_ourmlp8.zip
+  SHA-256 59dc8a8de52ba9628fe1dc15890ec0cacf795266e70fa6edf671d160921bcd7e
+============================================================================================
+dim 축 순효과 (대조군 대비) — 2024 프록시 예측 차
+  corr(ourmlp4, ourmlp8) 0.997509 · 평균|dp| 0.00296176 · max|dp| 0.0218843
+  ⚠️ 이건 '얼마나 달라졌나' 이지 '얼마나 좋아졌나' 가 아니다. 2024 는 in-sample 이라 점수로 못 읽는다 (§7.207).
+[hj10_ourmlp4.zip]
+  hj10_ourmlp4.zip: 불일치 1건
+    asof_cells
+      meta   {'gap_bsuccess': 3721, 'gap_success': 3531}
+      번들   {'gap_success': 3531, 'gap_bsuccess': 3721, 'gap_ball': 3531}
+
+  → hj10_ourmlp4_mf.zip 작성. meta.json 만 다르고 나머지 81개는 바이트 동일.
+[hj10_ourmlp4.zip]
+  hj10_ourmlp4.zip: 일치 ✅
+[hj11_ourmlp8.zip]
+  hj11_ourmlp8.zip: 불일치 1건
+    asof_cells
+      meta   {'gap_bsuccess': 3721, 'gap_success': 3531}
+      번들   {'gap_success': 3531, 'gap_bsuccess': 3721, 'gap_ball': 3531}
+
+  → hj11_ourmlp8_mf.zip 작성. meta.json 만 다르고 나머지 81개는 바이트 동일.
+[hj11_ourmlp8.zip]
+  hj11_ourmlp8.zip: 일치 ✅

@@ -1,0 +1,37 @@
+§7.218 — 우리 파이프라인 emb4 재학습 (dim4 대조군 + dim8 후보)
+  ⚠️ 재현 관문 실패(132.19%) 이후 설계다 — 이 멤버들은 챔피언 멤버의
+     '패치판' 이 아니라 다른 학습 산출물이다. 그래서 대조군을 같이 짓는다.
+챔피언 해제: D:\t1eval\B8_d4
+[batter_id dim 4]  학습 대상 5/5   (D:\t1eval\B8_d4)
+Loading train.csv ...
+  (1475092, 49)  (10.3s)
+시즌별 가중치: {2019: 0.001, 2020: 0.0039, 2021: 0.0156, 2022: 0.0625, 2023: 0.25, 2024: 1.0}
+Trackman 모드=none  테이블=None
+보정축 hand: 셀 1,571개  δ std=0.01802  β=1.875
+보정축 count4: 셀 3,105개  δ std=0.01314  β=1.25
+시즌진행분 gap_success: 오프셋 3,531개  mu=-0.00333 sd=0.03491  β=0.03  오염보정=('p', -1.0)
+시즌진행분 gap_bsuccess: 오프셋 3,721개  mu=-0.00503 sd=0.03423  β=0.03  오염보정=('b', -1.0)
+features=78  (drop=['game_type', 'game_month', 'game_dayofweek'], ids=True)  (21.4s)
+init_score 사용(§7.109): base(추론용, 2024 레벨)=-0.05559
+  보조 라벨 복원 99.9%  λ=1.0  축 ['middle', 'reverse'] (2개)
+soft label(§7.70): +71,199행 복제  h = 2019:0.093  2020:0.110  2021:0.243  2022:0.297
+  init_score 레벨: 12개 구간, 평균 +0.06299  범위 [-0.16324, +0.51158]
+LGA_MLP_ONLY: 디스크에 없는 MLP 멤버만 학습한다
+  학습 대상 5개: ['emb4_42', 'emb4_7', 'emb4_2024', 'emb4_1234', 'emb4_31337']
+  [mlp-only 1/5] emb4_42 저장  (274s)
+  [mlp-only 2/5] emb4_7 저장  (499s)
+  [mlp-only 3/5] emb4_2024 저장  (714s)
+  [mlp-only 4/5] emb4_1234 저장  (932s)
+  [mlp-only 5/5] emb4_31337 저장  (1163s)
+완료 — 5개 저장. 이제 --artifacts-only 를 돌릴 것.
+[1170s] dim 4 학습 완료
+  인코더 수치 71 · 범주 [793, 831, 14, 14, 9, 5, 13] · W0 (103, 128)
+  콜드 슬롯 접기 (emb0[0] · emb1[0])
+    mlp_emb4_42.npz        pitcher_id 3.899->0.124 · batter_id 0.629->0.080
+    mlp_emb4_7.npz         pitcher_id 2.172->0.091 · batter_id 2.247->0.106
+    mlp_emb4_2024.npz      pitcher_id 2.402->0.099 · batter_id 0.969->0.073
+    mlp_emb4_1234.npz      pitcher_id 1.295->0.073 · batter_id 1.551->0.077
+    mlp_emb4_31337.npz     pitcher_id 3.681->0.153 · batter_id 1.974->0.043
+  멤버 사본 -> D:\projects\LG aimers 야구\experiments\b8_members\d4
+[batter_id dim 8]  MEMDIR 캐시 적중 — 건너뜀 (D:\projects\LG aimers 야구\experiments\b8_members\d8)
+총 1170s

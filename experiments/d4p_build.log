@@ -1,0 +1,35 @@
+베이스 hj05_r047f330.zip   PROB_SHIFT -0.000110738
+  기존 풀 8멤버  가중합 1.000000
+추론 1/3 편입 전 (= 챔피언) ...
+  G4 통과 — 풀 13멤버 · 가중합 1.000000000000
+    emb4(혜진 d2) 0.5250 · emb4d4(우리 d4p) 0.3500 · noid 0.1250
+추론 2/3 편입 후 (레벨 미보정) ...
+  corr(챔피언, 새것) 0.999461 · 평균|Δp| 0.00186221 · max|Δp| 0.0124559
+  Var(p) 0.00278026 -> 0.00277924 · Δmean -0.00156981612
+  PROB_SHIFT -0.000110738 -> 0.001459078
+추론 3/3 재보정 검증 ...
+  재보정 후 Δmean -1.2e-10  OK
+
+변경 3/82: ['mlp_infer.py', 'model/artifacts.joblib', 'predict.py']
+추가 5: ['mlp_emb4d4_42.npz', 'mlp_emb4d4_7.npz', 'mlp_emb4d4_2024.npz', 'mlp_emb4d4_1234.npz', 'mlp_emb4d4_31337.npz']
+출력 D:\projects\LG aimers 야구\hj12_d4p.zip  (45.8 MB, 87파일)
+  SHA-256 371f1b594d026020b10f99b48e473e19bc75c86ef07a9ac106bf1591277e347f
+[hj12_d4p.zip]
+  hj12_d4p.zip: 불일치 5건
+    mlp_members
+      meta   ['emb4_42', 'emb4_7', 'emb4_2024', 'emb4_1234', 'emb4_31337', 'noid_42', 'noid_7', 'noid_2024']
+      번들   ['emb4_42', 'emb4_7', 'emb4_2024', 'emb4_1234', 'emb4_31337', 'emb4d4_42', 'emb4d4_7', 'emb4d4_2024', 'emb4d4_1234', 'emb4d4_31337', 'noid_42', 'noid_7', 'noid_2024']
+    mlp_variant_weight
+      meta   {'emb4': 0.875, 'noid': 0.125}
+      번들   {'emb4': 0.525, 'emb4d4': 0.35, 'noid': 0.125}
+    mlp_weights
+      meta   [0.175, 0.175, 0.175, 0.175, 0.175, 0.041666666666666664, 0.041666666666666664, 0.041666666666666664]
+      번들   [0.105, 0.105, 0.105, 0.105, 0.105, 0.06999999999999999, 0.06999999999999999, 0.06999999999999999, 0.06999999999999999, 0.06999999999999999, 0.041666666666666664, 0.041666666666666664, 0.041666666666666664]
+    mlp_emb_dim
+      meta   {'emb4': {'base_state': 4, 'batter_id': 4, 'batter_team_id': 4, 'count_state': 4, 'hand_matchup': 4, 'pitcher_id': 8, 'pitcher_team_id': 4}, 'noid': {'base_state': 4, 'batter_team_id': 4, 'count_state': 4, 'hand_matchup': 4, 'pitcher_team_id': 4}}
+      번들   {'emb4': {'base_state': 4, 'batter_id': 4, 'batter_team_id': 4, 'count_state': 4, 'hand_matchup': 4, 'pitcher_id': 8, 'pitcher_team_id': 4}, 'emb4d4': {'base_state': 4, 'batter_id': 4, 'batter_team_id': 4, 'count_state': 4, 'hand_matchup': 4, 'pitcher_id': 8, 'pitcher_team_id': 4}, 'noid': {'base_state': 4, 'batter_team_id': 4, 'count_state': 4, 'hand_matchup': 4, 'pitcher_team_id': 4}}
+    asof_cells
+      meta   {'gap_bsuccess': 3721, 'gap_success': 3531}
+      번들   {'gap_success': 3531, 'gap_bsuccess': 3721, 'gap_ball': 3531}
+
+  → hj12_mf.zip 작성. meta.json 만 다르고 나머지 86개는 바이트 동일.

@@ -1,0 +1,14 @@
+소스 hj08_grev.zip   PROB_SHIFT -0.000591537
+프록시 2024 253,507행 · 미지 처리 25,166 (9.93%, 타자 35명)
+추론 ① 패치 전 …
+패치 5개 · emb1[0] ← mean(emb1[1:])
+추론 ② 패치 후 (레벨 미보정) …
+  미지 행 Δp 평균 +0.000354495 · 평균|Δp| 0.000618447
+  알려진 행 max|Δp| 0   <- 0 이어야 한다
+  전체 Δmean +3.51912e-05   PROB_SHIFT -0.000591537 -> -0.000626728
+추론 ③ 재보정 검증 …
+  패치 후 Δmean +2.36e-10  ✅
+
+변경 격리  6/82: ['model/mlp_emb4_1234.npz', 'model/mlp_emb4_2024.npz', 'model/mlp_emb4_31337.npz', 'model/mlp_emb4_42.npz', 'model/mlp_emb4_7.npz', 'predict.py']
+출력   hj09_grbc.zip
+  SHA-256 d026323d69ba9cc40bc95cf940d2c9c1abfaf9fff367c087091c7dcf280ed889
