@@ -1,6 +1,6 @@
 """§7.216 `gap_reverse` — **배포 축 단위**로 β 를 고른다 (챔피언 등가 fold 층).
 
-base: `hj05_r047f330.zip` (사용자 지정 챔피언, LB 1123.7187284865)
+base: `hj05_r047f330.zip` (사용자 지정 챔피언, LB 1132.2409729548)
 측정층: `champfold.py` 의 fold 재학습 층 (코어 LGBM 20 · MLP D8C · CatBoost 12 · δ 5축)
 층 격차: compact paired · general_lgb 12 · user_fspec 라우팅(예측 가중 ~11%) 과
         PROB_SCALE 1.05 가 이 층에 없다. 크기는 챔피언에서 그대로 안 나온다.

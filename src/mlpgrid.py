@@ -1,6 +1,6 @@
 """§7.217 MLP **깊이 × 잔차 × 에폭 × 폭** 격자 — 챔피언 등가 fold 층에서 다시.
 
-base: `hj05_r047f330.zip` (사용자 지정 챔피언, LB 1123.7187284865)
+base: `hj05_r047f330.zip` (사용자 지정 챔피언, LB 1132.2409729548)
 측정층: `champfold.py` 층 = 코어 LGBM 20(챔피언 레시피) + MLP 8(**emb dim 8 + 콜드패치**)
         + CatBoost 12(α0.10) + δ 5축(jointbeta 배포 경로).
 층 격차: compact paired · general_lgb 12 · user_fspec 라우팅(예측 가중 ~11%)과
