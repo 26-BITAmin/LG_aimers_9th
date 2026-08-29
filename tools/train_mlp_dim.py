@@ -56,6 +56,11 @@ def main():
     ap.add_argument("--zip-dir", required=True, help="풀어 둔 챔피언 zip")
     ap.add_argument("--dim", type=int, required=True, help="pitcher_id 임베딩 차원")
     ap.add_argument("--out", required=True, help="npz 를 쓸 디렉터리")
+    ap.add_argument("--unk-dropout", type=float, default=0.0,
+                    help="학습 시 이 비율의 행을 pitcher_id 미지값(index 0)으로 보낸다. "
+                         "0 이면 배포 원본과 같다 — index 0 이 그래디언트를 못 받는다.")
+    ap.add_argument("--only-seeds", default=None,
+                    help="쉼표 구분. 이 시드만 학습한다 (중단분 이어서 채울 때)")
     ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args()
 
@@ -75,7 +80,8 @@ def main():
     soften = importlib.import_module("soften")
     recency_weight = importlib.import_module("data").recency_weight
     build_features = importlib.import_module("features").build_features
-    encode_apply = importlib.import_module("mlp_infer").encode_apply
+    _mi = importlib.import_module("mlp_infer")
+    encode_apply, EMB_COLS = _mi.encode_apply, _mi.EMB_COLS
 
     mlp.THREADS = a.threads
 
@@ -140,17 +146,45 @@ def main():
     sizes = list(enc["sizes"])
     print(f"  A {A.shape}  C {C.shape}  sizes {sizes}")
 
+    # ── UNK 드롭아웃 ──────────────────────────────────────────
+    # 배포 원본에서 index 0 은 **학습 중 한 행도 받지 않는다** (LUT 를 학습 데이터로
+    # 적합했으므로 미지값이 나올 수 없다). 그래서 초기값에 머물고, 그 난수 벡터가
+    # test 행의 ~20% 를 받는다 (§18). 여기서는 일부러 일부 행을 index 0 으로 보내
+    # **"정체를 모르는 투수" 표현을 학습시킨다** (NLP 의 UNK 드롭아웃과 같은 착상).
+    #
+    # ⚠️ 투수 단위가 아니라 **행 단위**로 가린다. 투수를 통째로 가리면 그 투수의
+    #    임베딩이 학습을 전혀 못 받는데, 배포 시점에 그 투수는 **알려진 투수**라
+    #    벡터가 비어 있으면 손해다. 행 단위면 각 투수가 (1-p) 의 행으로 자기 벡터를
+    #    학습하고 index 0 은 p 의 행으로 주변화된 표현을 얻는다.
+    PCOL = EMB_COLS.index("pitcher_id")
+
     cfg = dict(epochs=9, hid=128, lr=2e-3, dropout=0.3, wd=1e-2, use_id_emb=True,
                emb_dim={"pitcher_id": a.dim, "batter_id": 4, "pitcher_team_id": 4,
                         "batter_team_id": 4, "base_state": 4, "hand_matchup": 4,
                         "count_state": 4})
     seeds = list(cfgv("mlp_seeds") or (42, 7, 2024, 1234, 31337))
-    print(f"\npitcher_id 임베딩 차원 = {a.dim} · 시드 {seeds}")
+    if a.only_seeds:
+        want = [int(x) for x in a.only_seeds.split(",")]
+        bad = [x for x in want if x not in seeds]
+        if bad:
+            raise SystemExit(f"[중단] 배포 시드 목록에 없다: {bad} (가능: {seeds})")
+        seeds = want
+    print(f"\npitcher_id 임베딩 차원 = {a.dim} · 시드 {seeds}"
+          + (f" · UNK 드롭아웃 {a.unk_dropout:.0%}" if a.unk_dropout > 0 else ""))
 
     val = slice(0, 20000)     # 곡선 반환용 더미. 에폭은 9 고정이라 선택에 쓰지 않는다
     for sd in seeds:
         ts = time.time()
-        m, _curve = mlp.train_mlp(A, C, y, w, A[val], C[val], sizes, seed=sd,
+        Cs = C
+        if a.unk_dropout > 0:
+            # 마스크는 **멤버 시드에 묶는다** — 멤버마다 다른 행이 가려져 앙상블
+            # 다양성이 늘고, 특정 행이 모든 멤버에서 빠지는 일이 없다.
+            Cs = C.copy()
+            drop = np.random.RandomState(10_000 + sd).rand(len(Cs)) < a.unk_dropout
+            Cs[drop, PCOL] = 0
+            print(f"    UNK 마스크 적용 {drop.mean():.1%} · Cs[:,PCOL]==0 인 행 "
+                  f"{(Cs[:, PCOL] == 0).mean():.1%}")
+        m, _curve = mlp.train_mlp(A, Cs, y, w, A[val], Cs[val], sizes, seed=sd,
                                   verbose=False, y_aux=aux, offset=offset,
                                   **dict(cfg, aux=cfgv("mlp_aux_lambda", 1.0)))
         Wd = mlp.export_weights(m)

@@ -66,6 +66,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--zip-dir", required=True, help="풀어 둔 제출 zip 경로")
     ap.add_argument("--season", type=int, default=2024)
+    ap.add_argument("--col", default="pitcher_id",
+                    choices=["pitcher_id", "batter_id"], help="검사할 임베딩 컬럼")
     ap.add_argument("--mask-frac", type=float, default=0.20, help="미지값 처리할 투수 비율")
     ap.add_argument("--tau", type=float, default=1.0, help="유사도 softmax 온도")
     ap.add_argument("--topk", type=int, default=25, help="가중평균에 쓸 이웃 수")
@@ -93,14 +95,15 @@ def main():
     print(f"{a.season} 행 {len(X):,} · 피처 {X.shape[1]}")
 
     A, C = encode_apply(X, enc)
-    p_idx = C[:, EMB_COLS.index("pitcher_id")]          # 0 = 미지값
+    p_idx = C[:, EMB_COLS.index(a.col)]          # 0 = 미지값
     print(f"  실제 미지값 행 {(p_idx == 0).sum():,} ({(p_idx == 0).mean():.2%})")
 
     # ── 투수 프로파일 표 (학습 시점 동결 상수로 취급) ──────────────
     num_cols = list(enc["num_cols"])
-    prof_cols = [i for i, c in enumerate(num_cols) if c.startswith("asof_pitcher")]
-    print(f"  프로파일 피처 {len(prof_cols)}개 (asof_pitcher_*)")
-    n_emb = int(enc["sizes"][0])
+    pfx = "asof_" + a.col.split("_")[0]      # pitcher_id -> asof_pitcher
+    prof_cols = [i for i, c in enumerate(num_cols) if c.startswith(pfx)]
+    print(f"  프로파일 피처 {len(prof_cols)}개 ({pfx}_*)")
+    n_emb = int(enc["sizes"][EMB_COLS.index(a.col)])
     prof = np.zeros((n_emb, len(prof_cols)), dtype=np.float64)
     cnt = np.zeros(n_emb)
     np.add.at(prof, p_idx, A[:, prof_cols].astype(np.float64))
@@ -143,7 +146,7 @@ def main():
         for arm in ("UNK", "MEAN", "COLD", "TRUE"):
             z = np.zeros(len(rows))
             for nt in nets:
-                pe = nt["ecols"].index("pitcher_id")
+                pe = nt["ecols"].index(a.col)
                 E = [nt["emb"][m][Csub[:, EMB_COLS.index(c)]] for m, c in enumerate(nt["ecols"])]
                 if arm == "UNK":
                     E[pe] = np.repeat(nt["emb"][pe][0][None, :], len(rows), 0)
