@@ -1,6 +1,9 @@
-# 11. 후처리 상수 LB 스윕 — 라운드 기록
+# 11. 후처리 상수 LB 스윕 — 라운드 기록 (라운드 1~21)
 
 **시작 2026-08-21 · 도구 `notebooks/11_constant_sweep_colab.ipynb`**
+
+> **라운드 22 부터는 [`12_axis_reopening_report.md`](12_axis_reopening_report.md) 로 이어진다.**
+> 이 파일이 4,655행이 되어 분리했다. 현황 요약은 [`00_STATUS.md`](00_STATUS.md).
 
 | 라운드 | 축 | 결과 | LB |
 | --- | --- | --- | ---: |
