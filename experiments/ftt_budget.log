@@ -1,0 +1,18 @@
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42]  soft=True  cfg {'epochs': 6, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+    emb4(champ dim)/seed42     724.1
+  ▶ 앵커 emb4 시드평균 fold2024 =    724.1
+
+=== 에폭 예산 격자  fold 2024 · soft=True ===
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']   격자 [4, 7, 10]   시드 [42]
+  규칙: E*(팔) = 격자 argmax. 위약도 같은 규칙을 받으므로 선택 편향이 상쇄된다.
+    full         epochs=4      724.3   (16:50:13)
+    full         epochs=7      720.6   (16:59:00)
+    full         epochs=10     706.6   (17:23:31)
+  ▶ full         E*=4  {4: np.float64(724.2962918484697), 7: np.float64(720.612696484213), 10: np.float64(706.5989943897732)}
+    sem8         epochs=4      708.9   (17:33:47)
+    sem8         epochs=7      700.2   (17:49:30)
+    sem8         epochs=10     630.3   (18:13:05)
+  ▶ sem8         E*=4  {4: np.float64(708.8623998628863), 7: np.float64(700.2397819614314), 10: np.float64(630.2951935264978)}

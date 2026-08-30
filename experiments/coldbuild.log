@@ -1,0 +1,19 @@
+베이스 sy02_c4.zip · 파일 82개 · REF 바이트 일치 OK
+NEW 복사: D:\t1eval\COLD
+  mlp_emb4_1234.npz: |emb0[0]| 1.2946 (학습 노름  1.39% 분위) -> |mean| 0.0730
+  mlp_emb4_2024.npz: |emb0[0]| 2.4015 (학습 노름 34.09% 분위) -> |mean| 0.0986
+  mlp_emb4_31337.npz: |emb0[0]| 3.6813 (학습 노름 91.29% 분위) -> |mean| 0.1526
+  mlp_emb4_42.npz: |emb0[0]| 3.8985 (학습 노름 96.21% 분위) -> |mean| 0.1240
+  mlp_emb4_7.npz: |emb0[0]| 2.1722 (학습 노름 21.46% 분위) -> |mean| 0.0910
+패치 5/5 · emb0[0] <- mean(emb0[1:])
+[91s] 프록시 2024 253,507행 · 미지 처리 51,741 (20.41%)
+  미지 행 Δp  평균 -0.000479803 · 평균|Δp| 0.00152281 · max|Δp| 0.00749842
+  알려진 행 Δp  max|Δp| 0   <- 0 이어야 한다 (기전 격리)
+  전체 Δmean -9.79282e-05  (= 미지 행 몫 x 20.41%)
+  PROB_SHIFT 0.005482311 -> 0.005580239
+  재보정 후 Δmean = -0.000000000192  OK
+
+변경 격리 6/82: ['model/mlp_emb4_1234.npz', 'model/mlp_emb4_2024.npz', 'model/mlp_emb4_31337.npz', 'model/mlp_emb4_42.npz', 'model/mlp_emb4_7.npz', 'predict.py']
+sy04_cold.zip  44.2 MB
+  SHA-256 131d367167b4f1ce021fe89a3f5eedac80302f0684f9b899d5a32cc5d173786e
+총 138s

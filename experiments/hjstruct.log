@@ -1,0 +1,73 @@
+대상 hj03_dim8_cold.zip   (44,172,159B)
+
+==========================================================================================
+① 피처 프레임
+==========================================================================================
+  hj03 feature_cols 78개 · 내 build_features 78개
+  ✅ 이름·순서 완전 일치
+
+==========================================================================================
+② MLP 인코더
+==========================================================================================
+  num_cols   hj03 71 / 나 71   ✅
+  sizes      hj03 7 / 나 7   ❌   hj03=[793, 831, 14, 14, 9, 5, 13]... 나=[712, 743, 13, 13, 9, 5, 13]...
+  cat_luts 컬럼  hj03 ['pitcher_id', 'batter_id', 'pitcher_team_id', 'batter_team_id', 'base_state', 'hand_matchup', 'count_state']
+                 나   ['pitcher_id', 'batter_id', 'pitcher_team_id', 'batter_team_id', 'base_state', 'hand_matchup', 'count_state']
+
+==========================================================================================
+③ MLP emb4 가중치 — 키·shape
+==========================================================================================
+  키 목록 ✅   hj03 ['W0', 'W1', 'W2', 'b0', 'b1', 'b2', 'ecols', 'emb0', 'emb1', 'emb2', 'emb3', 'emb4', 'emb5', 'emb6']
+  배열                hj03             나   일치
+  W0          (103, 128)    (103, 128)   ✅
+  W1          (128, 128)    (128, 128)   ✅
+  W2            (128, 1)      (128, 1)   ✅
+  b0              (128,)        (128,)   ✅
+  b1              (128,)        (128,)   ✅
+  b2                (1,)          (1,)   ✅
+  ecols             (7,)          (7,)   ✅
+  emb0          (793, 8)      (712, 8)   ✅  (행수는 학습 개체 수라 달라도 정상)
+  emb1          (831, 4)      (743, 4)   ✅  (행수는 학습 개체 수라 달라도 정상)
+  emb2           (14, 4)       (13, 4)   ✅  (행수는 학습 개체 수라 달라도 정상)
+  emb3           (14, 4)       (13, 4)   ✅  (행수는 학습 개체 수라 달라도 정상)
+  emb4            (9, 4)        (9, 4)   ✅
+  emb5            (5, 4)        (5, 4)   ✅
+  emb6           (13, 4)       (13, 4)   ✅
+  ecols  hj03 ['pitcher_id', 'batter_id', 'pitcher_team_id', 'batter_team_id', 'base_state', 'hand_matchup', 'count_state']
+         나   ['pitcher_id', 'batter_id', 'pitcher_team_id', 'batter_team_id', 'base_state', 'hand_matchup', 'count_state']
+
+==========================================================================================
+④ 블렌드 상수 — hj03 실제값 vs 내 하네스
+==========================================================================================
+  항목                                      hj03           내 하네스   판정
+  mlp_alpha                               0.75            0.75   ✅
+  mlp_weights(emb4합)                     0.875           0.875   ✅
+  mlp_weights(noid합)                     0.125           0.125   ✅
+  cat_alpha                                0.1             0.1   ✅
+  cat 멤버수                                   12              12   ✅
+  LGBM 멤버수                                  20              12   ❌
+  fspec_alpha                              0.0             0.0   ✅
+  R 라우팅                 ('0.91875', '0.08125')           대응 없음   ⚠️ 미반영
+  F 라우팅                     ('0.625', '0.375')           대응 없음   ⚠️ 미반영
+  compact paired 가중                  0.75*0.05           대응 없음   ⚠️ 미반영
+  PROB_CENTER                           0.4801           대응 없음   ⚠️ 미반영
+  PROB_SCALE                              1.05           대응 없음   ⚠️ 미반영
+  logit_delta                      -0.04053024           대응 없음   ⚠️ 미반영
+
+==========================================================================================
+⑤ δ 축 (사후 로짓 보정) — hj03 아티팩트 안의 축과 β
+==========================================================================================
+  hj03 art['ctx'] 2개: hand=1.054, count4=1.25
+  hj03 art['asof'] 3개: gap_success=0.03, gap_bsuccess=0.03, gap_ball=-0.0038
+  hj03 art['mix'] 0개: 
+  내 deploy29 dep = [1.875, 1.25, 0.03, 0.03]
+     (config CTX_AXES [('hand', 1.875), ('count4', 1.25)] · ASOF_AXES [('gap_success', 0.03), ('gap_bsuccess', 0.03)])
+
+==========================================================================================
+⑥ hj03 에 있는데 내 하네스에 **대응물이 없는** 모델 가족
+==========================================================================================
+  대응 있음: artifacts x1, cat_base x3, cat_depthwise x3, cat_members x1, cat_sym x3, cat_wide x3, lgbm_base x5, lgbm_extra x5, lgbm_lowff x5, lgbm_wide x5, meta x1, mlp_emb4 x5, mlp_noid x3
+
+  ❌ 대응 없음: baseline_noid_encoder x1, baseline_noid_seed x3, compact_context_encoder x1, compact_context_seed x3, general_lgb_base x3, general_lgb_encoder x1, general_lgb_extra x3, general_lgb_lowff x3, general_lgb_wide x3, lgbm_fspec x3, routing_artifacts x1, user_fspec x3, user_fspec_features x1
+
+  → 총 29개 파일이 내 하네스에 없다.

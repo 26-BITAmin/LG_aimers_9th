@@ -1,0 +1,7 @@
+변형 **focus**   캐시 D:\projects\LG aimers 야구\experiments\cache_tmr
+
+=== fold 2023 ===
+  피처 82개 (tm 계열 4개)  train 976,060 → valid 245,525
+  보조 라벨 99.9%  soft label 후 1,047,259행
+  lgbm 12개   단독    606.8  (608s)
+  mlp emb4_42   단독    616.3  (818s)

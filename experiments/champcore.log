@@ -1,0 +1,123 @@
+챔피언 코어 피처 78개 · num_leaves base 62 · wide 254 · extra 62 · lowff 62
+
+=== fold 2023 — 남은 멤버 20/20 ===
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  soften+SMOTE: 976,060 → 1,060,616행 (합성 13,357)  (8s)
+    base_42 (leaves 62) 단독 592.5  (83s)
+    base_7 (leaves 62) 단독 592.5  (205s)
+    base_2024 (leaves 62) 단독 597.8  (277s)
+    base_1234 (leaves 62) 단독 595.5  (343s)
+    base_31337 (leaves 62) 단독 591.8  (409s)
+    wide_42 (leaves 254) 단독 574.9  (478s)
+    wide_7 (leaves 254) 단독 588.9  (580s)
+챔피언 코어 피처 78개 · num_leaves base 62 · wide 254 · extra 62 · lowff 62
+
+=== fold 2023 — 남은 멤버 13/20 ===
+D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py:136: UserWarning: Could not find the number of physical cores for the following reason:
+[WinError 2] ������ ������ ã�� �� �����ϴ�
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "D:\projects\LG aimers �߱�\.venv\Lib\site-packages\joblib\externals\loky\backend\context.py", line 257, in _count_physical_cores
+    cpu_info = subprocess.run(
+        "wmic CPU Get NumberOfCores /Format:csv".split(),
+        capture_output=True,
+        text=True,
+    )
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 554, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 1554, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+  soften+SMOTE: 976,060 → 1,060,616행 (합성 13,357)  (8s)
+    wide_2024 (leaves 254) 단독 571.5  (144s)
+    wide_1234 (leaves 254) 단독 575.6  (290s)
+    wide_31337 (leaves 254) 단독 583.1  (456s)
+    extra_42 (leaves 62) 단독 650.9  (598s)
+    extra_7 (leaves 62) 단독 641.8  (715s)
+    extra_2024 (leaves 62) 단독 637.3  (834s)
+    extra_1234 (leaves 62) 단독 651.3  (961s)
+    extra_31337 (leaves 62) 단독 633.9  (1046s)
+    lowff_42 (leaves 62) 단독 611.9  (1155s)
+    lowff_7 (leaves 62) 단독 602.6  (1238s)
+    lowff_2024 (leaves 62) 단독 594.6  (1354s)
+    lowff_1234 (leaves 62) 단독 593.9  (1455s)
+    lowff_31337 (leaves 62) 단독 601.2  (1574s)
+
+=== fold 2024 — 남은 멤버 20/20 ===
+  soften+SMOTE: 1,221,585 → 1,306,141행 (합성 13,357)  (1595s)
+    base_42 (leaves 62) 단독 811.7  (1719s)
+    base_7 (leaves 62) 단독 823.7  (1882s)
+    base_2024 (leaves 62) 단독 819.4  (2013s)
+    base_1234 (leaves 62) 단독 822.5  (2175s)
+    base_31337 (leaves 62) 단독 818.9  (2272s)
+    wide_42 (leaves 254) 단독 810.6  (2626s)
+    wide_7 (leaves 254) 단독 810.2  (2962s)
+    wide_2024 (leaves 254) 단독 814.9  (3205s)
+    wide_1234 (leaves 254) 단독 819.3  (3337s)
+    wide_31337 (leaves 254) 단독 822.0  (3485s)
+    extra_42 (leaves 62) 단독 824.0  (3588s)
+    extra_7 (leaves 62) 단독 824.3  (3696s)
+    extra_2024 (leaves 62) 단독 826.8  (3777s)
+    extra_1234 (leaves 62) 단독 825.0  (3860s)
+    extra_31337 (leaves 62) 단독 821.7  (3953s)
+    lowff_42 (leaves 62) 단독 829.5  (4043s)
+    lowff_7 (leaves 62) 단독 813.2  (4109s)
+    lowff_2024 (leaves 62) 단독 803.8  (4216s)
+    lowff_1234 (leaves 62) 단독 820.2  (4286s)
+    lowff_31337 (leaves 62) 단독 813.9  (4389s)
+
+============================================================================
+코어 20멤버 평균 vs 기존 s29 계보 12멤버
+============================================================================
+  fold 2023   챔피언레시피 20    621.4   s29 계보 12    612.3   Δ     +9.1   corr 0.98614
+  fold 2024   챔피언레시피 20    837.2   s29 계보 12    826.9   Δ    +10.4   corr 0.99587

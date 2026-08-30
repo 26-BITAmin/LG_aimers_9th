@@ -1,0 +1,18 @@
+추가 시드 [1234, 31337] x 변형 ('base', 'wide', 'extra', 'lowff') = 각 fold 8멤버
+  lgb fold2023 [base/1234]  (151s)
+  lgb fold2023 [base/31337]  (305s)
+  lgb fold2023 [wide/1234]  (648s)
+  lgb fold2023 [wide/31337]  (870s)
+  lgb fold2023 [extra/1234]  (978s)
+  lgb fold2023 [extra/31337]  (1107s)
+  lgb fold2023 [lowff/1234]  (1198s)
+  lgb fold2023 [lowff/31337]  (1318s)
+  lgb fold2024 [base/1234]  (1491s)
+  lgb fold2024 [base/31337]  (1595s)
+  lgb fold2024 [wide/1234]  (1796s)
+  lgb fold2024 [wide/31337]  (1916s)
+  lgb fold2024 [extra/1234]  (1974s)
+  lgb fold2024 [extra/31337]  (2044s)
+  lgb fold2024 [lowff/1234]  (2104s)
+  lgb fold2024 [lowff/31337]  (2145s)
+총 2145s

@@ -1,0 +1,85 @@
+§7.205 후속 — Trackman arm 학습   지문 5488ef1b18
+게이트 A 임계 tm_n ≥ 500 (사전 등록)   릴리스 컬럼 10개
+
+
+================================================================================
+■ featset=tm  fold=2023   (7s)
+================================================================================
+  fold2023/tm  X (245525, 89)  tm 컬럼 11  적중 86.6%
+    lgb f2023/tm [base/42]  (38s)
+    lgb f2023/tm [base/7]  (64s)
+    lgb f2023/tm [base/2024]  (95s)
+    lgb f2023/tm [wide/42]  (129s)
+    lgb f2023/tm [wide/7]  (165s)
+    lgb f2023/tm [wide/2024]  (203s)
+    lgb f2023/tm [extra/42]  (229s)
+    lgb f2023/tm [extra/7]  (254s)
+    lgb f2023/tm [extra/2024]  (283s)
+    lgb f2023/tm [lowff/42]  (301s)
+    lgb f2023/tm [lowff/7]  (320s)
+    lgb f2023/tm [lowff/2024]  (338s)
+  fold2023/tm  X (245525, 89)  tm 컬럼 11  적중 86.6%
+    cat f2023/tm [base/42]  (404s)
+    cat f2023/tm [base/7]  (469s)
+    cat f2023/tm [base/2024]  (528s)
+    cat f2023/tm [wide/42]  (595s)
+    cat f2023/tm [wide/7]  (668s)
+    cat f2023/tm [wide/2024]  (737s)
+    cat f2023/tm [sym/42]  (776s)
+    cat f2023/tm [sym/7]  (815s)
+    cat f2023/tm [sym/2024]  (856s)
+    cat f2023/tm [depthwise/42]  (1035s)
+    cat f2023/tm [depthwise/7]  (1206s)
+    cat f2023/tm [depthwise/2024]  (1426s)
+  fold2023/tm  X (245525, 89)  tm 컬럼 11  적중 86.6%
+  soft label h={2019: 0.09296236077678936, 2020: 0.10986948582219833, 2021: 0.24268318918115236, 2022: 0.29706964668783337}  보조 라벨 99.9%  λ=1.0
+    mlp f2023/tm [emb4/42]  (1676s)
+    mlp f2023/tm [emb4/7]  (1819s)
+    mlp f2023/tm [emb4/2024]  (1959s)
+    mlp f2023/tm [emb4/1234]  (2075s)
+    mlp f2023/tm [emb4/31337]  (2177s)
+    mlp f2023/tm [noid/42]  (2241s)
+    mlp f2023/tm [noid/7]  (2304s)
+    mlp f2023/tm [noid/2024]  (2380s)
+
+================================================================================
+■ featset=tm  fold=2024   (2381s)
+================================================================================
+  fold2024/tm  X (253507, 89)  tm 컬럼 11  적중 80.9%
+    lgb f2024/tm [base/42]  (2432s)
+    lgb f2024/tm [base/7]  (2475s)
+    lgb f2024/tm [base/2024]  (2517s)
+    lgb f2024/tm [wide/42]  (2564s)
+    lgb f2024/tm [wide/7]  (2607s)
+    lgb f2024/tm [wide/2024]  (2651s)
+    lgb f2024/tm [extra/42]  (2682s)
+    lgb f2024/tm [extra/7]  (2715s)
+    lgb f2024/tm [extra/2024]  (2749s)
+    lgb f2024/tm [lowff/42]  (2774s)
+    lgb f2024/tm [lowff/7]  (2801s)
+    lgb f2024/tm [lowff/2024]  (2827s)
+  fold2024/tm  X (253507, 89)  tm 컬럼 11  적중 80.9%
+    cat f2024/tm [base/42]  (2913s)
+    cat f2024/tm [base/7]  (2992s)
+    cat f2024/tm [base/2024]  (3086s)
+    cat f2024/tm [wide/42]  (3210s)
+    cat f2024/tm [wide/7]  (3330s)
+    cat f2024/tm [wide/2024]  (3442s)
+    cat f2024/tm [sym/42]  (3522s)
+    cat f2024/tm [sym/7]  (3591s)
+    cat f2024/tm [sym/2024]  (3644s)
+    cat f2024/tm [depthwise/42]  (3777s)
+    cat f2024/tm [depthwise/7]  (3921s)
+    cat f2024/tm [depthwise/2024]  (4061s)
+  fold2024/tm  X (253507, 89)  tm 컬럼 11  적중 80.9%
+  soft label h={2019: 0.09296236077678936, 2020: 0.10981159900281234, 2021: 0.2425861556714081, 2022: 0.29698748035264255}  보조 라벨 99.9%  λ=1.0
+    mlp f2024/tm [emb4/42]  (4264s)
+    mlp f2024/tm [emb4/7]  (4437s)
+    mlp f2024/tm [emb4/2024]  (4635s)
+    mlp f2024/tm [emb4/1234]  (4781s)
+    mlp f2024/tm [emb4/31337]  (4963s)
+    mlp f2024/tm [noid/42]  (5085s)
+    mlp f2024/tm [noid/7]  (5213s)
+    mlp f2024/tm [noid/2024]  (5316s)
+
+총 5317s. 평가는 src/tmeval.py

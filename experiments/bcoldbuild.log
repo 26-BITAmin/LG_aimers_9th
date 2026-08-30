@@ -1,0 +1,20 @@
+REF 해제: D:\t1eval\HJ03REF
+베이스 hj03_dim8_cold.zip · 파일 82개 · REF 바이트 일치 OK
+NEW 복사: D:\t1eval\BCOLD
+  mlp_emb4_1234.npz: |emb1[0]| 1.5513 (학습 노름 37.35% 분위) -> |mean| 0.0787
+  mlp_emb4_2024.npz: |emb1[0]| 0.9688 (학습 노름  8.80% 분위) -> |mean| 0.0726
+  mlp_emb4_31337.npz: |emb1[0]| 1.9744 (학습 노름 58.67% 분위) -> |mean| 0.0426
+  mlp_emb4_42.npz: |emb1[0]| 0.6286 (학습 노름  1.20% 분위) -> |mean| 0.0795
+  mlp_emb4_7.npz: |emb1[0]| 2.2474 (학습 노름 74.10% 분위) -> |mean| 0.1067
+패치 5/5 · emb1[0] <- mean(emb1[1:])
+[138s] 프록시 2024 253,507행 · 미지 타자 처리 25,166 (9.93%)
+  미지 행 Δp  평균 +0.000341103 · 평균|Δp| 0.000595147 · max|Δp| 0.00316113
+  알려진 행 Δp  max|Δp| 0   <- 0 이어야 한다 (기전 격리)
+  전체 Δmean +3.38618e-05  (= 미지 행 몫 x 9.93%)
+  PROB_SHIFT 0.000172669 -> 0.000138807
+  재보정 후 Δmean = -0.000000000183  OK
+
+변경 격리 6/82: ['model/mlp_emb4_1234.npz', 'model/mlp_emb4_2024.npz', 'model/mlp_emb4_31337.npz', 'model/mlp_emb4_42.npz', 'model/mlp_emb4_7.npz', 'predict.py']
+sy06_bcold.zip  44.2 MB
+  SHA-256 9e5de980e0bdfdb5e2bee554d93f2f87fe54c7a2ea5587589242ff9a41c8bbdd
+총 204s

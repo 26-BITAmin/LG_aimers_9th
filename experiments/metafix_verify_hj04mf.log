@@ -1,0 +1,31 @@
+검증 대상: hj04_rt045_mf.zip  (44.2 MB)
+
+=== 1. zip 무결성 ===
+  ✅ CRC 정상 · 구성원 82개 · 파일명 17자
+
+=== 2. 구조 ===
+  ✅ 숨은 macOS/에디터 파일 없음
+  ✅ 루트 구성 정상: ['contam.py', 'features.py', 'mlp_infer.py', 'model', 'predict.py', 'requirements.txt', 'script.py', 'team_reference']
+  ✅ 모델 파일: lgbm 23개 · mlp 8개
+
+=== 3. 의존성 ===
+  ✅ 7개 패키지 import 가능: catboost, lightgbm, numpy, pandas, scipy, joblib, scikit-learn
+  ✅ torch 미포함 (추론은 mlp_infer.py 의 numpy 순전파)
+
+=== 4. 격리 실행 (20,000행) ===
+  작업 디렉터리: C:\Users\강원우\AppData\Local\Temp\verify_zip_mc2higys\extracted
+  ✅ 정상 종료  13.1s  →  245,789행 환산 약 162s / 600s (27%)
+
+=== 5. 출력 형식 ===
+  ✅ 컬럼 ['row_id', 'control_success']
+  ✅ 행 수 20,000
+  ✅ row_id 가 sample_submission 과 정확히 일치 (순서 포함)
+  ✅ 확률 범위 정상  min=0.338051  mean=0.496220  max=0.651895
+
+=== 6. 행 독립성 (대회 규정) ===
+  ✅ 셔플 불변  최대 차이 0.0e+00
+  ✅ 청크 분할 불변  최대 차이 0.0e+00
+
+======================================================
+✅ hj04_rt045_mf.zip — 모든 검사 통과. 제출 가능.
+======================================================

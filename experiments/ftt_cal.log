@@ -1,0 +1,15 @@
+FT-Transformer 헤드 분할  —  헤드 18개 (그룹 8개 + 전역 2)
+  팔: ['group']   folds [2024]   seeds [42]   epochs 10   cont=linear
+  base: src/mlp.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+
+=== valid=2024 ===  train 1,221,585행 · valid 253,507행 · 수치 71 + 범주 7   (1s)
+  그룹 8개 · 커버 78/78   (전부 포함)
+    ep 1  loss=0.69202  (65s)  validBSS=   611.7
+    ep 2  loss=0.68944  (131s)  validBSS=   591.0
+    ep 3  loss=0.68876  (196s)  validBSS=   579.4
+    ep 4  loss=0.68792  (261s)  validBSS=   572.7
+    ep 5  loss=0.68714  (326s)  validBSS=   453.5
+    ep 6  loss=0.68642  (392s)  validBSS=   469.7
+    ep 7  loss=0.68586  (457s)  validBSS=   482.0
+    ep 8  loss=0.68497  (522s)  validBSS=   226.9

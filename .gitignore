@@ -70,3 +70,8 @@ submit/contam.py
 t1work/
 t1work_*/
 s41_t1core_aug.zip
+
+# FTT 캐시 — 재생성 가능하고 개별 파일이 GitHub 100MB 한도를 넘는다
+# (fold2023_soft 458MB / fold2024_soft 548MB). `experiments/cache/` 규칙이
+# 이 디렉터리를 안 덮어서 12f522f 에 통째로 딸려 들어갔다.
+experiments/cache_ftt/

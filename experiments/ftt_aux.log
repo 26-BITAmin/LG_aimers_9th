@@ -1,0 +1,56 @@
+########## full aux=1.0  22:07 ##########
+FT-Transformer í—¤ë“œ ë¶„í•   â€”  í—¤ë“œ 16ê°œ (ì „ì—­ í—¤ë“œ 0 Â· ì™„ì „ ë¶„í• )
+  íŒ” ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 4, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01, 'aux': 1.0}
+  base: src/foldcache.py fold í•˜ë„¤ìŠ¤ (ì±”í”¼ì–¸ ì¸µ ì•„ë‹˜ â€” Â§7.207 ì¸µ ê²©ì°¨ ê°ìˆ˜)
+
+=== ì‹œë“œ ì‚°í¬  fold2024 Â· íŒ” full Â· 4ì—í­ Â· 3ì‹œë“œ Â· aux ===
+  d=64 dh=8 inner=None depth=2 ffn_mult=2.0 lr=0.0005 wd=0.01 drop=0.1/0.1 aux=1.0
+    seed42        741.0   (22:17:57)
+Traceback (most recent call last):
+  File "D:\projects\LG aimers ¾ß±¸\src\ftt.py", line 998, in <module>
+    ep_mask = a.epochs_mask or a.epochs
+    ^^^^^^
+  File "D:\projects\LG aimers ¾ß±¸\src\ftt.py", line 897, in main
+                           yva=yva, verbose=True, **cfg)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+          f"{'  '.join(f'{v:.0f}' for v in sc)}   ({npar:,} ÆÄ¶ó¹ÌÅÍ)")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\LG aimers ¾ß±¸\src\ftt.py", line 779, in run_seedspread
+    #       sem8(E*) \u2212 shuf@sem8(E*)      ¡ç ¾çÂÊ ´Ù °°Àº È½¼ö¸¸Å­ °İÀÚ¿¡¼­ »Ì¾Ò´Ù
+    #
+    #   °¢ ÆÈÀÌ max ¸¦ °®´Â °ÍÀº ¸ÂÁö¸¸ À§¾àµµ °°Àº ¼öÀÇ ±âÈ¸¸¦ °®´Â´Ù. À§¾à ÆÈÀÇ
+  File "D:\projects\LG aimers ¾ß±¸\src\ftt.py", line 509, in train
+    with torch.autocast("cuda", dtype=torch.bfloat16, enabled=amp):
+    ^^^^^^^^^^^^
+  File "D:\projects\LG aimers ¾ß±¸\.venv-gpu\Lib\site-packages\torch\_tensor.py", line 631, in backward
+    torch.autograd.backward(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        self, gradient, retain_graph, create_graph, inputs=inputs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\projects\LG aimers ¾ß±¸\.venv-gpu\Lib\site-packages\torch\autograd\__init__.py", line 381, in backward
+    _engine_run_backward(
+    ~~~~~~~~~~~~~~~~~~~~^
+        tensors,
+        ^^^^^^^^
+    ...<5 lines>...
+        accumulate_grad=True,
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\projects\LG aimers ¾ß±¸\.venv-gpu\Lib\site-packages\torch\autograd\graph.py", line 869, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        t_outputs, *args, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )  # Calls into the C++ engine to run the backward pass
+    ^
+torch.AcceleratorError: CUDA error: out of memory
+Search for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+

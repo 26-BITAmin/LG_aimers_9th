@@ -1,0 +1,90 @@
+########## d32 ##########
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 4, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01, 'd': 32}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+=== 시드 산포  fold2024 · 팔 full · 4에폭 · 3시드 · d32 ===
+  d=32 dh=8 inner=None depth=2 ffn_mult=2.0 lr=0.0005 wd=0.01 drop=0.1/0.1
+    seed42        693.1   (18:24:56)
+    seed7         680.1   (18:33:32)
+    seed2024      711.0   (18:42:07)
+  ① 단독      평균   694.7  sd  15.5  범위  30.9
+  ② 2시드평균  평균   708.4  sd  10.7  → 팔 간 차이의 SE ≈  15.2   (3개 조합)
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:223: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:215: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  ② 3시드평균  평균   713.0  sd   nan  → 팔 간 차이의 SE ≈   nan   (1개 조합)
+########## d128 ##########
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 4, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01, 'd': 128}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+=== 시드 산포  fold2024 · 팔 full · 4에폭 · 3시드 · d128 ===
+  d=128 dh=8 inner=None depth=2 ffn_mult=2.0 lr=0.0005 wd=0.01 drop=0.1/0.1
+    seed42        689.4   (18:52:52)
+    seed7         757.8   (18:57:46)
+    seed2024      744.6   (19:02:39)
+  ① 단독      평균   730.6  sd  36.3  범위  68.4
+  ② 2시드평균  평균   755.5  sd  18.6  → 팔 간 차이의 SE ≈  26.3   (3개 조합)
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:223: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:215: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  ② 3시드평균  평균   763.8  sd   nan  → 팔 간 차이의 SE ≈   nan   (1개 조합)
+########## ffn1 ##########
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 4, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01, 'ffn_mult': 1.0}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+=== 시드 산포  fold2024 · 팔 full · 4에폭 · 3시드 · ffn1 ===
+  d=64 dh=8 inner=None depth=2 ffn_mult=1.0 lr=0.0005 wd=0.01 drop=0.1/0.1
+    seed42        710.1   (19:06:40)
+    seed7         707.9   (19:10:32)
+    seed2024      697.2   (19:14:23)
+  ① 단독      평균   705.1  sd   6.9  범위  12.9
+  ② 2시드평균  평균   719.2  sd   1.3  → 팔 간 차이의 SE ≈   1.8   (3개 조합)
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:223: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:215: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  ② 3시드평균  평균   724.0  sd   nan  → 팔 간 차이의 SE ≈   nan   (1개 조합)
+########## ffn4 ##########
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 4, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01, 'ffn_mult': 4.0}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+=== 시드 산포  fold2024 · 팔 full · 4에폭 · 3시드 · ffn4 ===
+  d=64 dh=8 inner=None depth=2 ffn_mult=4.0 lr=0.0005 wd=0.01 drop=0.1/0.1
+    seed42        707.0   (19:18:43)
+    seed7         728.0   (19:22:55)
+    seed2024      691.2   (19:27:06)
+  ① 단독      평균   708.7  sd  18.5  범위  36.8
+  ② 2시드평균  평균   727.2  sd   5.0  → 팔 간 차이의 SE ≈   7.0   (3개 조합)
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:223: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:215: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  ② 3시드평균  평균   733.3  sd   nan  → 팔 간 차이의 SE ≈   nan   (1개 조합)
+########## d32ffn1 ##########
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 4, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01, 'd': 32, 'ffn_mult': 1.0}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+=== 시드 산포  fold2024 · 팔 full · 4에폭 · 3시드 · d32ffn1 ===
+  d=32 dh=8 inner=None depth=2 ffn_mult=1.0 lr=0.0005 wd=0.01 drop=0.1/0.1
+    seed42        700.9   (19:30:38)
+    seed7         673.2   (19:34:03)
+    seed2024      710.1   (19:37:27)
+  ① 단독      평균   694.7  sd  19.2  범위  36.9
+  ② 2시드평균  평균   707.2  sd  11.4  → 팔 간 차이의 SE ≈  16.2   (3개 조합)
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:223: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+D:\projects\LG aimers �߱�\.venv-gpu\Lib\site-packages\numpy\_core\_methods.py:215: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  ② 3시드평균  평균   711.3  sd   nan  → 팔 간 차이의 SE ≈   nan   (1개 조합)

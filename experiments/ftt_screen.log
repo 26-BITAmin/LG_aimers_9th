@@ -1,0 +1,28 @@
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024]  seeds [42, 7]  soft=True  cfg {'epochs': 6, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+  train.csv 로드 + 피처 빌드 … (1s)
+  soft label: 1,221,585 → 1,292,784행  h={2019: 0.09296236077678936, 2020: 0.10981159900281234, 2021: 0.2425861556714081, 2022: 0.29698748035264255}
+
+=== 정규화 스크리닝  fold 2024 · 팔 sem8 · soft=True ===
+      ep 1  loss=0.69391  (63s)  validBSS=   595.6
+      ep 2  loss=0.69037  (125s)  validBSS=   684.3
+      ep 3  loss=0.68977  (188s)  validBSS=   645.2
+      ep 4  loss=0.68943  (250s)  validBSS=   727.7
+  A_보수     마지막    727.7   곡선 596  684  645  728   (117,713 파라미터)
+      ep 1  loss=0.69555  (63s)  validBSS=   568.1
+      ep 2  loss=0.69073  (125s)  validBSS=   663.2
+      ep 3  loss=0.69014  (188s)  validBSS=   669.2
+      ep 4  loss=0.68987  (251s)  validBSS=   690.4
+  B_저lr    마지막    690.4   곡선 568  663  669  690   (117,713 파라미터)
+      ep 1  loss=0.69199  (63s)  validBSS=   625.8
+      ep 2  loss=0.69002  (125s)  validBSS=   721.6
+      ep 3  loss=0.68934  (188s)  validBSS=   698.7
+      ep 4  loss=0.68877  (251s)  validBSS=   779.0
+  C_약드롭    마지막    779.0   곡선 626  722  699  779   (117,713 파라미터)
+      ep 1  loss=0.69429  (63s)  validBSS=   616.7
+      ep 2  loss=0.69014  (126s)  validBSS=   689.0
+      ep 3  loss=0.68949  (188s)  validBSS=   560.7
+      ep 4  loss=0.68913  (251s)  validBSS=   684.8
+  D_큰ID    마지막    684.8   곡선 617  689  561  685   (141,185 파라미터)

@@ -1,0 +1,92 @@
+기준 zip: hj03_dim8_cold.zip
+
+================================================================================================
+■ 기준 hj03_dim8_cold.zip (44,172,159B)  vs  sy04_cold.zip (44,175,337B)
+================================================================================================
+  파일 82 vs 82   공통 82   sha 동일 76   sha 다름 6   기준만 0   비교만 0
+
+  ── sha 가 다른 6개 파일 파고들기 ──
+
+    model/mlp_emb4_1234.npz   163,144B → 150,765B  (-12,379B)
+      W0                       shape (103, 128)     max|Δ| 5.241e-02  sd 0.0899  corr 0.99714632
+      W1                       shape (128, 128)     max|Δ| 1.004e-01  sd 0.0935  corr 0.99716552
+      W2                       shape (128, 1)       max|Δ| 1.024e-02  sd 0.0146  corr 0.99099400
+      b0                       shape (128,)         max|Δ| 3.987e-02  sd 0.1377  corr 0.99616213
+      b1                       shape (128,)         max|Δ| 2.216e-01  sd 0.4245  corr 0.99730854
+      b2                       shape (1,)           max|Δ| 9.787e-03  sd 0.0000  corr nan
+      emb0                     shape (793, 8)       max|Δ| 7.908e-02  sd 0.9954  corr 0.99993598
+      emb1                     shape (831, 4)       max|Δ| 6.492e-02  sd 0.9780  corr 0.99995483
+      emb2                     shape (14, 4)        max|Δ| 5.572e-02  sd 0.9523  corr 0.99976050
+      emb3                     shape (14, 4)        max|Δ| 5.384e-02  sd 0.9453  corr 0.99979439
+      emb4                     shape (9, 4)         max|Δ| 9.721e-03  sd 0.9431  corr 0.99999375
+      emb5                     shape (5, 4)         max|Δ| 1.287e-02  sd 0.7987  corr 0.99997479
+      emb6                     shape (13, 4)        max|Δ| 1.571e-02  sd 0.8362  corr 0.99998380
+
+    model/mlp_emb4_2024.npz   163,144B → 150,698B  (-12,446B)
+      W0                       shape (103, 128)     max|Δ| 6.586e-02  sd 0.0890  corr 0.99701863
+      W1                       shape (128, 128)     max|Δ| 5.785e-02  sd 0.0908  corr 0.99752359
+      W2                       shape (128, 1)       max|Δ| 6.352e-03  sd 0.0145  corr 0.99081230
+      b0                       shape (128,)         max|Δ| 4.403e-02  sd 0.1506  corr 0.99707032
+      b1                       shape (128,)         max|Δ| 1.005e-01  sd 0.4351  corr 0.99841940
+      b2                       shape (1,)           max|Δ| 1.466e-02  sd 0.0000  corr nan
+      emb0                     shape (793, 8)       max|Δ| 6.194e-02  sd 0.9713  corr 0.99993401
+      emb1                     shape (831, 4)       max|Δ| 6.887e-02  sd 0.9616  corr 0.99996448
+      emb2                     shape (14, 4)        max|Δ| 3.202e-02  sd 1.0647  corr 0.99994069
+      emb3                     shape (14, 4)        max|Δ| 5.598e-02  sd 0.9264  corr 0.99974353
+      emb4                     shape (9, 4)         max|Δ| 8.466e-03  sd 0.7378  corr 0.99998691
+      emb5                     shape (5, 4)         max|Δ| 9.330e-03  sd 1.1714  corr 0.99999310
+      emb6                     shape (13, 4)        max|Δ| 1.065e-02  sd 0.9650  corr 0.99999169
+
+    model/mlp_emb4_31337.npz   163,144B → 150,787B  (-12,357B)
+      W0                       shape (103, 128)     max|Δ| 1.126e-01  sd 0.0892  corr 0.99713969
+      W1                       shape (128, 128)     max|Δ| 7.203e-02  sd 0.0936  corr 0.99737646
+      W2                       shape (128, 1)       max|Δ| 7.397e-03  sd 0.0154  corr 0.99177307
+      b0                       shape (128,)         max|Δ| 6.375e-02  sd 0.2074  corr 0.99639350
+      b1                       shape (128,)         max|Δ| 7.232e-02  sd 0.4182  corr 0.99861761
+      b2                       shape (1,)           max|Δ| 8.628e-03  sd 0.0000  corr nan
+      emb0                     shape (793, 8)       max|Δ| 7.163e-02  sd 0.9941  corr 0.99994550
+      emb1                     shape (831, 4)       max|Δ| 3.684e-02  sd 0.9947  corr 0.99997512
+      emb2                     shape (14, 4)        max|Δ| 5.655e-02  sd 0.9370  corr 0.99986639
+      emb3                     shape (14, 4)        max|Δ| 7.726e-02  sd 1.0561  corr 0.99983870
+      emb4                     shape (9, 4)         max|Δ| 7.026e-03  sd 0.7537  corr 0.99998999
+      emb5                     shape (5, 4)         max|Δ| 1.001e-02  sd 1.1139  corr 0.99999100
+      emb6                     shape (13, 4)        max|Δ| 1.060e-02  sd 1.0688  corr 0.99999263
+
+    model/mlp_emb4_42.npz   163,144B → 150,758B  (-12,386B)
+      W0                       shape (103, 128)     max|Δ| 5.055e-02  sd 0.0897  corr 0.99729088
+      W1                       shape (128, 128)     max|Δ| 7.051e-02  sd 0.0918  corr 0.99694607
+      W2                       shape (128, 1)       max|Δ| 7.694e-03  sd 0.0147  corr 0.99183347
+      b0                       shape (128,)         max|Δ| 3.595e-02  sd 0.1561  corr 0.99806792
+      b1                       shape (128,)         max|Δ| 1.179e-01  sd 0.4395  corr 0.99796975
+      b2                       shape (1,)           max|Δ| 1.375e-02  sd 0.0000  corr nan
+      emb0                     shape (793, 8)       max|Δ| 6.320e-02  sd 0.9882  corr 0.99995090
+      emb1                     shape (831, 4)       max|Δ| 5.481e-02  sd 0.9921  corr 0.99996831
+      emb2                     shape (14, 4)        max|Δ| 3.617e-02  sd 0.9245  corr 0.99987471
+      emb3                     shape (14, 4)        max|Δ| 4.305e-02  sd 0.9122  corr 0.99983161
+      emb4                     shape (9, 4)         max|Δ| 8.912e-03  sd 1.0680  corr 0.99999452
+      emb5                     shape (5, 4)         max|Δ| 9.139e-03  sd 0.9884  corr 0.99999266
+      emb6                     shape (13, 4)        max|Δ| 1.077e-02  sd 0.8752  corr 0.99998345
+
+    model/mlp_emb4_7.npz   163,144B → 150,795B  (-12,349B)
+      W0                       shape (103, 128)     max|Δ| 6.125e-02  sd 0.0900  corr 0.99741092
+      W1                       shape (128, 128)     max|Δ| 4.947e-02  sd 0.0932  corr 0.99780831
+      W2                       shape (128, 1)       max|Δ| 6.714e-03  sd 0.0147  corr 0.99204918
+      b0                       shape (128,)         max|Δ| 4.270e-02  sd 0.2125  corr 0.99838912
+      b1                       shape (128,)         max|Δ| 2.959e-01  sd 0.4386  corr 0.99683014
+      b2                       shape (1,)           max|Δ| 8.628e-03  sd 0.0000  corr nan
+      emb0                     shape (793, 8)       max|Δ| 7.139e-02  sd 0.9938  corr 0.99994567
+      emb1                     shape (831, 4)       max|Δ| 7.715e-02  sd 0.9760  corr 0.99994925
+      emb2                     shape (14, 4)        max|Δ| 6.257e-02  sd 0.9624  corr 0.99980929
+      emb3                     shape (14, 4)        max|Δ| 8.330e-02  sd 0.8588  corr 0.99977993
+      emb4                     shape (9, 4)         max|Δ| 1.492e-02  sd 0.9808  corr 0.99998788
+      emb5                     shape (5, 4)         max|Δ| 9.212e-03  sd 1.2161  corr 0.99999442
+      emb6                     shape (13, 4)        max|Δ| 1.528e-02  sd 0.9753  corr 0.99998970
+
+    predict.py   12,178B → 12,178B  (+0B)
+      --- 기준
+      +++ 비교
+      @@ -230 +230 @@
+      -        PROB_SHIFT = 0.000172669
+      +        PROB_SHIFT = 0.005580239
+
+  ★ 실질 변경 6/6: ['model/mlp_emb4_1234.npz', 'model/mlp_emb4_2024.npz', 'model/mlp_emb4_31337.npz', 'model/mlp_emb4_42.npz', 'model/mlp_emb4_7.npz', 'predict.py']

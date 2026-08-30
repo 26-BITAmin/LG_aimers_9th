@@ -1,0 +1,61 @@
+§7.195c 오염 수리 분산 채널 검정   지문 5488ef1b18
+  fold2023 LGBM 12멤버 재구성 OK  max|Δ|=0.0e+00
+  fold2023 블렌드 재구성 OK  max|Δ|=1.1e-16   base(BSS)=807.2
+  fold2024 LGBM 12멤버 재구성 OK  max|Δ|=0.0e+00
+  fold2024 블렌드 재구성 OK  max|Δ|=1.1e-16   base(BSS)=924.5
+  fold2023 FIX 학습셋 870752행 (원 976060, 오염 F 105308 삭제)  F 잔존 0행
+    lgb-FIX fold2023 [base/42] (44s)
+    lgb-FIX fold2023 [base/7] (69s)
+    lgb-FIX fold2023 [base/2024] (98s)
+    lgb-FIX fold2023 [wide/42] (133s)
+    lgb-FIX fold2023 [wide/7] (169s)
+    lgb-FIX fold2023 [wide/2024] (215s)
+    lgb-FIX fold2023 [extra/42] (243s)
+    lgb-FIX fold2023 [extra/7] (267s)
+    lgb-FIX fold2023 [extra/2024] (291s)
+    lgb-FIX fold2023 [lowff/42] (309s)
+    lgb-FIX fold2023 [lowff/7] (329s)
+    lgb-FIX fold2023 [lowff/2024] (347s)
+  fold2024 FIX 학습셋 1116277행 (원 1221585, 오염 F 105308 삭제)  F 잔존 25686행
+    lgb-FIX fold2024 [base/42] (393s)
+    lgb-FIX fold2024 [base/7] (422s)
+    lgb-FIX fold2024 [base/2024] (464s)
+    lgb-FIX fold2024 [wide/42] (505s)
+    lgb-FIX fold2024 [wide/7] (552s)
+    lgb-FIX fold2024 [wide/2024] (604s)
+    lgb-FIX fold2024 [extra/42] (634s)
+    lgb-FIX fold2024 [extra/7] (668s)
+    lgb-FIX fold2024 [extra/2024] (699s)
+    lgb-FIX fold2024 [lowff/42] (721s)
+    lgb-FIX fold2024 [lowff/7] (744s)
+    lgb-FIX fold2024 [lowff/2024] (767s)
+
+[①] lgb 12멤버 분산 (clean 평가행 로짓)   (768s)
+  fold2023  전체 std  CUR 0.0217 → FIX 0.0226 (+4.0%)   시드내 std  CUR 0.0121 → FIX 0.0129 (+6.5%)
+  fold2024  전체 std  CUR 0.0252 → FIX 0.0246 (-2.3%)   시드내 std  CUR 0.0131 → FIX 0.0130 (-0.7%)
+
+[②] 멤버 solo BSS 순위의 fold 간 안정성
+  CUR: fold2023 평균 764.7 (min 718.2 max 803.8)   fold2024 평균 889.6   순위 상관 ρ=+0.329
+  FIX: fold2023 평균 711.9 (min 659.7 max 758.0)   fold2024 평균 839.0   순위 상관 ρ=+0.566
+  fold2023 최고 멤버  CUR lgb_extra_42   FIX lgb_extra_7
+  fold2024 최고 멤버  CUR lgb_base_7   FIX lgb_lowff_7
+
+[③] lgb 가족 내 greedy — 각 팔 자신의 B1 기준   (774s)
+  [CUR] sel=2023→2024  자기 B1=807.68   k:       5      10      20      40
+    in-fold Δ    +4.64   +4.64   +4.64   +4.64
+    전이 Δ       -5.74   -5.74   -5.74   -5.74
+  [CUR] sel=2024→2023  자기 B1=925.75   k:       5      10      20      40
+    in-fold Δ    +3.09   +3.10   +3.10   +3.10
+    전이 Δ       -1.95   -1.53   -1.53   -1.66
+  [FIX] sel=2023→2024  자기 B1=802.97   k:       5      10      20      40
+    in-fold Δ    +6.01   +6.01   +6.01   +6.01
+    전이 Δ       -2.21   -2.21   -2.21   -2.21
+  [FIX] sel=2024→2023  자기 B1=916.83   k:       5      10      20      40
+    in-fold Δ    +2.42   +2.44   +2.44   +2.44
+    전이 Δ       -0.29   +0.35   +0.35   +0.35
+
+[참고] B1 절대 (lgb 균등 + MLP/cat B1 고정)
+  fold2023  CUR 807.68 → FIX 802.97  (Δ -4.71)
+  fold2024  CUR 925.75 → FIX 916.83  (Δ -8.91)
+
+총 881s

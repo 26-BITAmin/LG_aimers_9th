@@ -1,0 +1,111 @@
+§7.195d 생성적 수리 (GEN/HRD)   지문 5488ef1b18
+  fold2023 LGBM 12멤버 재구성 OK  max|Δ|=0.0e+00
+  fold2023 블렌드 재구성 OK  max|Δ|=1.1e-16   base(BSS)=807.2
+  fold2024 LGBM 12멤버 재구성 OK  max|Δ|=0.0e+00
+  fold2024 블렌드 재구성 OK  max|Δ|=1.1e-16   base(BSS)=924.5
+  fold2023 r 학습 풀(R) 623,665행 양성률 0.2703 · 오염 y=1 71,199행 · r q05/q95 0.194/0.444
+  fold2023 GEN dup 71,199행 · h_row std 0.0977 (상수라면 0 근처)
+  fold2023 HRD 2019: 1,652/17,773행 flip (h_s=0.093)
+  fold2023 HRD 2020: 1,499/13,644행 flip (h_s=0.110)
+  fold2023 HRD 2021: 4,417/18,202행 flip (h_s=0.243)
+  fold2023 HRD 2022: 6,411/21,580행 flip (h_s=0.297)
+    lgb-GEN fold2023 [base/42] (59s)
+    lgb-GEN fold2023 [base/7] (86s)
+    lgb-GEN fold2023 [base/2024] (112s)
+    lgb-GEN fold2023 [wide/42] (148s)
+    lgb-GEN fold2023 [wide/7] (184s)
+    lgb-GEN fold2023 [wide/2024] (219s)
+    lgb-GEN fold2023 [extra/42] (247s)
+    lgb-GEN fold2023 [extra/7] (275s)
+    lgb-GEN fold2023 [extra/2024] (303s)
+    lgb-GEN fold2023 [lowff/42] (325s)
+    lgb-GEN fold2023 [lowff/7] (346s)
+    lgb-GEN fold2023 [lowff/2024] (366s)
+    lgb-HRD fold2023 [base/42] (396s)
+    lgb-HRD fold2023 [base/7] (419s)
+    lgb-HRD fold2023 [base/2024] (444s)
+    lgb-HRD fold2023 [wide/42] (478s)
+    lgb-HRD fold2023 [wide/7] (512s)
+    lgb-HRD fold2023 [wide/2024] (556s)
+    lgb-HRD fold2023 [extra/42] (581s)
+    lgb-HRD fold2023 [extra/7] (606s)
+    lgb-HRD fold2023 [extra/2024] (631s)
+    lgb-HRD fold2023 [lowff/42] (651s)
+    lgb-HRD fold2023 [lowff/7] (671s)
+    lgb-HRD fold2023 [lowff/2024] (690s)
+  fold2024 r 학습 풀(R) 781,705행 양성률 0.2764 · 오염 y=1 71,199행 · r q05/q95 0.192/0.429
+  fold2024 GEN dup 71,199행 · h_row std 0.0975 (상수라면 0 근처)
+  fold2024 HRD 2019: 1,652/17,773행 flip (h_s=0.093)
+  fold2024 HRD 2020: 1,498/13,644행 flip (h_s=0.110)
+  fold2024 HRD 2021: 4,416/18,202행 flip (h_s=0.243)
+  fold2024 HRD 2022: 6,409/21,580행 flip (h_s=0.297)
+    lgb-GEN fold2024 [base/42] (750s)
+    lgb-GEN fold2024 [base/7] (782s)
+    lgb-GEN fold2024 [base/2024] (814s)
+    lgb-GEN fold2024 [wide/42] (860s)
+    lgb-GEN fold2024 [wide/7] (905s)
+    lgb-GEN fold2024 [wide/2024] (951s)
+    lgb-GEN fold2024 [extra/42] (985s)
+    lgb-GEN fold2024 [extra/7] (1019s)
+    lgb-GEN fold2024 [extra/2024] (1053s)
+    lgb-GEN fold2024 [lowff/42] (1079s)
+    lgb-GEN fold2024 [lowff/7] (1121s)
+    lgb-GEN fold2024 [lowff/2024] (1153s)
+    lgb-HRD fold2024 [base/42] (1186s)
+    lgb-HRD fold2024 [base/7] (1231s)
+    lgb-HRD fold2024 [base/2024] (1269s)
+    lgb-HRD fold2024 [wide/42] (1311s)
+    lgb-HRD fold2024 [wide/7] (1372s)
+    lgb-HRD fold2024 [wide/2024] (1416s)
+    lgb-HRD fold2024 [extra/42] (1450s)
+    lgb-HRD fold2024 [extra/7] (1485s)
+    lgb-HRD fold2024 [extra/2024] (1522s)
+    lgb-HRD fold2024 [lowff/42] (1547s)
+    lgb-HRD fold2024 [lowff/7] (1572s)
+    lgb-HRD fold2024 [lowff/2024] (1596s)
+
+[조작 크기] 12멤버 평균 |Δz| vs CUR (clean 평가행)
+  fold2023  FIX 0.0394   GEN 0.0209   HRD 0.0714
+  fold2024  FIX 0.0328   GEN 0.0151   HRD 0.0295
+
+[①] lgb 12멤버 분산 (clean 평가행 로짓)
+  fold2023  CUR 0.0217   FIX 0.0226   GEN 0.0220   HRD 0.0296
+  fold2024  CUR 0.0252   FIX 0.0246   GEN 0.0251   HRD 0.0260
+
+[②] solo BSS 순위의 fold 간 안정성
+  CUR: f2023 평균 764.7   f2024 평균 889.6   ρ=+0.329
+  FIX: f2023 평균 711.9   f2024 평균 839.0   ρ=+0.566
+  GEN: f2023 평균 770.5   f2024 평균 888.9   ρ=+0.329
+  HRD: f2023 평균 488.2   f2024 평균 877.0   ρ=+0.608
+
+[③] lgb 가족 내 greedy — 각 팔 자신의 B1 기준   (1608s)
+  [CUR] sel=2023→2024  자기 B1=807.68   k:       5      10      20      40
+    in-fold Δ    +4.64   +4.64   +4.64   +4.64
+    전이 Δ       -5.74   -5.74   -5.74   -5.74
+  [CUR] sel=2024→2023  자기 B1=925.75   k:       5      10      20      40
+    in-fold Δ    +3.09   +3.10   +3.10   +3.10
+    전이 Δ       -1.95   -1.53   -1.53   -1.66
+  [FIX] sel=2023→2024  자기 B1=802.97   k:       5      10      20      40
+    in-fold Δ    +6.01   +6.01   +6.01   +6.01
+    전이 Δ       -2.21   -2.21   -2.21   -2.21
+  [FIX] sel=2024→2023  자기 B1=916.83   k:       5      10      20      40
+    in-fold Δ    +2.42   +2.44   +2.44   +2.44
+    전이 Δ       -0.29   +0.35   +0.35   +0.35
+  [GEN] sel=2023→2024  자기 B1=809.33   k:       5      10      20      40
+    in-fold Δ    +5.45   +5.45   +5.45   +5.45
+    전이 Δ       -5.24   -5.24   -5.24   -5.24
+  [GEN] sel=2024→2023  자기 B1=925.46   k:       5      10      20      40
+    in-fold Δ    +2.83   +2.84   +2.84   +2.84
+    전이 Δ       -2.19   -2.55   -2.51   -2.51
+  [HRD] sel=2023→2024  자기 B1=808.95   k:       5      10      20      40
+    in-fold Δ    +8.90   +8.90   +8.90   +8.90
+    전이 Δ       -4.54   -4.54   -4.54   -4.54
+  [HRD] sel=2024→2023  자기 B1=925.44   k:       5      10      20      40
+    in-fold Δ    +3.00   +3.02   +3.02   +3.02
+    전이 Δ       -1.02   -1.47   -1.47   -1.47
+
+[B1 절대] (lgb 균등 + MLP/cat B1 고정)
+  fold2023  CUR 807.68   FIX 802.97   GEN 809.33   HRD 808.95
+  fold2024  CUR 925.75   FIX 916.83   GEN 925.46   HRD 925.44
+
+총 1791s

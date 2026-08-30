@@ -1,0 +1,10 @@
+FT-Transformer 헤드 분할  —  헤드 16개 (전역 헤드 0 · 완전 분할)
+  팔 ['full', 'sem8', 'sem8ov', 'subj3', 'shuf@sem8', 'shuf@subj3']
+  folds [2024, 2023]  seeds [42, 7]  soft=True  cfg {'epochs': 6, 'cont': 'linear', 'lr': 0.0005, 'wd': 0.01}
+  base: src/foldcache.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+    emb4  5시드  단독 724.1 764.1 732.0 730.1 702.8   sd  22.0   시드평균    804.6
+    noid  3시드  단독 779.7 746.1 767.4   sd  17.0   시드평균    796.4
+  ▶ 앵커 = 배포 MLP 슬롯 (emb4 .875 + noid .125) fold2024 =    808.9
+    emb4  5시드  단독 580.0 561.3 626.7 558.5 560.3   sd  28.9   시드평균    626.0
+    noid  3시드  단독 606.3 601.0 598.1   sd   4.2   시드평균    622.7
+  ▶ 앵커 = 배포 MLP 슬롯 (emb4 .875 + noid .125) fold2023 =    629.0

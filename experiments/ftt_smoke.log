@@ -1,0 +1,35 @@
+FT-Transformer 헤드 분할  —  헤드 18개 (그룹 8개 + 전역 2)
+  팔: ['full', 'group', 'shuf']   folds [2024]   seeds [42]   epochs 2   cont=linear
+  base: src/mlp.py fold 하네스 (챔피언 층 아님 — §7.207 층 격차 감수)
+
+  train.csv 로드 + 피처 빌드 … (0s)
+
+=== valid=2024 ===  train 60,000행 · valid 60,000행 · 수치 71 + 범주 7   (13s)
+  그룹 8개 · 커버 78/78   (전부 포함)
+    ep 1  loss=0.70146  (5s)  validBSS=   207.6
+    ep 2  loss=0.69211  (8s)  validBSS=   351.6
+    [full/seed42] 단독 BSS =    351.6   (37s)
+  full   시드평균 BSS =    351.6   (헤드당 key 79.0개 · 파라미터 133,825)
+    ep 1  loss=0.70283  (4s)  validBSS=   280.2
+    ep 2  loss=0.69181  (8s)  validBSS=   419.4
+    [group/seed42] 단독 BSS =    419.4   (44s)
+  group  시드평균 BSS =    419.4   (헤드당 key 18.8개 · 파라미터 133,825)
+    ep 1  loss=0.70073  (4s)  validBSS=   381.3
+    ep 2  loss=0.69139  (8s)  validBSS=   462.9
+    [shuf/seed42] 단독 BSS =    462.9   (52s)
+  shuf   시드평균 BSS =    462.9   (헤드당 key 18.8개 · 파라미터 133,825)
+
+팔              2024         평균
+-------------------------------
+full          351.6      351.6
+group         419.4      419.4
+shuf          462.9      462.9
+
+=== 사전 등록 판정 ===
+  ① group > full  (분할이 일한다)   ② group > shuf  (구성이 일한다)
+  둘 다 fold 전부에서 부호가 같아야 한다. 하나라도 어긋나면 보류다.
+  group − full : [67.8]  평균 +67.8   부호일치 O
+  group − shuf : [-43.5]  평균 -43.5   부호일치 O
+  fold2024 팔 간 로짓 상관: full~group 0.859  full~shuf 0.910  group~shuf 0.871
+
+total 52s

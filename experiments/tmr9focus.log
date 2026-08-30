@@ -1,0 +1,82 @@
+Trackman 재구축 9단계 — 재구축 집중 컬럼 × 챔피언 등가 32멤버 층
+지문 5488ef1b18   featset=focus   MLP 는 base 고정 (재학습 안 함)
+
+
+====================================================================================
+■ fold 2023   (7s)
+====================================================================================
+  [focus] 3,185행 × 3컬럼
+  fold2023/focus  X (245525, 82)  tm 컬럼 4  적중 86.5%
+    lgb f2023/focus [base/42]  (39s)
+    lgb f2023/focus [base/7]  (94s)
+    lgb f2023/focus [base/2024]  (157s)
+    lgb f2023/focus [wide/42]  (272s)
+    lgb f2023/focus [wide/7]  (385s)
+    lgb f2023/focus [wide/2024]  (523s)
+    lgb f2023/focus [extra/42]  (607s)
+    lgb f2023/focus [extra/7]  (687s)
+    lgb f2023/focus [extra/2024]  (753s)
+    lgb f2023/focus [lowff/42]  (826s)
+    lgb f2023/focus [lowff/7]  (878s)
+    lgb f2023/focus [lowff/2024]  (934s)
+  [focus] 3,185행 × 3컬럼
+  fold2023/focus  X (245525, 82)  tm 컬럼 4  적중 86.5%
+    cat f2023/focus [base/42]  (1087s)
+    cat f2023/focus [base/7]  (1203s)
+    cat f2023/focus [base/2024]  (1321s)
+    cat f2023/focus [wide/42]  (1489s)
+    cat f2023/focus [wide/7]  (1648s)
+    cat f2023/focus [wide/2024]  (1826s)
+    cat f2023/focus [sym/42]  (1906s)
+    cat f2023/focus [sym/7]  (1996s)
+    cat f2023/focus [sym/2024]  (2089s)
+    cat f2023/focus [depthwise/42]  (2285s)
+    cat f2023/focus [depthwise/7]  (2475s)
+    cat f2023/focus [depthwise/2024]  (2847s)
+
+====================================================================================
+■ fold 2024   (2849s)
+====================================================================================
+  [focus] 3,185행 × 3컬럼
+  fold2024/focus  X (253507, 82)  tm 컬럼 4  적중 80.3%
+    lgb f2024/focus [base/42]  (3039s)
+    lgb f2024/focus [base/7]  (3191s)
+    lgb f2024/focus [base/2024]  (3290s)
+    lgb f2024/focus [wide/42]  (3423s)
+    lgb f2024/focus [wide/7]  (3547s)
+    lgb f2024/focus [wide/2024]  (3669s)
+    lgb f2024/focus [extra/42]  (3734s)
+    lgb f2024/focus [extra/7]  (3786s)
+    lgb f2024/focus [extra/2024]  (3839s)
+    lgb f2024/focus [lowff/42]  (3881s)
+    lgb f2024/focus [lowff/7]  (3922s)
+    lgb f2024/focus [lowff/2024]  (3967s)
+  [focus] 3,185행 × 3컬럼
+  fold2024/focus  X (253507, 82)  tm 컬럼 4  적중 80.3%
+    cat f2024/focus [base/42]  (4116s)
+    cat f2024/focus [base/7]  (4262s)
+    cat f2024/focus [base/2024]  (4399s)
+    cat f2024/focus [wide/42]  (4570s)
+    cat f2024/focus [wide/7]  (4794s)
+    cat f2024/focus [wide/2024]  (5019s)
+    cat f2024/focus [sym/42]  (5126s)
+    cat f2024/focus [sym/7]  (5234s)
+    cat f2024/focus [sym/2024]  (5352s)
+    cat f2024/focus [depthwise/42]  (5685s)
+    cat f2024/focus [depthwise/7]  (5951s)
+    cat f2024/focus [depthwise/2024]  (6253s)
+
+====================================================================================
+앵커 확인 — base 조합이 §7.194 B1 을 재현하는가 (807.68 / 925.75)
+====================================================================================
+Traceback (most recent call last):
+  File "D:\projects\LG aimers �߱�\src\tmr9focus.py", line 156, in <module>
+    main()
+    ~~~~^^
+  File "D:\projects\LG aimers �߱�\src\tmr9focus.py", line 123, in main
+    _p, b = score(fold, base_pick)
+            ~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\projects\LG aimers �߱�\src\tmr9focus.py", line 117, in score
+    p = shift_to_prior(1 / (1 + np.exp(-(z[st["mask"]] + st["ax"]))), st["ybar"])
+                                           ~~^^^^^^^^
+KeyError: 'mask'

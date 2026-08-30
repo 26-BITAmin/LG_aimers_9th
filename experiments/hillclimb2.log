@@ -1,0 +1,37 @@
+§7.191b 라이브러리 확장 Caruana   지문 5488ef1b18   BAGS=12 STEPS=60 frac=0.6
+  fold2023 LGBM 12멤버 재구성 OK  max|Δ|=0.0e+00
+  fold2023 블렌드 재구성 OK  max|Δ|=1.1e-16   base(BSS)=807.2
+  fold2024 LGBM 12멤버 재구성 OK  max|Δ|=0.0e+00
+  fold2024 블렌드 재구성 OK  max|Δ|=1.1e-16   base(BSS)=924.5
+
+추가 멤버 163개 발견:
+  catfeat 3  catgpu12 12  gnn 1  mono 24  tabm 92  tabm_ctrl 25  tabm_plb 6
+  라이브러리 총 195멤버   (17s)
+  fold2023  B0 808.71   B1 807.68
+  fold2024  B0 927.34   B1 925.75
+
+[참고] 추가 가족 단독 BSS (가족 내 평균 로짓)
+  fold2023: catfeat   739.7 (corr 0.957)   catgpu12   758.5 (corr 0.956)   gnn   755.8 (corr 0.964)   mono   176.4 (corr 0.620)   tabm   808.4 (corr 0.987)   tabm_ctrl   789.9 (corr 0.988)   tabm_plb   759.3 (corr 0.979)
+  fold2024: catfeat   917.6 (corr 0.954)   catgpu12   889.8 (corr 0.956)   gnn   885.6 (corr 0.962)   mono   838.7 (corr 0.940)   tabm   884.5 (corr 0.981)   tabm_ctrl   875.2 (corr 0.986)   tabm_plb   840.6 (corr 0.971)
+
+[EXT195] sel=2023 → eval=2024   스텝 중앙값 2   (2211s)
+  가족 가중: cat 0.052  catgpu12 0.041  emb4 0.033  lgb 0.028  tabm 0.791  tabm_ctrl 0.055
+  위약(p5*) 가중 0.0000  (균등 기대 0.0308 — 2배 초과 시 선택 노이즈 경고)
+  in-fold Δ vs B1    +31.02
+  transfer Δ vs B1   -30.61  95% [-46.92, -14.17]  P(Δ>0)=0.000
+  상위 가중:  tabm_k5aux_42 0.542  tabm_gu32e9_42 0.056  cat_sym_42 0.042  tabm_k5_42 0.041  mlp_emb4_7 0.033  lgb_extra_2024 0.028  tabm_noidauxmem_42 0.028  tabm_g32e9_42 0.027  tabm_ctrlaux_7 0.023  tabm_g32e9_1234 0.018  catgpuens_depthwise_42 0.018  catgpuens_sym_2024 0.017
+
+[EXT195] sel=2024 → eval=2023   스텝 중앙값 4   (4523s)
+  가족 가중: cat 0.077  catfeat 0.280  catgpu12 0.062  emb4 0.021  lgb 0.066  noid 0.016  tabm 0.420  tabm_ctrl 0.046  tabm_plb 0.012
+  위약(p5*) 가중 0.0119  (균등 기대 0.0308 — 2배 초과 시 선택 노이즈 경고)
+  in-fold Δ vs B1    +21.71
+  transfer Δ vs B1   -10.20  95% [-24.72, +3.99]  P(Δ>0)=0.077
+  상위 가중:  catfeat_lowcard 0.259  tabm_noidauxmem_42 0.143  tabm_noidauxmem_2024 0.092  tabm_noidaux 0.076  cat_depthwise_7 0.042  lgb_base_7 0.037  cat_depthwise_2024 0.036  catgpuens_wide_7 0.035  lgb_wide_42 0.028  tabm_ctrl_10004 0.023  catgpuens_base_7 0.021  mlp_emb4_42 0.021
+
+============================================================================================
+판정 — 사전 등록: Δ(sel2023→f2024, vs B1) > 0 & P≥0.9 & 위약 가중 정상
+============================================================================================
+  in-fold(2023) +31.02   → f2024 -30.61 [-46.92, -14.17] P=0.000   역방향 → f2023 -10.20
+  위약 가중 0.0000 (정상)   게이트: 기각   (역방향 음수 경고)
+
+  저장: hillclimb2_weights.npz   총 4524s
