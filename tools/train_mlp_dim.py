@@ -59,6 +59,16 @@ def main():
     ap.add_argument("--unk-dropout", type=float, default=0.0,
                     help="학습 시 이 비율의 행을 pitcher_id 미지값(index 0)으로 보낸다. "
                          "0 이면 배포 원본과 같다 — index 0 이 그래디언트를 못 받는다.")
+    ap.add_argument("--aux-pitchmix", action="store_true",
+                    help="구종군 3열을 보조 타깃에 추가한다 (§7.116 E4). 헤드 수는 타깃 모양이 정한다")
+    ap.add_argument("--aux-tmdev", default=None,
+                    help="트랙맨 릴리스 이탈 타깃 pkl (tm_align_targets.py 산출). "
+                         "논문 Manzi 2021 이 지목한 제구 일관성 변수. 미정렬 행은 0.5(무정보)")
+    ap.add_argument("--aux-lambda", type=float, default=None,
+                    help="보조 손실 가중. 생략하면 meta 값(1.0). 보조 손실은 헤드별 **평균**"
+                         "이므로 헤드를 늘리면 기존 헤드가 희석된다 — 보존하려면 헤드비만큼 올린다")
+    ap.add_argument("--holdout-season", type=int, default=None,
+                    help="이 시즌 미만으로 학습하고 이 시즌에서 MLP 앙상블 BSS 를 잰다")
     ap.add_argument("--only-seeds", default=None,
                     help="쉼표 구분. 이 시드만 학습한다 (중단분 이어서 채울 때)")
     ap.add_argument("--threads", type=int, default=4)
@@ -117,7 +127,21 @@ def main():
 
     print("보조 라벨 복원 …")
     aux, cov = modelabel.aux_labels(df)
-    print(f"  복원률 {cov:.1%}  축 {aux.shape[1]}개")
+    print(f"  복원률 {cov:.1%}  축 {aux.shape[1]}개 (middle · reverse)")
+    if a.aux_tmdev:
+        tmt = pd.read_pickle(a.aux_tmdev).set_index("row_id")["dev_hi"]
+        v = df["row_id"].map(tmt).to_numpy(dtype=np.float64)
+        cov = np.isfinite(v).mean()
+        # 정렬 안 된 행은 0.5 — BCE 에서 기울기가 헤드 편향으로만 가고 방향 정보를 안 준다
+        v = np.where(np.isfinite(v), v, 0.5).astype(np.float32)
+        aux = np.concatenate([aux, v[:, None]], axis=1)
+        print(f"  + 트랙맨 릴리스 이탈 1축  정렬 커버리지 {cov:.1%}  →  보조 축 {aux.shape[1]}개")
+    if a.aux_pitchmix:
+        sys.path.insert(0, "/Users/hyejin/Aimers_9th/tools")
+        import pitchmix_labels
+        pm, pcov, _ = pitchmix_labels.aux_labels(df)
+        aux = np.concatenate([aux, pm], axis=1).astype(np.float32)
+        print(f"  + 구종군 3축 복원률 {pcov:.1%}  →  보조 축 {aux.shape[1]}개")
 
     ss = df["season"].to_numpy(dtype=np.int64)
     gt = df["game_type"].astype("object").to_numpy().astype(str)
@@ -158,6 +182,14 @@ def main():
     #    학습하고 index 0 은 p 의 행으로 주변화된 표현을 얻는다.
     PCOL = EMB_COLS.index("pitcher_id")
 
+    hv = None
+    if a.holdout_season:
+        # soften 이 행을 복제하므로 시즌 벡터도 그때 함께 늘어난 ss 를 쓴다
+        tr_m = ss < a.holdout_season
+        va_m = ss == a.holdout_season
+        print(f"  홀드아웃: 학습 {tr_m.sum():,}행 (<{a.holdout_season}) · 평가 {va_m.sum():,}행")
+        hv = (np.flatnonzero(tr_m), np.flatnonzero(va_m))
+
     cfg = dict(epochs=9, hid=128, lr=2e-3, dropout=0.3, wd=1e-2, use_id_emb=True,
                emb_dim={"pitcher_id": a.dim, "batter_id": 4, "pitcher_team_id": 4,
                         "batter_team_id": 4, "base_state": 4, "hand_matchup": 4,
@@ -170,9 +202,11 @@ def main():
             raise SystemExit(f"[중단] 배포 시드 목록에 없다: {bad} (가능: {seeds})")
         seeds = want
     print(f"\npitcher_id 임베딩 차원 = {a.dim} · 시드 {seeds}"
+          + (f" · aux_lambda {a.aux_lambda}" if a.aux_lambda is not None else "")
           + (f" · UNK 드롭아웃 {a.unk_dropout:.0%}" if a.unk_dropout > 0 else ""))
 
     val = slice(0, 20000)     # 곡선 반환용 더미. 에폭은 9 고정이라 선택에 쓰지 않는다
+    zsum, yv = None, None
     for sd in seeds:
         ts = time.time()
         Cs = C
@@ -184,14 +218,40 @@ def main():
             Cs[drop, PCOL] = 0
             print(f"    UNK 마스크 적용 {drop.mean():.1%} · Cs[:,PCOL]==0 인 행 "
                   f"{(Cs[:, PCOL] == 0).mean():.1%}")
-        m, _curve = mlp.train_mlp(A, Cs, y, w, A[val], Cs[val], sizes, seed=sd,
-                                  verbose=False, y_aux=aux, offset=offset,
-                                  **dict(cfg, aux=cfgv("mlp_aux_lambda", 1.0)))
+        if hv is None:
+            Ai, Ci, yi, wi, oi = A, Cs, y, w, offset
+        else:
+            ti = hv[0]
+            Ai, Ci, yi, wi = A[ti], Cs[ti], y[ti], w[ti]
+            oi = None if offset is None else offset[ti]
+        m, _curve = mlp.train_mlp(Ai, Ci, yi, wi, Ai[val], Ci[val], sizes, seed=sd,
+                                  verbose=False, y_aux=(aux if hv is None else aux[hv[0]]),
+                                  offset=oi,
+                                  **dict(cfg, aux=(a.aux_lambda if a.aux_lambda is not None else cfgv("mlp_aux_lambda", 1.0))))
         Wd = mlp.export_weights(m)
         p = os.path.join(a.out, f"mlp_emb4_{sd}.npz")
         np.savez(p, **Wd)
         shp = [Wd[f"emb{i}"].shape for i in range(len(Wd["ecols"]))]
         print(f"  seed {sd:<6} {time.time()-ts:6.0f}s  emb {shp[0]}  -> {os.path.basename(p)}")
+
+    if hv is not None:
+        vi = hv[1]
+        from mlp_infer import MLPPredictor  # noqa
+        zs = np.zeros(len(vi))
+        import glob as _g
+        for f in sorted(_g.glob(os.path.join(a.out, "mlp_emb4_*.npz"))):
+            z = np.load(f)
+            nt = MLPPredictor({k: z[k] for k in z.files}, enc)
+            Av, Cv = A[vi], C[vi]
+            h = np.concatenate([Av] + [nt.emb[m2][Cv[:, nt.eidx[m2]]] for m2 in range(len(nt.emb))], axis=1)
+            def _g2(x): return 0.5*x*(1.0+np.tanh(0.7978845608028654*(x+0.044715*x**3)))
+            h = _g2(h @ nt.W[0] + nt.b[0]); h = _g2(h @ nt.W[1] + nt.b[1])
+            zs += (h @ nt.W[2] + nt.b[2]).ravel()
+        zs /= len(seeds)
+        pv = 1.0/(1.0+np.exp(-zs)); yv2 = y[vi]
+        r = yv2.mean(); bss = 1e5*(1-((pv-yv2)**2).mean()/(r*(1-r)))
+        print(f"\n홀드아웃 {a.holdout_season}  MLP {len(seeds)}멤버 앙상블 BSS = {bss:.3f}"
+              f"   (보조 축 {aux.shape[1]}개)")
 
     print(f"\n완료 {time.time()-t0:.0f}s  ->  {a.out}")
 
