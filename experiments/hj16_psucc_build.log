@@ -1,0 +1,19 @@
+소스 hj15_pmid.zip   PROB_SHIFT 0.000338880   피처 78개
+  기존 col 축 [('asof_pitcher_middle_rate_sm', -0.007)] — 여기에 추가한다
+  추가할 축 [('asof_pitcher_success_rate', 0.0085)]
+전 시즌 train 으로 μ/σ (챔피언 features.py) …
+  rows/col [1474300]
+  asof_pitcher_success_rate              β +0.00850  mu +0.525377563  sd 0.058218564
+G0 우리 코드 대조 …
+  asof_pitcher_success_rate              mu +0.525377563/+0.525377563 (0.00%)  sd 0.058218564/0.058218564 (0.00%)  OK
+패치  col 통로가 이미 있다 — 코드 무변경 (축만 추가)
+추론 ① 축 추가 전 (패치만) …
+추론 ② 축 추가 후 (레벨 미보정) …
+  Δp 평균 -0.000897349 · 평균|Δp| 0.0016015 · max|Δp| 0.0201318
+  PROB_SHIFT 0.000338880 -> 0.001236229
+추론 ③ 재보정 검증 …
+  재보정 후 Δmean +2.75e-10  OK
+
+변경 격리  2/82: ['model/artifacts.joblib', 'predict.py']
+출력   hj16_psucc.zip
+  SHA-256 5e5d3a589b353572abb30c2201c9c00a64d1a29c176e4f1393dd9239e2095cab

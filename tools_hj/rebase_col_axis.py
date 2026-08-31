@@ -184,9 +184,13 @@ def main():
     art = bundle["artifacts"]
     fcols = list(bundle["feature_cols"])
     print(f"소스 {os.path.basename(a.src)}   PROB_SHIFT {shift0:.9f}   피처 {len(fcols)}개")
-    assert not art.get("col"), "이미 col 축이 있다"
+    have = [x["name"] for x in (art.get("col") or [])]
+    if have:
+        print("  기존 col 축", [(x["name"], x["beta"]) for x in art["col"]],
+              "— 여기에 추가한다")
     for c in cols:
         assert c in fcols, f"{c} 는 배포 피처 78개에 없다"
+        assert c not in have, f"{c} 축이 이미 있다"
     print(f"  추가할 축 {specs}")
 
     # ── μ/σ (챔피언 파이프라인) ────────────────────────────────────────
@@ -207,9 +211,13 @@ def main():
                   f"{'OK' if max(rm, rs) < 0.01 else '⚠️ 1% 초과'}")
 
     # ── 코드 패치 ──────────────────────────────────────────────────────
-    patch(fp, [(SIG_OLD, SIG_NEW), (TAIL_OLD, COL_BLOCK)])
-    patch(pp, [(CALL_OLD, CALL_NEW)])
-    print("패치  features.logit_adjust(+X, col 루프) · predict.logit_adjust(X=X)")
+    already = SIG_NEW in read_text(fp) and CALL_NEW in read_text(pp)
+    if already:
+        print("패치  col 통로가 이미 있다 — 코드 무변경 (축만 추가)")
+    else:
+        patch(fp, [(SIG_OLD, SIG_NEW), (TAIL_OLD, COL_BLOCK)])
+        patch(pp, [(CALL_OLD, CALL_NEW)])
+        print("패치  features.logit_adjust(+X, col 루프) · predict.logit_adjust(X=X)")
 
     # ── 3단 추론으로 PROB_SHIFT 재보정 ────────────────────────────────
     df = pd.read_csv(TRAIN_CSV, encoding="utf-8-sig")
@@ -220,8 +228,9 @@ def main():
     print("추론 ① 축 추가 전 (패치만) …")
     before = predict_in_subprocess(work, pq, os.path.join(tmp, "b.npy"))
 
-    art["col"] = [{"name": c, "beta": float(b), "mu": float(m), "sd": float(s_)}
-                  for (c, b), m, s_ in zip(specs, mu, sd)]
+    art["col"] = list(art.get("col") or []) + [
+        {"name": c, "beta": float(b), "mu": float(m), "sd": float(s_)}
+        for (c, b), m, s_ in zip(specs, mu, sd)]
     joblib.dump(bundle, ajp)
 
     print("추론 ② 축 추가 후 (레벨 미보정) …")
@@ -250,7 +259,8 @@ def main():
     diff = sorted(n for n in names if os.path.isfile(os.path.join(work, n))
                   and open(os.path.join(work, n), "rb").read()
                   != open(os.path.join(orig, n), "rb").read())
-    exp = sorted(["predict.py", "features.py", "model/artifacts.joblib"])
+    exp = sorted(["predict.py", "model/artifacts.joblib"]
+                 + ([] if already else ["features.py"]))
     print(f"\n변경 격리  {len(diff)}/{len(names)}: {diff}")
     assert diff == exp, f"기대 {exp}"
     assert len(os.path.basename(a.out)) <= 30
