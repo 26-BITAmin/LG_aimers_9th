@@ -1,0 +1,22 @@
+§7.240 빌드 — TM CatBoost 잔차 브랜치  γ 0.10
+fold 2023  G0 앵커 D +30.61 (오차 0.01%) OK
+  기준선 845.23 · TM covered 85.7% · 학습가능(R∧cov) 188,503행
+fold 2024  G0 앵커 D +4.75 (오차 0.10%) OK
+  기준선 942.22 · TM covered 79.7% · 학습가능(R∧cov) 179,087행
+풀링 학습 367,590행 × 74피처  resid sd 0.49765
+  seed 2026  캐시 재사용
+  seed 2027  캐시 재사용
+  seed 2028  캐시 재사용
+서빙 프로필: ctx 17,324셀 · pit 781투수
+패치  predict.py (init + affine 이후 브랜치)  PROB_SHIFT 0.001236229
+추론 ① 브랜치 상태 없음 (패치만) …
+추론 ② 브랜치 ON (레벨 미보정) …
+  적용행 0.881 · Δp 평균 -0.000130809 · max|Δp| 0.016216 · 비적용행 max|Δp| 0
+  적용행 corr(Δp, γ·corr_off) +1.000000 · max|차이| 5.55e-17
+  PROB_SHIFT 0.001236229 -> 0.001367038
+추론 ③ 재보정 검증 …
+  재보정 후 Δmean +2.54e-10  OK
+
+변경 ['predict.py'] · 추가 ['model/tmcb_seed2026.cbm', 'model/tmcb_seed2027.cbm', 'model/tmcb_seed2028.cbm', 'model/tmcb_state.joblib']
+출력   hj19_tmcb.zip
+  SHA-256 feaaee00c02dd845aca181e96014ec373caaaca9e2d3eaa6f0d23333f7e85605
