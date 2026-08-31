@@ -1,0 +1,20 @@
+소스 hj09_grbc.zip   PROB_SHIFT -0.000626728   피처 78개
+  추가할 축 [('asof_pitcher_middle_rate_sm', -0.007), ('matchup_success_edge', 0.0085)]
+전 시즌 train 으로 μ/σ (챔피언 features.py) …
+  rows/col [1475092, 1475092]
+  asof_pitcher_middle_rate_sm            β -0.00700  mu +0.144682592  sd 0.019380066
+  matchup_success_edge                   β +0.00850  mu -0.002392072  sd 0.044210526
+G0 우리 코드 대조 …
+  asof_pitcher_middle_rate_sm            mu +0.144682592/+0.144682592 (0.00%)  sd 0.019380066/0.019380066 (0.00%)  OK
+  matchup_success_edge                   mu -0.002392072/-0.002392072 (0.00%)  sd 0.044210526/0.044210526 (0.00%)  OK
+패치  features.logit_adjust(+X, col 루프) · predict.logit_adjust(X=X)
+추론 ① 축 추가 전 (패치만) …
+추론 ② 축 추가 후 (레벨 미보정) …
+  Δp 평균 -0.00105689 · 평균|Δp| 0.0027152 · max|Δp| 0.0129534
+  PROB_SHIFT -0.000626728 -> 0.000430165
+추론 ③ 재보정 검증 …
+  재보정 후 Δmean +2.24e-10  OK
+
+변경 격리  3/82: ['features.py', 'model/artifacts.joblib', 'predict.py']
+출력   hj14_colax.zip
+  SHA-256 249240d187a1a020f914b21dc4191bff1daf981cb660cb12821e5ab6382e08d8
