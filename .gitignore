@@ -35,4 +35,5 @@ logs/
 # Cache
 .cache/
 
-.claude/
+.claude/base/
+base/
