@@ -35,5 +35,5 @@ logs/
 # Cache
 .cache/
 
-.claude/base/
+.claude/
 base/
