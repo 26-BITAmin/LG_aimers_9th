@@ -4,9 +4,10 @@
 #   python -m venv .venv
 #   .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
 #
-# 재현 절차 전체는 REPRODUCE.md 를 볼 것.
+# 재현 절차는 각 브랜치 문서를 볼 것 — wonwoo:PIPELINE.md · hyejin:REPRODUCE_HJ.md
+# 추론 전용 환경은 requirements.txt (제출 zip 과 동일한 7개).
 
-# ── 추론에도 쓰인다 (submit/requirements.txt와 동일해야 한다) ──────────
+# ── 추론에도 쓰인다 (requirements.txt 와 동일해야 한다) ──────────
 lightgbm==4.6.0
 numpy==2.2.6
 pandas==2.3.3

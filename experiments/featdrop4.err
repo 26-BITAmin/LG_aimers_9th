@@ -1,4 +1,0 @@
-D:\projects\LG aimers 야구\src\featdrop4.py:168: RuntimeWarning: invalid value encountered in scalar divide
-  f"  Δ {dm:+7.2f} ± {se:.2f}  (t {dm/se:+.1f})")
-D:\projects\LG aimers 야구\src\featdrop4.py:168: RuntimeWarning: invalid value encountered in scalar divide
-  f"  Δ {dm:+7.2f} ± {se:.2f}  (t {dm/se:+.1f})")
